@@ -44,8 +44,16 @@ st.markdown("""
         color: white !important;
     }
     
-    section[data-testid="stSidebar"] .stNumberInput input {
-        color: #1e293b !important;
+    /* Sidebar Input Styling - White background with black text for readability */
+    section[data-testid="stSidebar"] .stNumberInput input,
+    section[data-testid="stSidebar"] .stTextInput input,
+    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] {
+        background-color: white !important;
+        color: black !important;
+    }
+
+    section[data-testid="stSidebar"] .stNumberInput button {
+        color: black !important;
     }
 
     /* Logo Seamless Circular integration */
@@ -104,10 +112,15 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
-    .stWarning {
+    .stWarning, .stAlert, [data-testid="stNotificationContent"] {
         background-color: #fffbeb !important;
         border-color: #facc15 !important;
-        color: #92400e !important;
+        color: #000000 !important;
+    }
+
+    /* Target all text inside alerts to be black */
+    .stAlert p, .stAlert div, .stAlert span, .stAlert h1, .stAlert h2, .stAlert h3 {
+        color: #000000 !important;
     }
 
     .info-tag {
