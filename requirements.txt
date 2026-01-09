@@ -1,2 +1,1 @@
-streamlit
-math
+streamlit==1.50.0
