@@ -158,6 +158,11 @@ st.markdown("""
         display: inline-block;
         margin-bottom: 20px;
     }
+
+    /* Hide Streamlit Header and Menu for a cleaner look */
+    header {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
