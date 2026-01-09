@@ -3,8 +3,8 @@ import math
 
 # Page configuration
 st.set_page_config(
-    page_title="Solar Feasibility & Requirement Tool",
-    page_icon="☀️",
+    page_title="Solar Feasibility and Requirement Tool",
+    page_icon="lightning_bolt",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -14,62 +14,83 @@ st.markdown("""
     <style>
     /* Main background */
     .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        color: #f8fafc;
+        background: #f8fafc;
+        color: #1e293b;
     }
     
     /* Sidebar styling */
     section[data-testid="stSidebar"] {
-        background-color: rgba(30, 41, 59, 0.7);
-        backdrop-filter: blur(10px);
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: #002B5B !important;
+        color: white !important;
+    }
+    
+    section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] .stText {
+        color: white !important;
+    }
+
+    section[data-testid="stSidebar"] label {
+        color: white !important;
+    }
+    
+    section[data-testid="stSidebar"] [data-testid="stHeader"] {
+        background-color: rgba(0,0,0,0) !important;
+    }
+
+    /* Sidebar Headers to White */
+    section[data-testid="stSidebar"] h1, 
+    section[data-testid="stSidebar"] h2, 
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] h4 {
+        color: white !important;
+    }
+    
+    section[data-testid="stSidebar"] .stNumberInput input {
+        color: #1e293b !important;
+    }
+
+    /* Logo Seamless Circular integration */
+    [data-testid="stSidebar"] [data-testid="stImage"] img {
+        border-radius: 50%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        background-color: transparent !important;
     }
     
     /* Metric cards */
     [data-testid="stMetricValue"] {
-        color: #fbbf24;
+        color: #002B5B;
         font-weight: 700;
     }
     
     [data-testid="stMetricLabel"] {
-        color: #94a3b8;
+        color: #64748b;
     }
     
-    .metric-card {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        text-align: center;
-        transition: transform 0.3s ease;
-    }
-    
-    .metric-card:hover {
-        transform: translateY(-5px);
-        background: rgba(255, 255, 255, 0.08);
-        border-color: #fbbf24;
-    }
-
-    /* Savings section highlighting */
+    /* Savings box styling */
     .savings-box {
-        background: rgba(34, 197, 94, 0.1);
-        border: 1px solid rgba(34, 197, 94, 0.2);
+        background: #fefce8;
+        border: 1px solid #fef08a;
         padding: 24px;
         border-radius: 16px;
         margin: 10px 0;
     }
 
-    /* Footer styling */
+    /* Footer styling - Black font */
     .footer {
         margin-top: 50px;
-        padding: 20px;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 40px;
+        border-top: 1px solid #e2e8f0;
         text-align: center;
-        color: #94a3b8;
+        color: #000000 !important;
+        background: #f1f5f9;
+        border-radius: 0 0 16px 16px;
+    }
+    
+    .footer h3, .footer p, .footer strong {
+        color: #000000 !important;
     }
     
     .footer a {
-        color: #fbbf24;
+        color: #002B5B;
         text-decoration: none;
         font-weight: bold;
     }
@@ -78,33 +99,33 @@ st.markdown("""
         text-decoration: underline;
     }
     
-    /* Headings */
-    h1, h2, h3 {
-        color: #f8fafc !important;
+    h1, h2, h3, h4 {
+        color: #0f172a !important;
         font-family: 'Inter', sans-serif;
     }
     
     .stWarning {
-        background-color: rgba(245, 158, 11, 0.2) !important;
-        border-color: #f59e0b !important;
-        color: #fbbf24 !important;
+        background-color: #fffbeb !important;
+        border-color: #facc15 !important;
+        color: #92400e !important;
     }
 
     .info-tag {
-        background: rgba(59, 130, 246, 0.2);
-        color: #60a5fa;
+        background: #002B5B;
+        color: white;
         padding: 4px 12px;
         border-radius: 20px;
         font-size: 0.8em;
         font-weight: bold;
         display: inline-block;
-        margin-bottom: 10px;
+        margin-bottom: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # Sidebar Inputs
-st.sidebar.header("📋 System Inputs")
+st.sidebar.image("logo.png", use_container_width=True)
+st.sidebar.header("System Inputs")
 
 project_scale = st.sidebar.selectbox(
     "Project Scale",
@@ -117,8 +138,7 @@ bill = st.sidebar.number_input(
     min_value=0.0, 
     max_value=100000000.0, 
     value=5000.0 if project_scale == "Residential" else (50000.0 if project_scale == "C&I" else 1000000.0), 
-    step=500.0,
-    help="Your average monthly electricity spending."
+    step=500.0
 )
 
 rate = st.sidebar.number_input(
@@ -133,8 +153,7 @@ solar_target_pct = st.sidebar.slider(
     "Expected Solar Consumption %", 
     min_value=0, 
     max_value=100, 
-    value=100,
-    help="Goal percentage of total power to be supplied by solar."
+    value=100
 )
 
 available_area = st.sidebar.number_input(
@@ -144,167 +163,157 @@ available_area = st.sidebar.number_input(
     step=5.0
 )
 
-module_wattage = st.sidebar.number_input(
-    "PV Module Wattage (Wp)", 
-    min_value=100, 
-    max_value=800, 
-    value=550, 
-    step=10
-)
+module_wattage = st.sidebar.number_input("PV Module Wattage (Wp)", min_value=100, max_value=800, value=550, step=10)
 
 # Fixed Panel Size
+# 3sqm is used to allot for spacing and other installation constraints.
 PANEL_SIZE_SQM = 3.0
-st.sidebar.info(f"Panel Size: {PANEL_SIZE_SQM} sqm (Includes spacing & installation constraints)")
+st.sidebar.info(f"Panel Size: {PANEL_SIZE_SQM} sqm (Includes spacing and installation constraints)")
 
-system_type = st.sidebar.selectbox(
-    "System Type", 
-    ["Grid-Tied", "Hybrid", "Off-Grid"]
-)
+system_type = st.sidebar.selectbox("System Type", ["Grid-Tied", "Hybrid", "Off-Grid"])
 
-# Battery Settings
+# Battery Configuration Settings
+st.sidebar.markdown("---")
+st.sidebar.subheader("Battery Configuration")
+
 if system_type in ["Hybrid", "Off-Grid"]:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🔋 Battery Configuration")
-    
     backup_hours = st.sidebar.slider("Backup Duration (Hours)", 1, 24, 4)
-    
-    # Scale-based battery options
-    if project_scale == "Residential":
-        battery_options = {"5kWh": 5, "10kWh": 10, "15kWh": 15}
-    elif project_scale == "C&I":
-        battery_options = {"15kWh": 15, "100kWh": 100, "215kWh": 215, "1MWh": 1000}
-    else: # Utility
-        battery_options = {"215kWh": 215, "1MWh": 1000}
-    
-    # User selects a battery size from the available list
-    battery_label = st.sidebar.selectbox("Battery Unit Size", list(battery_options.keys()), index=len(battery_options)-1)
-    battery_capacity_kwh = battery_options[battery_label]
+else:
+    backup_hours = 0 # Not applicable for standard on-grid logic unless we use the 'Reach Goal' logic
+
+# Scale-based defaults and load profile
+if project_scale == "Residential":
+    battery_options = {"5kWh": 5, "10kWh": 10, "15kWh": 15}
+    default_daytime_pct = 30
+elif project_scale == "C&I":
+    battery_options = {"15kWh": 15, "100kWh": 100, "215kWh": 215, "1MWh": 1000}
+    default_daytime_pct = 70
+else: # Utility
+    battery_options = {"215kWh": 215, "1MWh": 1000}
+    default_daytime_pct = 10
+
+daytime_load_pct = st.sidebar.slider(
+    "Daytime Load Split %",
+    0, 100, default_daytime_pct,
+    help="Percentage of your daily electricity consumption that occurs during sun hours (approx 8am-4pm)."
+)
+direct_cons_rate = daytime_load_pct / 100
+
+selected_battery_label = st.sidebar.selectbox("Battery Unit Size", list(battery_options.keys()), index=len(battery_options)-1)
+battery_unit_kwh = battery_options[selected_battery_label]
 
 # Core Logic Constants
 PSH = 4.0 # Peak Sun Hours
 EFFICIENCY = 0.80
 
 # Calculations
-# 1. Total Monthly kWh
 monthly_kwh = bill / rate
 daily_kwh = monthly_kwh / 30
-
-# 2. Daily Goal
 target_daily_solar_kwh = daily_kwh * (solar_target_pct / 100)
 
-# 3. Required Capacity (kWp)
 required_kwp = target_daily_solar_kwh / (PSH * EFFICIENCY)
 
-# 4. Number of Panels (Always even, rounded down)
-raw_panels_required = math.ceil((required_kwp * 1000) / module_wattage)
-num_panels_required = (raw_panels_required // 2) * 2
+# Even Panel counts (rounding down)
+raw_panels_req = math.ceil((required_kwp * 1000) / module_wattage)
+num_panels_required = (raw_panels_req // 2) * 2
 
-# 5. Total Area Needed
-total_area_needed = num_panels_required * PANEL_SIZE_SQM
-
-# 6. Total PV Possible based on Area (Always even, rounded down)
-raw_panels_possible = math.floor(available_area / PANEL_SIZE_SQM)
-total_panels_possible = (raw_panels_possible // 2) * 2
+raw_panels_poss = math.floor(available_area / PANEL_SIZE_SQM)
+total_panels_possible = (raw_panels_poss // 2) * 2
 possible_kwp = (total_panels_possible * module_wattage) / 1000
 
-# 7. Final Metrics to Display (Cap at possible capacity)
+# Final Metrics (Cap at possible)
 display_panels = min(num_panels_required, total_panels_possible)
 display_kwp = (display_panels * module_wattage) / 1000
 display_area = display_panels * PANEL_SIZE_SQM
 
-# 8. Actual Feasible Production
+# Resulting production
 effective_daily_solar_kwh = display_kwp * PSH * EFFICIENCY
 max_possible_offset = min(100.0, ((possible_kwp * PSH * EFFICIENCY) / daily_kwh * 100) if daily_kwh > 0 else 0)
 
-# Scale Validation and Categorization
+# Scale Suggestion
 actual_category = ""
-if display_kwp <= 20:
-    actual_category = "Residential"
-elif 20 < display_kwp <= 300:
-    actual_category = "C&I"
-else:
-    actual_category = "Utility Scale"
+if display_kwp <= 20: actual_category = "Residential"
+elif 20 < display_kwp <= 300: actual_category = "C&I"
+else: actual_category = "Utility Scale"
 
-# Main Screen Layout
-st.title("☀️ Solar Feasibility & Requirement Tool")
+# Main Screen
+st.title("Solar Feasibility and Requirement Tool")
 st.markdown(f'<div class="info-tag">{project_scale} Project</div>', unsafe_allow_html=True)
 st.markdown("---")
 
-# Scale Warning
 if project_scale != actual_category:
-    st.info(f"💡 Based on your bill, this system is sized as **{actual_category}** ({display_kwp:.1f} kWp), though you selected **{project_scale}**.")
+    st.info(f"Note: System sized as **{actual_category}** ({display_kwp:.1f} kWp). Consider aligning Project Scale for optimized battery options.")
 
-# Area Check Warning
-# Use a higher threshold for "insufficient" to avoid noise, or strictly follow Required > Available
 if num_panels_required > total_panels_possible:
-    st.warning(f"⚠️ **Space Insufficient for this target.**\n\nYour available area ({available_area} sqm) can only accommodate {total_panels_possible} panels. Maximum possible offset with current space is **{max_possible_offset:.1f}%**.")
+    st.warning(f"Warning: Space insufficient for {solar_target_pct}% target. Available area ({available_area}m²) limits system to {total_panels_possible} panels ({max_possible_offset:.1f}% offset).")
 
-# High-Level Metrics
+# Metrics
 col1, col2, col3 = st.columns(3)
+with col1: st.metric("System Capacity", f"{display_kwp:.2f} kWp")
+with col2: st.metric("Number of Panels", f"{display_panels}")
+with col3: st.metric("Total Area Used", f"{display_area:.1f} m²")
 
-with col1:
-    st.metric("System Capacity", f"{display_kwp:.2f} kWp")
-
-with col2:
-    st.metric("Number of Panels", f"{display_panels}")
-
-with col3:
-    st.metric("Total Area Used", f"{display_area:.1f} m²")
-
-st.markdown("### 💰 Savings & Offset")
-
-# Savings Calculation (Based on effective solar production)
-# In kWh
+st.markdown("### Savings and Offset")
 monthly_savings_kwh = effective_daily_solar_kwh * 30
-yearly_savings_kwh = monthly_savings_kwh * 12
-
-# In PHP
 monthly_savings_php = monthly_savings_kwh * rate
-yearly_savings_php = yearly_savings_kwh * rate
+yearly_savings_php = monthly_savings_php * 12
 
-col_a, col_b = st.columns(2)
+cola, colb = st.columns(2)
+with cola:
+    st.markdown(f'<div class="savings-box"><h4>Monthly Savings</h4><h2 style="color:#22c55e;">₱ {monthly_savings_php:,.2f}</h2><p style="color:#64748b;">({monthly_savings_kwh:,.1f} kWh/month history)</p></div>', unsafe_allow_html=True)
+with colb:
+    st.markdown(f'<div class="savings-box"><h4>Yearly Savings</h4><h2 style="color:#22c55e;">₱ {yearly_savings_php:,.2f}</h2><p style="color:#64748b;">({monthly_savings_kwh*12:,.1f} kWh/year history)</p></div>', unsafe_allow_html=True)
 
-with col_a:
-    st.markdown("""
-        <div class="savings-box">
-            <h4>Monthly Savings</h4>
-            <h2 style='color:#22c55e;'>₱ {:,.2f}</h2>
-            <p style='color:#94a3b8;'>({:,.1f} kWh / month)</p>
-        </div>
-    """.format(monthly_savings_php, monthly_savings_kwh), unsafe_allow_html=True)
+# Battery Assessment
+st.markdown("---")
+st.markdown("### Battery Storage Assessment")
 
-with col_b:
-    st.markdown("""
-        <div class="savings-box">
-            <h4>Yearly Savings</h4>
-            <h2 style='color:#22c55e;'>₱ {:,.2f}</h2>
-            <p style='color:#94a3b8;'>({:,.1f} kWh / year)</p>
-        </div>
-    """.format(yearly_savings_php, yearly_savings_kwh), unsafe_allow_html=True)
-
-# Battery Logic
-if system_type in ["Hybrid", "Off-Grid"]:
-    st.markdown("---")
-    st.markdown("### 🔋 Battery Storage Requirement")
+if system_type == "Grid-Tied":
+    # On-grid logic: suggested battery to reach the target energy consumption
+    # Households/C&I usually can't self-consume 100% of solar production instantly.
     
-    # Requirement = Avg Hourly Load * Backup Hours
-    avg_hourly_load = (bill / rate / 30 / 24)
+    # Calculate how much of the energy produced can be consumed instantly
+    # We compare the produced Solar Energy vs the Daytime Load
+    daytime_kwh_load = daily_kwh * direct_cons_rate
+    
+    # Direct consumption is the minimum of what we produce and what we need at that moment
+    direct_cons_kwh = min(effective_daily_solar_kwh, daytime_kwh_load)
+    storage_gap_kwh = effective_daily_solar_kwh - direct_cons_kwh
+    
+    # Assessment UI
+    st.write(f"**Self-Consumption Assessment:** Given your **{daytime_load_pct}%** daytime load split, we estimate you will directly consume **{direct_cons_kwh:.1f} kWh** of solar energy daily.")
+    
+    if storage_gap_kwh > 0:
+        st.write(f"To reach your **{solar_target_pct}%** target without exporting surplus to the grid, a battery solution is recommended for the **{storage_gap_kwh:.1f} kWh** sunset gap.")
+        
+        num_batt_suggested = math.ceil(storage_gap_kwh / battery_unit_kwh)
+        
+        bcol1, bcol2 = st.columns([1, 2])
+        with bcol1:
+            st.metric(f"Suggested {selected_battery_label} Units", f"{num_batt_suggested}")
+        with bcol2:
+            st.info(f"Adding **{num_batt_suggested}x {selected_battery_label}** units enables maximum self-consumption and peak shaving.")
+    else:
+        st.success("Your daytime load is high enough to consume all solar production directly! No battery storage is required for your current target.")
+
+else: # Hybrid or Off-Grid
+    # Requirement = Backup hours logic
+    avg_hourly_load = daily_kwh / 24
     storage_needed_kwh = avg_hourly_load * backup_hours
-    
-    num_batteries = math.ceil(storage_needed_kwh / battery_capacity_kwh)
+    num_batt = math.ceil(storage_needed_kwh / battery_unit_kwh)
     
     bcol1, bcol2 = st.columns([1, 2])
     with bcol1:
-        st.metric(f"{battery_label} Batteries", f"{num_batteries}")
+        st.metric(f"Required {selected_battery_label} Units", f"{num_batt}")
     with bcol2:
-        st.info(f"Targeting **{backup_hours} hours** of backup. Total storage needed: **{storage_needed_kwh:.1f} kWh**. Using **{num_batteries}x {battery_label}** units.")
+        st.info(f"Targeting **{backup_hours} hours** of backup. Total storage needed: **{storage_needed_kwh:.1f} kWh**.")
 
-# Footer Section
-st.markdown("""
+# Footer
+st.markdown(f"""
     <div class="footer">
-        <h3>📞 Contact Us</h3>
+        <h3>Contact Us</h3>
         <p>For professional installation and detailed assessments:</p>
-        <p><strong>Display Name:</strong> Earl Dy</p>
-        <p><strong>Phone:</strong> <a href="tel:09687269310" target="_blank">09687269310</a></p>
+        <p><strong>Earl Dy</strong></p>
+        <p>09687269310 | <a href="mailto:earldy.kpwunibest@gmail.com">earldy.kpwunibest@gmail.com</a></p>
     </div>
     """, unsafe_allow_html=True)
