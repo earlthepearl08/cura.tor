@@ -44,16 +44,38 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Sidebar Input Styling - White background with black text for readability */
-    section[data-testid="stSidebar"] .stNumberInput input,
-    section[data-testid="stSidebar"] .stTextInput input,
-    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] {
+    /* Sidebar Input Styling - Forced white backgrounds for all widgets */
+    section[data-testid="stSidebar"] .stNumberInput [data-testid="stWidgetLabel"] p,
+    section[data-testid="stSidebar"] .stSelectbox [data-testid="stWidgetLabel"] p,
+    section[data-testid="stSidebar"] .stSlider [data-testid="stWidgetLabel"] p {
+        color: white !important;
+    }
+
+    /* Target the actual input containers */
+    section[data-testid="stSidebar"] .stNumberInput > div > div,
+    section[data-testid="stSidebar"] .stSelectbox > div > div,
+    section[data-testid="stSidebar"] .stTextInput > div > div {
         background-color: white !important;
+        color: black !important;
+        border-radius: 8px !important;
+    }
+
+    /* Ensure text inside is black */
+    section[data-testid="stSidebar"] input, 
+    section[data-testid="stSidebar"] select,
+    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] * {
         color: black !important;
     }
 
+    /* Style the +/- buttons in number input */
     section[data-testid="stSidebar"] .stNumberInput button {
+        background-color: #f1f5f9 !important;
         color: black !important;
+        border: none !important;
+    }
+    
+    section[data-testid="stSidebar"] .stNumberInput button:hover {
+        background-color: #e2e8f0 !important;
     }
 
     /* Logo Seamless Circular integration */
