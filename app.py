@@ -44,38 +44,41 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Sidebar Input Styling - Forced white backgrounds for all widgets */
-    section[data-testid="stSidebar"] .stNumberInput [data-testid="stWidgetLabel"] p,
-    section[data-testid="stSidebar"] .stSelectbox [data-testid="stWidgetLabel"] p,
-    section[data-testid="stSidebar"] .stSlider [data-testid="stWidgetLabel"] p {
+    /* Sidebar Input Styling - Direct overrides for Streamlit Cloud */
+    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
         color: white !important;
     }
 
-    /* Target the actual input containers */
-    section[data-testid="stSidebar"] .stNumberInput > div > div,
-    section[data-testid="stSidebar"] .stSelectbox > div > div,
-    section[data-testid="stSidebar"] .stTextInput > div > div {
+    /* Force white background and black text for ALL sidebar inputs */
+    [data-testid="stSidebar"] [data-baseweb="input"],
+    [data-testid="stSidebar"] [data-baseweb="select"] > div,
+    [data-testid="stSidebar"] [data-baseweb="select"] {
         background-color: white !important;
         color: black !important;
         border-radius: 8px !important;
     }
 
-    /* Ensure text inside is black */
-    section[data-testid="stSidebar"] input, 
-    section[data-testid="stSidebar"] select,
-    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] * {
+    /* Ensure the actual input text is black */
+    [data-testid="stSidebar"] input {
+        color: black !important;
+        background-color: white !important;
+        -webkit-text-fill-color: black !important;
+    }
+
+    /* Fix the Selectbox dropdown and text */
+    [data-testid="stSidebar"] [data-baseweb="select"] * {
         color: black !important;
     }
 
     /* Style the +/- buttons in number input */
-    section[data-testid="stSidebar"] .stNumberInput button {
-        background-color: #f1f5f9 !important;
+    [data-testid="stSidebar"] [data-testid="stNumberInput"] button {
+        background-color: white !important;
         color: black !important;
-        border: none !important;
+        border: 1px solid #e2e8f0 !important;
     }
     
-    section[data-testid="stSidebar"] .stNumberInput button:hover {
-        background-color: #e2e8f0 !important;
+    [data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover {
+        background-color: #f8fafc !important;
     }
 
     /* Logo Seamless Circular integration */
