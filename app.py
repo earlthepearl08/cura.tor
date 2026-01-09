@@ -159,15 +159,21 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* Hide Streamlit Header and Menu for a cleaner look */
-    header {visibility: hidden;}
+    /* Hide specific UI elements while keeping sidebar toggle */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+    }
+    button[data-testid="baseButton-header"] {
+        display: none !important;
+    }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    [data-testid="stDeployButton"] {display: none;}
     </style>
     """, unsafe_allow_html=True)
 
 # Sidebar Inputs
-st.sidebar.image("logo.png", use_container_width=True)
+st.sidebar.image("logo.png", width="stretch")
 st.sidebar.header("System Inputs")
 
 project_scale = st.sidebar.selectbox(
