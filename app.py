@@ -81,6 +81,24 @@ st.markdown("""
         background-color: #f8fafc !important;
     }
 
+    /* Make the clear button (x) and its container transparent */
+    [data-testid="stSidebar"] [data-baseweb="input"] > div:last-child,
+    [data-testid="stSidebar"] [role="button"][aria-label="Clear value"],
+    [data-testid="stSidebar"] [role="button"][title="Clear value"] {
+        background-color: transparent !important;
+    }
+    
+    /* Style the clear icon (x) itself */
+    [data-testid="stSidebar"] svg[title="Clear value"],
+    [data-testid="stSidebar"] svg[aria-label="Clear value"] {
+        fill: #64748b !important;
+    }
+    
+    [data-testid="stSidebar"] svg[title="Clear value"]:hover,
+    [data-testid="stSidebar"] svg[aria-label="Clear value"]:hover {
+        fill: #1e293b !important;
+    }
+
     /* Logo Seamless Circular integration */
     [data-testid="stSidebar"] [data-testid="stImage"] img {
         border-radius: 50%;
