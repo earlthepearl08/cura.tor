@@ -32,6 +32,7 @@
 
         .result-gradient {
             background: linear-gradient(to bottom, #002B5B, #3B82F6);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -130,114 +131,117 @@
                         </select>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-8">
-                        <div>
-                            <label class="block text-xs font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">Input
-                                Unit</label>
-                            <div class="flex p-1 bg-slate-100 rounded-xl">
-                                <label
-                                    class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
-                                    <input type="radio" name="meas" value="Power" checked onchange="updateUI()"
-                                        class="hidden"> Power
-                                </label>
-                                <label
-                                    class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
-                                    <input type="radio" name="meas" value="Amps" onchange="updateUI()" class="hidden">
-                                    Amps
-                                </label>
-                            </div>
-                        </div>
-                        <div id="unit-scale-box">
-                            <label
-                                class="block text-xs font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">Scale</label>
-                            <div class="flex p-1 bg-slate-100 rounded-xl">
-                                <label
-                                    class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
-                                    <input type="radio" name="unit" value="kW" checked class="hidden"> kW
-                                </label>
-                                <label
-                                    class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
-                                    <input type="radio" name="unit" value="Watts" class="hidden"> Watts
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label
-                            class="block text-xs font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">Value</label>
-                        <input type="number" id="rating-val" value="0"
-                            class="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black text-3xl outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">Voltage
-                            Profile</label>
-                        <select id="voltage-cfg"
-                            class="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none cursor-pointer">
-                            <option value="1P-220V">Single Phase (1P) 220V</option>
-                            <option value="3P-220V">Three Phase (3P) 220V</option>
-                            <option value="3P-230V">Three Phase (3P) 230V</option>
-                            <option value="3P-380V">Three Phase (3P) 380V</option>
-                            <option value="3P-400V">Three Phase (3P) 400V</option>
-                            <option value="3P-440V">Three Phase (3P) 440V</option>
-                            <option value="3P-460V">Three Phase (3P) 460V</option>
-                        </select>
-                    </div>
-
-                    <button onclick="calculate()"
-                        class="btn-navy w-full py-6 text-white rounded-3xl font-black text-2xl uppercase tracking-widest">Calculate
-                        Capacity</button>
+                    <label
+                        class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
+                        <input type="radio" name="meas" value="Power" checked onchange="updateUI()" class="hidden">
+                        Power
+                    </label>
+                    <label
+                        class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
+                        <input type="radio" name="meas" value="kVA" onchange="updateUI()" class="hidden">
+                        kVA
+                    </label>
+                    <label
+                        class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
+                        <input type="radio" name="meas" value="HP" onchange="updateUI()" class="hidden">
+                        HP
+                    </label>
+                    <label
+                        class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
+                        <input type="radio" name="meas" value="Amps" onchange="updateUI()" class="hidden">
+                        Amps
+                    </label>
                 </div>
             </div>
-
-            <!-- Right Side: Results -->
-            <div id="result-view" class="hidden flex flex-col gap-8">
-                <!-- Specialized Error Box -->
-                <div id="err-box"
-                    class="hidden p-8 bg-red-50 border-4 border-red-100 text-red-700 rounded-[2rem] font-bold shadow-lg leading-relaxed text-center">
+            <div id="unit-scale-box">
+                <label class="block text-xs font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">Scale</label>
+                <div class="flex p-1 bg-slate-100 rounded-xl">
+                    <label
+                        class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
+                        <input type="radio" name="unit" value="kW" checked class="hidden"> kW
+                    </label>
+                    <label
+                        class="flex-1 text-center py-3 rounded-lg cursor-pointer font-bold text-sm has-[:checked]:bg-white has-[:checked]:shadow-sm">
+                        <input type="radio" name="unit" value="Watts" class="hidden"> Watts
+                    </label>
                 </div>
-
-                <!-- Result Visualization -->
-                <div id="res-card"
-                    class="bg-white rounded-[2.5rem] p-10 text-center shadow-2xl border border-slate-100 flex-1 flex flex-col justify-between">
-                    <div>
-                        <span class="text-xs font-black text-slate-400 uppercase tracking-widest">Recommended
-                            Capacity</span>
-                        <div class="result-gradient text-8xl font-black outfit leading-none my-8" id="res-kva">0 <span
-                                class="text-3xl font-bold">kVA</span></div>
-
-                        <div id="product-display"
-                            class="mt-8 p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem]">
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-left">
-                                Recommended Unit Profile</p>
-                            <div id="images-container" class="flex justify-center items-center gap-6 min-h-[150px]">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-10 space-y-4">
-                        <a id="lnk-quote" href="#" target="_blank"
-                            class="btn-quote block w-full p-6 text-white rounded-[1.5rem] font-black text-2xl uppercase tracking-tighter">Request
-                            a Quote From Kinmo</a>
-                        <div
-                            class="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-[11px] font-semibold text-slate-500 leading-relaxed italic text-left">
-                            Official Note: This sizing is an engineering estimate based on standard load curves. To
-                            finalize your specifications and ensure power quality accuracy, please schedule an
-                            ocular inspection.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Empty State -->
-            <div id="empty-state"
-                class="flex flex-col items-center justify-center p-10 bg-slate-100/50 rounded-[2.5rem] border-4 border-dashed border-slate-200 text-center">
-                <img src="logo.png" class="w-32 opacity-20 mb-8 grayscale">
-                <p class="text-slate-400 font-bold text-xl leading-snug max-w-xs mx-auto">Complete the parameters to
-                    generate your professional recommendation.</p>
             </div>
         </div>
+
+        <div>
+            <label class="block text-xs font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">Value</label>
+            <input type="number" id="rating-val" value="0"
+                class="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black text-3xl outline-none">
+        </div>
+
+        <div>
+            <label class="block text-xs font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">Voltage
+                Profile</label>
+            <select id="voltage-cfg"
+                class="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none cursor-pointer">
+                <option value="1P-220V">Single Phase (1P) 220V</option>
+                <option value="3P-220V">Three Phase (3P) 220V</option>
+                <option value="3P-230V">Three Phase (3P) 230V</option>
+                <option value="3P-380V">Three Phase (3P) 380V</option>
+                <option value="3P-400V">Three Phase (3P) 400V</option>
+                <option value="3P-440V">Three Phase (3P) 440V</option>
+                <option value="3P-460V">Three Phase (3P) 460V</option>
+            </select>
+        </div>
+
+        <button onclick="calculate()"
+            class="btn-navy w-full py-6 text-white rounded-3xl font-black text-2xl uppercase tracking-widest">Calculate
+            Capacity</button>
+    </div>
+    </div>
+
+    <!-- Right Side: Results -->
+    <div id="result-view" class="hidden flex flex-col gap-8">
+        <!-- Specialized Error Box -->
+        <div id="err-box"
+            class="hidden p-8 bg-red-50 border-4 border-red-100 text-red-700 rounded-[2rem] font-bold shadow-lg leading-relaxed text-center">
+        </div>
+
+        <!-- Result Visualization -->
+        <div id="res-card"
+            class="bg-white rounded-[2.5rem] p-10 text-center shadow-2xl border border-slate-100 flex-1 flex flex-col justify-between">
+            <div>
+                <span class="text-xs font-black text-slate-400 uppercase tracking-widest">Recommended
+                    Capacity</span>
+                <div class="result-gradient text-8xl font-black outfit leading-none my-8" id="res-kva">0 <span
+                        class="text-3xl font-bold">kVA</span></div>
+
+                <div id="product-display"
+                    class="mt-8 p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem]">
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-left">
+                        Recommended Unit Profile</p>
+                    <div id="images-container" class="flex justify-center items-center gap-6 min-h-[150px]">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-10 space-y-4">
+                <a id="lnk-quote" href="#" target="_blank"
+                    class="btn-quote block w-full p-6 text-white rounded-[1.5rem] font-black text-2xl uppercase tracking-tighter">Request
+                    a Quote From Kinmo</a>
+                <div
+                    class="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-[11px] font-semibold text-slate-500 leading-relaxed italic text-left">
+                    Official Note: This sizing is an engineering estimate based on standard load curves. To
+                    finalize your specifications and ensure power quality accuracy, please schedule an
+                    ocular inspection.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state"
+        class="flex flex-col items-center justify-center p-10 bg-slate-100/50 rounded-[2.5rem] border-4 border-dashed border-slate-200 text-center">
+        <img src="logo.png" class="w-32 opacity-20 mb-8 grayscale">
+        <p class="text-slate-400 font-bold text-xl leading-snug max-w-xs mx-auto">Complete the parameters to
+            generate your professional recommendation.</p>
+    </div>
+    </div>
     </div>
 
     <script>
@@ -253,9 +257,9 @@
             document.getElementById('mode-res').className = isRes ? "toggle-btn px-10 py-5 rounded-xl text-lg active-toggle shadow-lg" : "toggle-btn px-10 py-5 rounded-xl text-lg inactive-toggle hover:bg-slate-200";
             document.getElementById('mode-ind').className = !isRes ? "toggle-btn px-10 py-5 rounded-xl text-lg active-toggle shadow-lg" : "toggle-btn px-10 py-5 rounded-xl text-lg inactive-toggle hover:bg-slate-200";
 
-            const isAmps = document.querySelector('input[name="meas"]:checked').value === 'Amps';
-            document.getElementById('unit-scale-box').style.opacity = isAmps ? '0.3' : '1';
-            document.getElementById('unit-scale-box').style.pointerEvents = isAmps ? 'none' : 'auto';
+            const isPower = document.querySelector('input[name="meas"]:checked').value === 'Power';
+            document.getElementById('unit-scale-box').style.opacity = isPower ? '1' : '0.3';
+            document.getElementById('unit-scale-box').style.pointerEvents = isPower ? 'auto' : 'none';
 
             document.getElementById('label-app').innerText = isRes ? "Equipment Application" : "Industrial Machine / Load Type";
             document.getElementById('result-view').classList.add('hidden');
@@ -289,6 +293,10 @@
                 const isWatts = document.querySelector('input[name="unit"]:checked').value === 'Watts';
                 const kw = isWatts ? rawValue / 1000 : rawValue;
                 baseKVA = kw / 0.8;
+            } else if (inputType === 'kVA') {
+                baseKVA = rawValue;
+            } else if (inputType === 'HP') {
+                baseKVA = (rawValue * 0.746) / 0.8;
             } else {
                 baseKVA = (rawValue * cfg.v * pF) / 1000;
             }
