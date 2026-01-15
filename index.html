@@ -84,26 +84,30 @@
 <body class="min-h-screen pb-20">
     <div class="max-w-6xl mx-auto px-4 py-10">
         <!-- Header -->
-        <header class="hero-gradient rounded-[2.5rem] p-12 text-center text-white shadow-2xl mb-12">
-            <div class="flex justify-center mb-6">
-                <img src="logo.png" class="w-24 h-24 bg-white p-1 rounded-full shadow-lg">
+        <header
+            class="hero-gradient rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-12 text-center text-white shadow-2xl mb-12">
+            <div class="flex justify-center mb-4 sm:mb-6">
+                <img src="logo.png" class="w-16 h-16 sm:w-24 sm:h-24 bg-white p-1 rounded-full shadow-lg">
             </div>
-            <h1 class="text-5xl font-black mb-2 outfit tracking-tight uppercase leading-none">Professional AVR Sizing
-                Calculator</h1>
-            <p class="text-xl opacity-90 font-bold mt-4">Kinmo PW Corporation | Power Quality Solutions</p>
+            <h1
+                class="text-3xl sm:text-5xl font-black mb-2 outfit tracking-tight uppercase leading-tight sm:leading-none">
+                Professional AVR Sizing Calculator</h1>
+            <p class="text-base sm:text-xl opacity-90 font-bold mt-2 sm:mt-4">Kinmo PW Corporation | Power Quality
+                Solutions</p>
         </header>
 
         <!-- Main Toggle -->
-        <div class="flex justify-center mb-10">
-            <div class="bg-white p-2 rounded-2xl shadow-xl flex gap-2 border border-slate-200">
+        <div class="flex justify-center mb-10 overflow-x-auto">
+            <div class="bg-white p-2 rounded-2xl shadow-xl flex gap-2 border border-slate-200 min-w-max">
                 <button id="mode-res" onclick="setMode('res')"
-                    class="toggle-btn px-10 py-5 rounded-xl text-lg active-toggle">Residential / Commercial</button>
+                    class="toggle-btn px-6 sm:px-10 py-5 rounded-xl text-base sm:text-lg active-toggle">Residential /
+                    Commercial</button>
                 <button id="mode-ind" onclick="setMode('ind')"
-                    class="toggle-btn px-10 py-5 rounded-xl text-lg inactive-toggle">Industrial</button>
+                    class="toggle-btn px-6 sm:px-10 py-5 rounded-xl text-base sm:text-lg inactive-toggle">Industrial</button>
             </div>
         </div>
 
-        <div class="grid lg:grid-cols-2 gap-10 items-start">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-start">
             <!-- Left Side: Inputs Card -->
             <div class="glass rounded-[2rem] p-10 shadow-xl border border-slate-100 space-y-8">
                 <h2
@@ -242,10 +246,21 @@
                             </div>
                         </div>
 
-                        <div class="mt-10 space-y-4">
+                        <div class="mt-8 space-y-4">
+                            <!-- Technical Summary Box -->
+                            <div class="p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-left">
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Technical
+                                    Profile (Auto-Copied)</p>
+                                <div id="spec-summary" class="text-xs font-bold text-slate-700 leading-relaxed italic">
+                                    --
+                                </div>
+                            </div>
+
                             <a id="lnk-quote" href="#" target="_blank"
-                                class="btn-quote block w-full p-6 text-white rounded-[1.5rem] font-black text-2xl uppercase tracking-tighter">Request
-                                a Quote From Kinmo</a>
+                                class="btn-quote flex items-center justify-center gap-3 w-full p-6 text-white rounded-[1.5rem] font-black text-2xl uppercase tracking-tighter transition-all">
+                                <span>Send to Messenger</span>
+                                <span class="text-3xl">↗</span>
+                            </a>
                             <div
                                 class="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-[11px] font-semibold text-slate-500 leading-relaxed italic text-left">
                                 Official Note: This sizing is an engineering estimate based on standard load curves. To
@@ -460,8 +475,22 @@
 
                 const name = document.getElementById('app-name').value || "Equipment";
                 const profile = finalKVA + "kVA " + vKey.replace('-', ' ') + " for " + name + " (" + loadKey + ")";
-                const encoded = encodeURIComponent("Hello! I used the Professional AVR Sizing Calculator. Here is my technical profile: " + profile);
-                document.getElementById('lnk-quote').href = "https://m.me/kinmopw?text=" + encoded;
+                const messageText = "Hello! I used the Professional AVR Sizing Calculator. Here is my technical profile: " + profile;
+                const encoded = encodeURIComponent(messageText);
+
+                // Show in summary box
+                document.getElementById('spec-summary').innerText = profile;
+
+                // Set the link
+                const lnk = document.getElementById('lnk-quote');
+                lnk.href = "https://m.me/kinmopwcorporation?text=" + encoded;
+
+                // Auto-copy to clipboard
+                navigator.clipboard.writeText(messageText).then(() => {
+                    console.log('Specs copied to clipboard.');
+                }).catch(err => {
+                    console.error('Copy failed: ', err);
+                });
             }
 
             function updateVoltageList() {
