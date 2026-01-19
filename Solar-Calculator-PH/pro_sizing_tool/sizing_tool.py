@@ -325,6 +325,21 @@ with col_result:
             
             # Image Logic
             images_html = ""
+            hyper_sensitive_advisory = ""
+
+            if load_key == "Hyper-Sensitive":
+                hyper_sensitive_advisory = f"""
+                <div style="margin-top: 1.5rem; padding: 1.25rem; background: #EFF6FF; border: 2px solid #BFDBFE; border-radius: 1.5rem; text-align: left;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <span style="background: #2563EB; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 900;">!</span>
+                        <p style="font-size: 0.7rem; font-weight: 900; color: #1E3A8A; text-transform: uppercase; letter-spacing: 0.1em; margin: 0;">Precision Load Advisory</p>
+                    </div>
+                    <p style="font-size: 0.8rem; font-weight: 700; color: #1E40AF; line-height: 1.5; margin: 0;">
+                        For Hyper-Sensitive machines, we strongly recommend using an <strong>Active Voltage Conditioner</strong> or <strong>Static Voltage Regulator</strong> for nanosecond correction speeds. Please send an inquiry for more information.
+                    </p>
+                </div>
+                """
+
             if final_kva < 10:
                 images_html = f"""
                 <div style="display: flex; gap: 15px; justify-content: center;">
@@ -341,7 +356,7 @@ with col_result:
             elif final_kva <= 500:
                 images_html = f"""
                 <div style="text-align: center;">
-                    <img src="{avr_cabinet_b64}" class="product-img" style="height: 180px;">
+                    <img src="{avr_vertical_b64 if not avr_cabinet_b64 else avr_cabinet_b64}" class="product-img" style="height: 180px;">
                     <p style="font-size: 0.75rem; font-weight: 800; color: #64748B; text-transform: uppercase; margin-top: 10px;">High-Capacity Precision System</p>
                 </div>"""
             else:
@@ -361,11 +376,13 @@ with col_result:
                     {images_html}
                 </div>
                 
+                {hyper_sensitive_advisory}
+
                 <a href="{msg_url}" class="btn-quote" target="_blank">Request a Quote From Kinmo</a>
                 
                 <div style="margin-top: 1.5rem; padding: 1.5rem; background: #F1F5F9; border-radius: 1.5rem; text-align: left; border: 1px solid #E2E8F0;">
                     <p style="font-size: 0.75rem; color: #64748B; font-weight: 600; line-height: 1.6; font-style: italic;">
-                        <strong>Official Note:</strong> This sizing is an engineering estimate based on standard load curves. To finalize your specifications and ensure nanosecond correction accuracy, please schedule an ocular inspection.
+                        <strong>Official Note:</strong> This sizing is an engineering estimate based on standard load curves. To finalize your specifications and ensure power quality accuracy, please schedule an ocular inspection.
                     </p>
                 </div>
             </div>
@@ -376,7 +393,7 @@ with col_result:
         st.markdown(f"""
         <div style="display: flex; flex-direction: column; items-center; justify-content: center; padding: 3rem; background: #F1F5F9; border-radius: 2.5rem; border: 4px dashed #E2E8F0; text-align: center; height: 100%;">
             <img src="data:image/png;base64,{base64.b64encode(open(os.path.join(SCRIPT_DIR, 'logo.png'), 'rb').read()).decode() if os.path.exists(os.path.join(SCRIPT_DIR, 'logo.png')) else ''}" style="width: 120px; opacity: 0.2; margin: 0 auto 2rem; filter: grayscale(1);">
-            <p style="color: #94A3B8; font-weight: 700; font-size: 1.25rem; max-width: 300px; margin: 0 auto; line-height: 1.4;">Complete the parameters to generate your professional recommendation.</p>
+            <p style="color: #94A3B8; font-weight: 700; font-size: 1.25rem; max-width: 300px; margin: 0 auto; line-height: 1.4;">Complete the parameters to generate your professional recommendation. Please send an inquiry for more information.</p>
         </div>
         """, unsafe_allow_html=True)
 
