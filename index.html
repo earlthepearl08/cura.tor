@@ -90,6 +90,10 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        // API Keys (hardcoded for personal use)
+        const GOOGLE_VISION_API_KEY = 'AIzaSyDp5v_RuQZsNlrqJOKJ1TgAZq2n3GZ8nBg';
+        const GOOGLE_DRIVE_CLIENT_ID = '989864367677-fcll4q385kai03cj1hkhaa852i5rdhis.apps.googleusercontent.com';
+
         // Smart OCR Parsing Logic
         const parseBusinessCard = (text) => {
             const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -971,14 +975,11 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
             const [isProcessing, setIsProcessing] = useState(false);
 
             // Settings state
-            // Google Vision API key is hardcoded for personal use
-            const GOOGLE_VISION_API_KEY = 'AIzaSyDp5v_RuQZsNlrqJOKJ1TgAZq2n3GZ8nBg';
+            // API keys are defined globally (see top of file)
             const googleApiKey = GOOGLE_VISION_API_KEY;
             const [ocrEngine, setOcrEngine] = useState(localStorage.getItem('ocr_engine') || 'tesseract');
 
             // Google Drive sync state
-            // Client ID is hardcoded - users just click Connect and sign in
-            const GOOGLE_DRIVE_CLIENT_ID = '989864367677-fcll4q385kai03cj1hkhaa852i5rdhis.apps.googleusercontent.com';
             const driveClientId = GOOGLE_DRIVE_CLIENT_ID;
             const [driveConnected, setDriveConnected] = useState(false);
             const [driveUser, setDriveUser] = useState(null);
