@@ -1,5 +1,5 @@
 // Cura.tor Service Worker
-const CACHE_NAME = 'curator-v4';
+const CACHE_NAME = 'curator-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
