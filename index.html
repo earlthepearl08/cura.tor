@@ -681,13 +681,19 @@
                         if (COMPANY_SUFFIX_WORD_REGEX.test(nextLower) && !hasAddressLocationWord(nextLower)) { console.log('  -> STOP: is company'); break; }
 
                         // CONTINUE if line looks like address continuation
+                        // Must have actual address characteristics, not just be short!
                         const hasLocWord = hasAddressLocationWord(nextLower);
                         const hasComma = nextLine.includes(',');
-                        const startsLower = /^[a-z]/.test(nextLine.trim());
-                        const isShort = nextLine.length < 40;
-                        const looksLikeAddress = hasLocWord || hasComma || startsLower || isShort;
+                        const hasNumber = /\d/.test(nextLine);
 
-                        console.log(`  -> hasLocWord=${hasLocWord} hasComma=${hasComma} startsLower=${startsLower} isShort=${isShort} => looksLikeAddress=${looksLikeAddress}`);
+                        // Only continue if line has address characteristics:
+                        // - Has location word (city, street, etc.)
+                        // - Has comma AND number (likely "City, 12345")
+                        // - Previous line ended with comma and this has location word
+                        const prevEndsWithComma = addressParts[addressParts.length - 1]?.trim().endsWith(',');
+                        const looksLikeAddress = hasLocWord || (hasComma && hasNumber) || (prevEndsWithComma && (hasLocWord || hasNumber));
+
+                        console.log(`  -> hasLocWord=${hasLocWord} hasComma=${hasComma} hasNumber=${hasNumber} prevEndsWithComma=${prevEndsWithComma} => looksLikeAddress=${looksLikeAddress}`);
 
                         if (looksLikeAddress) {
                             addressParts.push(nextLine);
