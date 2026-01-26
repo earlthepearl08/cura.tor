@@ -95,109 +95,139 @@
         const GOOGLE_DRIVE_CLIENT_ID = '989864367677-fcll4q385kai03cj1hkhaa852i5rdhis.apps.googleusercontent.com';
 
         // Smart OCR Parsing Logic
+        // Precompiled regex patterns (created once, reused for all parses)
+        const COMPANY_END_WORDS = ['inc', 'inc.', 'corp', 'corp.', 'corporation', 'llc', 'ltd', 'ltd.', 'co.', 'company'];
+        const COMPANY_SUFFIX_END_REGEX = new RegExp(`\\b(${COMPANY_END_WORDS.map(s => s.replace('.', '\\.')).join('|')})$`, 'i');
+        const COMPANY_SUFFIX_WORD_REGEX = new RegExp(`\\b(${COMPANY_END_WORDS.map(s => s.replace('.', '\\.')).join('|')})\\b`, 'i');
+        const STRONG_COMPANY_SUFFIXES = ['inc', 'inc.', 'corp', 'corp.', 'corporation', 'llc', 'ltd', 'ltd.'];
+        const STRONG_SUFFIX_REGEX = new RegExp(`\\b(${STRONG_COMPANY_SUFFIXES.map(s => s.replace('.', '\\.')).join('|')})\\b`, 'i');
+        const MERGE_ADDRESS_KW = ['street', 'st.', 'avenue', 'ave', 'road', 'rd', 'floor', 'flr', 'suite', 'unit', 'building', 'bldg', 'city', 'barangay', 'brgy'];
+        const PHONE_REGEX = /^\+?\d[\d\s().-]{6,}$/;
+        const HAS_LETTERS_REGEX = /[A-Za-z]/;
+
+        // Professional suffixes pattern
+        const PROFESSIONAL_SUFFIXES = ['ree', 'pee', 'rme', 'pme', 'cpa', 'cma', 'cfa', 'md', 'm\\.d\\.', 'do', 'd\\.o\\.', 'rn', 'r\\.n\\.', 'bsn', 'jd', 'j\\.d\\.', 'esq', 'esq\\.', 'atty', 'atty\\.', 'phd', 'ph\\.d\\.', 'edd', 'ed\\.d\\.', 'mba', 'm\\.b\\.a\\.', 'ms', 'm\\.s\\.', 'ma', 'm\\.a\\.', 'pe', 'p\\.e\\.', 'se', 's\\.e\\.', 'prc', 'lic\\.', 'certified'];
+        const PROFESSIONAL_SUFFIX_REGEX = new RegExp(`[,\\s](${PROFESSIONAL_SUFFIXES.join('|')})$|[,\\s](${PROFESSIONAL_SUFFIXES.join('|')})[,\\s]`, 'i');
+
+        // Title keywords pattern
+        const TITLE_KEYWORDS = ['ceo', 'cto', 'cfo', 'coo', 'president', 'vice president', 'vp', 'director', 'manager', 'supervisor', 'lead', 'engineer', 'developer', 'designer', 'analyst', 'consultant', 'sales', 'marketing', 'executive', 'officer', 'associate', 'specialist', 'coordinator', 'administrator', 'assistant', 'founder', 'partner', 'owner', 'chairman', 'secretary', 'accountant', 'attorney', 'lawyer', 'doctor', 'nurse', 'representative', 'agent', 'broker', 'realtor', 'architect', 'account manager', 'project manager', 'general manager'];
+        const TITLE_KEYWORD_REGEX = new RegExp(`\\b(${TITLE_KEYWORDS.join('|')})\\b`, 'i');
+
         const parseBusinessCard = (text) => {
             const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             let lines = normalizedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
             // PRE-PROCESS: Merge fragmented company names
-            // OCR often splits company names like "TORQUE BUILDERS, INC." into separate lines
-            const companyEndWords = ['inc', 'inc.', 'corp', 'corp.', 'corporation', 'llc', 'ltd', 'ltd.', 'co.', 'company'];
+            // Handles: "BUILDERS,\nINC." | "Google\nLLC" | "Hedgefund\nCorporation Inc"
 
-            // Look for pattern: ALL CAPS word(s) ending with comma + INC/CORP/LLC nearby
-            // These should be merged into one company name
-            const suffixIndices = [];
-            const commaIndices = [];
+            // Helper: Check if line is a valid company name fragment
+            const isValidFragment = (line) => {
+                const lower = line.toLowerCase();
+                return HAS_LETTERS_REGEX.test(line) &&
+                       !line.includes('@') &&
+                       !PHONE_REGEX.test(line) &&
+                       !MERGE_ADDRESS_KW.some(kw => lower.includes(kw)) &&
+                       line.length < 50;
+            };
+
+            // Helper: Check if line ends with a company suffix (uses precompiled regex)
+            const endsWithSuffix = (line) => COMPANY_SUFFIX_END_REGEX.test(line.toLowerCase());
+
+            // Helper: Check if line IS exactly a suffix
+            const isExactSuffix = (line) => {
+                const lower = line.toLowerCase().trim();
+                return COMPANY_END_WORDS.some(suf => lower === suf || lower === suf.replace('.', ''));
+            };
+
+            // Helper: Extend merge backwards for ALL CAPS single words
+            const extendBackwards = (startIdx, lines) => {
+                while (startIdx > 0) {
+                    const prev = lines[startIdx - 1];
+                    const isAllCaps = prev === prev.toUpperCase() && /[A-Z]/.test(prev);
+                    const isSingleWord = prev.split(/\s+/).length === 1;
+                    if (isAllCaps && isSingleWord && !prev.includes('@') && !/\d{3}/.test(prev) && !endsWithSuffix(prev)) {
+                        startIdx--;
+                    } else break;
+                }
+                return startIdx;
+            };
+
+            // Identify line types
+            const suffixLines = [];      // Lines that ARE just a suffix
+            const suffixEndLines = [];   // Lines that END with a suffix
+            const commaLines = [];       // ALL CAPS lines ending with comma
 
             lines.forEach((line, idx) => {
-                const lineLower = line.toLowerCase().trim();
                 const isAllCaps = line === line.toUpperCase() && /[A-Z]/.test(line);
+                if (isExactSuffix(line)) suffixLines.push(idx);
+                else if (endsWithSuffix(line)) suffixEndLines.push(idx);
+                if (isAllCaps && line.endsWith(',')) commaLines.push(idx);
+            });
 
-                if (companyEndWords.some(suf => lineLower === suf || lineLower === suf.replace('.', ''))) {
-                    suffixIndices.push(idx);
+            // Build merge map
+            const mergeMap = new Map();
+            const skipIndices = new Set();
+
+            const addMerge = (start, end) => {
+                mergeMap.set(start, end);
+                for (let m = start; m <= end; m++) skipIndices.add(m);
+            };
+
+            // Process standalone suffix lines (e.g., "LLC")
+            suffixLines.forEach(suffixIdx => {
+                if (skipIndices.has(suffixIdx)) return;
+
+                // Try 1: Look for comma-ending line within 3 lines back
+                for (let k = suffixIdx - 1; k >= Math.max(0, suffixIdx - 3); k--) {
+                    if (commaLines.includes(k)) {
+                        addMerge(extendBackwards(k, lines), suffixIdx);
+                        return;
+                    }
                 }
-                if (isAllCaps && line.endsWith(',')) {
-                    commaIndices.push(idx);
+
+                // Try 2: Check immediate previous line
+                if (suffixIdx > 0 && isValidFragment(lines[suffixIdx - 1]) && !isExactSuffix(lines[suffixIdx - 1])) {
+                    addMerge(extendBackwards(suffixIdx - 1, lines), suffixIdx);
                 }
             });
 
-            // For each suffix, look backwards for a comma-ending line to merge with
-            const mergeMap = new Map(); // Maps start index -> end index for merges
-            const skipIndices = new Set();
-
-            suffixIndices.forEach(suffixIdx => {
-                // Look backwards for the nearest comma-ending ALL CAPS line (within 3 lines)
-                for (let k = suffixIdx - 1; k >= Math.max(0, suffixIdx - 3); k--) {
-                    if (commaIndices.includes(k)) {
-                        // Found a match! Mark lines between comma and suffix (exclusive) for skipping
-                        // But include the comma line and suffix line in the merge
-                        let startIdx = k;
-
-                        // Also look before the comma line for connected ALL CAPS words
-                        while (startIdx > 0) {
-                            const prevLine = lines[startIdx - 1];
-                            const prevIsAllCaps = prevLine === prevLine.toUpperCase() && /[A-Z]/.test(prevLine);
-                            const prevIsSingleWord = prevLine.split(/\s+/).length === 1;
-                            if (prevIsAllCaps && prevIsSingleWord && !prevLine.includes('@') && !/\d{3}/.test(prevLine)) {
-                                startIdx--;
-                            } else {
-                                break;
-                            }
-                        }
-
-                        mergeMap.set(startIdx, suffixIdx);
-
-                        // Mark in-between indices for skipping (they'll be part of merge)
-                        for (let m = startIdx; m <= suffixIdx; m++) {
-                            skipIndices.add(m);
-                        }
-                        break;
-                    }
+            // Process lines ending with suffix (e.g., "Corporation Inc")
+            suffixEndLines.forEach(idx => {
+                if (skipIndices.has(idx) || idx === 0) return;
+                if (isValidFragment(lines[idx - 1]) && !endsWithSuffix(lines[idx - 1])) {
+                    addMerge(extendBackwards(idx - 1, lines), idx);
                 }
             });
 
             // Build merged lines
             const mergedLines = [];
             let i = 0;
-
             while (i < lines.length) {
                 if (mergeMap.has(i)) {
-                    // This is the start of a merge range
                     const endIdx = mergeMap.get(i);
-                    // Collect: start line, comma line, suffix line (skip stuff in between)
-                    const startLine = lines[i];
-                    const commaLineIdx = commaIndices.find(c => c > i && c <= endIdx);
-                    const commaLine = commaLineIdx !== undefined ? lines[commaLineIdx] : '';
-                    const suffixLine = lines[endIdx];
-
-                    // Build merged company name
-                    let merged = startLine;
-                    if (commaLineIdx !== undefined && commaLineIdx !== i) {
-                        merged = merged + ' ' + commaLine;
+                    // Merge all lines in range, handling comma lines specially
+                    let merged = lines[i];
+                    const commaIdx = commaLines.find(c => c > i && c <= endIdx);
+                    if (commaIdx !== undefined && commaIdx !== i) merged += ' ' + lines[commaIdx];
+                    if (!merged.toLowerCase().includes(lines[endIdx].toLowerCase())) {
+                        merged += ' ' + lines[endIdx];
                     }
-                    if (!merged.toLowerCase().includes(suffixLine.toLowerCase())) {
-                        merged = merged + ' ' + suffixLine;
-                    }
-
                     mergedLines.push(merged.replace(/\s+/g, ' ').trim());
-
-                    // Add any skipped lines (like "ELECTRICAL CONTRACTOR") separately
+                    // Add non-merge lines in range (e.g., "ELECTRICAL CONTRACTOR")
                     for (let m = i + 1; m < endIdx; m++) {
-                        if (m !== commaLineIdx) {
-                            mergedLines.push(lines[m]);
-                        }
+                        if (m !== commaIdx) mergedLines.push(lines[m]);
                     }
-
                     i = endIdx + 1;
-                } else if (skipIndices.has(i)) {
-                    // Already handled in a merge
-                    i++;
-                } else {
+                } else if (!skipIndices.has(i)) {
                     mergedLines.push(lines[i]);
                     i++;
-                }
+                } else i++;
             }
 
             lines = mergedLines;
+            if (mergeMap.size > 0) {
+                console.log('[Parser] Merged company names:', Array.from(mergeMap.entries()).map(([s, e]) => `${s}-${e}`));
+            }
 
             // Extract emails - must have proper format with domain
             const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
@@ -245,32 +275,6 @@
             // Extract websites
             const websiteRegex = /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/\S*)?/gi;
             const websites = (normalizedText.match(websiteRegex) || []).filter(w => !w.includes('@'));
-
-            // Professional suffixes (to recognize as part of names, not separate entities)
-            const professionalSuffixes = [
-                'ree', 'pee', 'rme', 'pme', // Engineering (Philippines)
-                'cpa', 'cma', 'cfa', // Accounting/Finance
-                'md', 'm.d.', 'do', 'd.o.', // Medical
-                'rn', 'r.n.', 'bsn', // Nursing
-                'jd', 'j.d.', 'esq', 'esq.', 'atty', 'atty.', // Legal
-                'phd', 'ph.d.', 'edd', 'ed.d.', // Doctorate
-                'mba', 'm.b.a.', 'ms', 'm.s.', 'ma', 'm.a.', // Masters
-                'pe', 'p.e.', 'se', 's.e.', // Professional Engineer
-                'prc', 'lic.', 'certified'
-            ];
-
-            // Common job title keywords (note: "head" removed - too ambiguous with "head office")
-            const titleKeywords = [
-                'ceo', 'cto', 'cfo', 'coo', 'president', 'vice president', 'vp',
-                'director', 'manager', 'supervisor', 'lead',
-                'engineer', 'developer', 'designer', 'analyst', 'consultant',
-                'sales', 'marketing', 'executive', 'officer', 'associate',
-                'specialist', 'coordinator', 'administrator', 'assistant',
-                'founder', 'partner', 'owner', 'chairman', 'secretary',
-                'accountant', 'attorney', 'lawyer', 'doctor', 'nurse',
-                'representative', 'agent', 'broker', 'realtor', 'architect',
-                'account manager', 'project manager', 'general manager'
-            ];
 
             // Common company suffixes
             const companySuffixes = [
@@ -339,12 +343,8 @@
                 if (usedLines.has(idx) || categorized.name) return;
                 const lineLower = line.toLowerCase();
 
-                const hasProfessionalSuffix = professionalSuffixes.some(suffix => {
-                    const regex = new RegExp(`[,\\s]${suffix.replace('.', '\\.')}$|[,\\s]${suffix.replace('.', '\\.')}[,\\s]`, 'i');
-                    return regex.test(lineLower);
-                });
-
-                if (hasProfessionalSuffix) {
+                // Use precompiled regex for professional suffix check
+                if (PROFESSIONAL_SUFFIX_REGEX.test(lineLower)) {
                     categorized.name = line;
                     usedLines.add(idx);
                 }
@@ -354,31 +354,18 @@
             // Collect ALL potential position lines with scores, then pick the best one
             const positionCandidates = [];
 
-            // Debug: log all lines
-            console.log('[Parser] Lines after merge:', lines);
-
             lines.forEach((line, idx) => {
                 if (usedLines.has(idx)) return;
                 const lineLower = line.toLowerCase();
 
-                // Check if line contains job title keywords
-                const matchedKeywords = titleKeywords.filter(keyword => {
-                    const regex = new RegExp(`\\b${keyword}\\b`, 'i');
-                    return regex.test(lineLower);
-                });
+                // Use precompiled regex for title keyword check
+                if (!TITLE_KEYWORD_REGEX.test(lineLower)) return;
 
-                if (matchedKeywords.length === 0) return;
-
-                console.log(`[Parser] Position candidate: "${line}" matched: ${matchedKeywords.join(', ')}`);
+                // Find which keywords matched for scoring
+                const matchedKeywords = TITLE_KEYWORDS.filter(kw => lineLower.includes(kw));
 
                 // Don't use as title if it looks like a company name with strong suffix
-                const hasStrongCompanySuffix = ['inc', 'inc.', 'corp', 'corp.', 'corporation', 'llc', 'ltd', 'ltd.'].some(
-                    suffix => lineLower.includes(suffix)
-                );
-                if (hasStrongCompanySuffix) {
-                    console.log(`[Parser] Skipping "${line}" - has company suffix`);
-                    return;
-                }
+                if (STRONG_SUFFIX_REGEX.test(lineLower)) return;
 
                 // Don't use as title if it looks like an address
                 const addressIndicators = ['building', 'bldg', 'floor', 'flr', 'street', 'st.', 'avenue', 'ave', 'road', 'rd', 'place', 'tower', 'unit', 'suite', 'block', 'blk', 'lot', 'phase', 'head office', 'main office', 'branch office'];
@@ -429,25 +416,15 @@
 
             // Pick the best position candidate
             let positionIdx = -1;
-            console.log('[Parser] All position candidates:', positionCandidates);
             if (positionCandidates.length > 0) {
                 positionCandidates.sort((a, b) => b.score - a.score);
-                console.log('[Parser] Best position candidate:', positionCandidates[0]);
                 // Only use if score is positive (not a service list)
                 if (positionCandidates[0].score > 0) {
                     categorized.position = positionCandidates[0].line;
                     positionIdx = positionCandidates[0].idx;
                     usedLines.add(positionIdx);
-                    console.log('[Parser] Selected position:', categorized.position, 'at index', positionIdx);
-                } else {
-                    console.log('[Parser] No valid position found (all scores <= 0)');
                 }
-            } else {
-                console.log('[Parser] No position candidates found');
             }
-
-            // Strong company suffixes - lines with these should NEVER be names
-            const strongCompanySuffixes = ['inc', 'inc.', 'corp', 'corp.', 'corporation', 'llc', 'ltd', 'ltd.', 'co.', 'company'];
 
             // STEP 3: If we found a position, the line BEFORE it is likely the person's name
             // (unless we already found a name with professional suffix)
@@ -460,12 +437,8 @@
                     const candidateLower = candidateLine.toLowerCase();
                     const words = candidateLine.split(/\s+/);
 
-                    // NEVER use a line with company suffix as a name
-                    const hasCompanySuffix = strongCompanySuffixes.some(suf => {
-                        const regex = new RegExp(`\\b${suf.replace('.', '\\.')}\\b`, 'i');
-                        return regex.test(candidateLower);
-                    });
-                    if (hasCompanySuffix) continue;
+                    // NEVER use a line with company suffix as a name (use precompiled regex)
+                    if (STRONG_SUFFIX_REGEX.test(candidateLower)) continue;
 
                     // Skip lines that look like service/feature lists (dot-separated)
                     const dotItems = candidateLine.split(/[.•·]/).filter(s => s.trim().length > 0);
@@ -496,12 +469,8 @@
                 if (usedLines.has(idx)) return;
                 const lineLower = line.toLowerCase();
 
-                // Skip lines that look like company names (have INC, CORP, etc.)
-                const looksLikeCompany = strongCompanySuffixes.some(suf => {
-                    const regex = new RegExp(`\\b${suf.replace('.', '\\.')}\\b`, 'i');
-                    return regex.test(lineLower);
-                });
-                if (looksLikeCompany) return;
+                // Skip lines that look like company names (use precompiled regex)
+                if (STRONG_SUFFIX_REGEX.test(lineLower)) return;
 
                 const hasAddressKeyword = addressKeywords.some(keyword => lineLower.includes(keyword));
                 const hasZipCode = /\b\d{4,6}\b/.test(line);
@@ -522,12 +491,8 @@
                 if (usedLines.has(idx)) return;
                 const lineLower = line.toLowerCase();
 
-                const hasCompanySuffix = companySuffixes.some(suffix => {
-                    const regex = new RegExp(`\\b${suffix.replace('.', '\\.')}\\b`, 'i');
-                    return regex.test(lineLower);
-                });
-
-                if (hasCompanySuffix) {
+                // Use precompiled regex for company suffix check
+                if (COMPANY_SUFFIX_WORD_REGEX.test(lineLower)) {
                     // Score the company candidate
                     let score = line.length;
 
@@ -572,12 +537,8 @@
                     const lineLower = line.toLowerCase();
                     const words = line.split(/[\s,]+/).filter(w => w.length > 0);
 
-                    // NEVER use lines with company suffixes as names
-                    const hasCompanySuffix = strongCompanySuffixes.some(suf => {
-                        const regex = new RegExp(`\\b${suf.replace('.', '\\.')}\\b`, 'i');
-                        return regex.test(lineLower);
-                    });
-                    if (hasCompanySuffix) return;
+                    // NEVER use lines with company suffixes as names (use precompiled regex)
+                    if (STRONG_SUFFIX_REGEX.test(lineLower)) return;
 
                     // Name patterns: 2-5 words, mostly letters, may have comma for suffix
                     const isLikelyName =
@@ -603,12 +564,8 @@
                     const lineLower = line.toLowerCase();
                     const words = line.split(/\s+/);
 
-                    // NEVER use lines with company suffixes as names
-                    const hasCompanySuffix = strongCompanySuffixes.some(suf => {
-                        const regex = new RegExp(`\\b${suf.replace('.', '\\.')}\\b`, 'i');
-                        return regex.test(lineLower);
-                    });
-                    if (hasCompanySuffix) continue;
+                    // NEVER use lines with company suffixes as names (use precompiled regex)
+                    if (STRONG_SUFFIX_REGEX.test(lineLower)) continue;
 
                     // Simple heuristic: first line with 2-4 words, no numbers, no special chars
                     if (words.length >= 2 && words.length <= 4 && !/\d/.test(line) && line.length < 40) {
@@ -623,12 +580,8 @@
             if (!categorized.name) {
                 const firstUnused = lines.findIndex((line, idx) => {
                     if (usedLines.has(idx)) return false;
-                    const lineLower = line.toLowerCase();
-                    const hasCompanySuffix = strongCompanySuffixes.some(suf => {
-                        const regex = new RegExp(`\\b${suf.replace('.', '\\.')}\\b`, 'i');
-                        return regex.test(lineLower);
-                    });
-                    return !hasCompanySuffix;
+                    // Use precompiled regex
+                    return !STRONG_SUFFIX_REGEX.test(line.toLowerCase());
                 });
                 if (firstUnused !== -1) {
                     categorized.name = lines[firstUnused];
@@ -684,47 +637,7 @@
             return result;
         };
 
-        // Detect if parsing result looks uncertain
-        const detectUncertainty = (parsed) => {
-            const companyWords = ['inc', 'inc.', 'corp', 'corp.', 'corporation', 'llc', 'ltd', 'ltd.', 'co.', 'company', 'solutions', 'group', 'enterprises', 'services', 'consulting', 'agency', 'international', 'holdings'];
-
-            const nameLower = (parsed.name || '').toLowerCase();
-            const companyLower = (parsed.company || '').toLowerCase();
-            const nameWords = (parsed.name || '').split(/\s+/);
-            const companyWords_ = (parsed.company || '').split(/\s+/);
-
-            // Signal 1: Name contains company words
-            const nameHasCompanyWords = companyWords.some(word => nameLower.includes(word));
-
-            // Signal 2: Company looks like a person name (2-3 words, no company indicators, title case)
-            const companyLooksLikeName =
-                companyWords_.length >= 2 &&
-                companyWords_.length <= 3 &&
-                !companyWords.some(word => companyLower.includes(word)) &&
-                parsed.company && parsed.company !== parsed.company.toUpperCase();
-
-            // Signal 3: Name has more than 4 words
-            const nameTooLong = nameWords.length > 4;
-
-            // Signal 4: Company empty but name has company-like words
-            const companyEmptyNameHasCompany = !parsed.company && nameHasCompanyWords;
-
-            const isUncertain = nameHasCompanyWords || companyLooksLikeName || nameTooLong || companyEmptyNameHasCompany;
-
-            if (isUncertain) {
-                console.log('[Parser] Uncertainty detected:', {
-                    nameHasCompanyWords,
-                    companyLooksLikeName,
-                    nameTooLong,
-                    companyEmptyNameHasCompany,
-                    parsed: { name: parsed.name, company: parsed.company }
-                });
-            }
-
-            return isUncertain;
-        };
-
-        // Validate/correct parsing with Gemini AI (only called when uncertain)
+        // Validate/correct parsing with Gemini AI
         const validateWithGemini = async (rawText, parsed) => {
             console.log('[Gemini] Enhancing parsing to 99% accuracy...');
 
@@ -750,6 +663,12 @@ YOUR TASK: Improve accuracy to 99% by:
 5. **Clean artifacts**: Remove OCR errors like extra spaces, weird characters
 6. **Infer missing data**: If position is missing but context suggests a role, add it
 7. **Format company properly**: "ACME, INC." → "Acme, Inc."
+8. **CRITICAL - Merge fragmented company names**: OCR often splits company names across lines. Look in raw text for patterns like:
+   - "Google" on one line, "LLC" on another → combine to "Google LLC"
+   - "Acme" then "Corporation" → "Acme Corporation"
+   - "Hedgefund" then "Corporation Inc" → "Hedgefund Corporation Inc"
+   - Company name in logo text that appears separately from suffix
+   If the parsed company is ONLY a suffix (LLC, Inc, Corp, etc.), missing a word, or incomplete, search the RAW text for the full company name and combine ALL the parts.
 
 Return ONLY valid JSON (no markdown formatting):
 {
@@ -781,10 +700,15 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
 
                 if (data.error) {
                     console.error('[Gemini] API error:', data.error);
-                    return parsed; // Return original if error
+                    return { ...parsed, _aiValidated: false, _aiError: data.error.message || 'API error' };
                 }
 
-                const text = data.candidates[0].content.parts[0].text;
+                // Safe navigation with null checks
+                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) {
+                    console.warn('[Gemini] Empty or malformed response, using original parsing');
+                    return { ...parsed, _aiValidated: false, _aiError: 'Empty response from AI' };
+                }
 
                 // Extract JSON from response (handle markdown code blocks)
                 let jsonText = text.trim();
@@ -794,7 +718,7 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
 
                 const corrected = JSON.parse(jsonText);
 
-                console.log('[Gemini] Enhanced to 99%:', {
+                console.log('[Gemini] Enhanced:', {
                     before: { name: parsed.name, company: parsed.company },
                     after: { name: corrected.name, company: corrected.company }
                 });
@@ -807,22 +731,27 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                     company: corrected.company || parsed.company,
                     phone: corrected.phone || parsed.phone,
                     email: corrected.email || parsed.email,
-                    address: corrected.address || parsed.address
+                    address: corrected.address || parsed.address,
+                    _aiValidated: true
                 };
 
             } catch (error) {
                 console.error('[Gemini] Validation error:', error);
-                return parsed; // Return original on error
+                return { ...parsed, _aiValidated: false, _aiError: error.message };
             }
         };
 
-        // Parse with automatic AI validation when uncertain
-        const parseWithValidation = async (text) => {
+        // Parse with optional AI validation
+        const parseWithValidation = async (text, useAI = true) => {
             const parsed = parseBusinessCard(text);
 
-            // Always enhance with AI for 99% accuracy
+            if (!useAI) {
+                console.log('[Parser] AI validation disabled, using rule-based parsing only');
+                return { ...parsed, _aiValidated: false, _aiError: 'AI disabled' };
+            }
+
+            // Enhance with AI for 99% accuracy
             // Uses Gemini 1.5 Flash (free tier: 1,500 requests/day)
-            // For personal use, this is plenty - ~50 scans/day = 1,500/month
             return await validateWithGemini(text, parsed);
         };
 
@@ -978,6 +907,7 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
             // API keys are defined globally (see top of file)
             const googleApiKey = GOOGLE_VISION_API_KEY;
             const [ocrEngine, setOcrEngine] = useState(localStorage.getItem('ocr_engine') || 'tesseract');
+            const [aiValidation, setAiValidation] = useState(localStorage.getItem('ai_validation') !== 'false'); // Default ON
 
             // Google Drive sync state
             const driveClientId = GOOGLE_DRIVE_CLIENT_ID;
@@ -1270,12 +1200,17 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
             };
 
             const capture = () => {
+                if (!videoRef.current) return;
                 const canvas = document.createElement('canvas');
-                canvas.width = videoRef.current.videoWidth;
-                canvas.height = videoRef.current.videoHeight;
-                canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
+                canvas.width = videoRef.current.videoWidth || 640;
+                canvas.height = videoRef.current.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                if (ctx) ctx.drawImage(videoRef.current, 0, 0);
                 setCapturedImage(canvas.toDataURL('image/jpeg'));
-                videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+                // Safely stop video tracks
+                if (videoRef.current.srcObject) {
+                    videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+                }
             };
 
             // OCR function
@@ -1310,7 +1245,7 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                     setProgress(90);
                     setStatusMessage('Parsing results...');
 
-                    const parsed = await parseWithValidation(result.text);
+                    const parsed = await parseWithValidation(result.text, aiValidation);
                     setOcrResult({
                         ...parsed,
                         rawText: result.text,
@@ -1394,10 +1329,10 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                                 result = { text: tesseractResult.data.text, confidence: tesseractResult.data.confidence };
                             }
 
-                            const parsed = await parseWithValidation(result.text);
+                            const parsed = await parseWithValidation(result.text, aiValidation);
                             results.push({
                                 ...parsed,
-                                id: Date.now() + i,
+                                id: `${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
                                 image: item.preview,
                                 fileName: item.file.name,
                                 rawText: result.text,
@@ -1413,8 +1348,6 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                         }
                     }
 
-                    if (worker) await worker.terminate();
-
                     setBulkResults(results);
                     setStatusMessage('');
 
@@ -1427,13 +1360,30 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                     console.error('[Bulk Error]', e);
                     setError(`Batch processing failed: ${e.message}`);
                 } finally {
+                    // Always terminate worker to prevent memory leaks
+                    if (worker) {
+                        try { await worker.terminate(); } catch (e) { console.warn('Worker termination failed:', e); }
+                    }
                     setIsProcessing(false);
                 }
             };
 
+            // Cleanup blob URLs when component unmounts or bulk queue changes
+            useEffect(() => {
+                return () => {
+                    // Revoke blob URLs to prevent memory leaks
+                    bulkQueue.forEach(item => {
+                        if (item.preview && item.preview.startsWith('blob:')) {
+                            URL.revokeObjectURL(item.preview);
+                        }
+                    });
+                };
+            }, [bulkQueue]);
+
             // Save settings
             const saveSettings = () => {
                 localStorage.setItem('ocr_engine', ocrEngine);
+                localStorage.setItem('ai_validation', aiValidation);
                 setView('home');
             };
 
@@ -1598,6 +1548,28 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                                     <div className="text-xs text-slate-400 mt-1">More accurate. Uses cloud processing.</div>
                                 </button>
                             </div>
+                        </div>
+
+                        {/* AI Validation Toggle */}
+                        <div className="space-y-3">
+                            <label className="text-xs uppercase tracking-wider text-slate-500 font-bold">AI Enhancement</label>
+                            <button
+                                onClick={() => setAiValidation(!aiValidation)}
+                                className={`w-full p-4 rounded-xl text-left transition-all flex items-center justify-between ${aiValidation ? 'bg-purple-500/20 border border-purple-500/50' : 'glass'}`}
+                            >
+                                <div>
+                                    <div className="font-bold text-sm">AI-Powered Validation</div>
+                                    <div className="text-xs text-slate-400 mt-1">Uses Gemini AI to improve parsing accuracy to 99%</div>
+                                </div>
+                                <div className={`w-12 h-6 rounded-full transition-all ${aiValidation ? 'bg-purple-500' : 'bg-slate-600'} relative`}>
+                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${aiValidation ? 'right-1' : 'left-1'}`}></div>
+                                </div>
+                            </button>
+                            {!aiValidation && (
+                                <p className="text-xs text-amber-400/80 px-1">
+                                    ⚠️ Without AI, parsing relies on rule-based detection only. May be less accurate for complex cards.
+                                </p>
+                            )}
                         </div>
 
                         {/* Google Drive Sync */}
@@ -1772,7 +1744,7 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                                     />
                                     <button
                                         onClick={async () => {
-                                            const reparsed = await parseWithValidation(ocrResult.rawText);
+                                            const reparsed = await parseWithValidation(ocrResult.rawText, aiValidation);
                                             setOcrResult(prev => ({
                                                 ...prev,
                                                 ...reparsed,
@@ -1970,7 +1942,7 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                                             />
                                             <button
                                                 onClick={async () => {
-                                                    const reparsed = await parseWithValidation(r.rawText);
+                                                    const reparsed = await parseWithValidation(r.rawText, aiValidation);
                                                     setBulkResults(prev => prev.map((item, i) => i === idx ? {
                                                         ...item,
                                                         ...reparsed,
