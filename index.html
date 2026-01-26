@@ -446,10 +446,8 @@
         const TITLE_KEYWORD_REGEX = new RegExp(`\\b(${TITLE_KEYWORDS.join('|')})\\b`, 'i');
 
         const parseBusinessCard = (text) => {
-            console.log('[Parser v2] Starting parse...');
             const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             let lines = normalizedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-            console.log('[Parser v2] Initial lines:', lines);
 
             // PRE-PROCESS: Merge fragmented company names
             // Handles: "BUILDERS,\nINC." | "Google\nLLC" | "Hedgefund\nCorporation Inc"
@@ -546,7 +544,6 @@
                     const isTitleCase = /^[A-Z][a-z]*(\s+[A-Z][a-z]*)*$/.test(prevLine);
                     if (isValidFragment(prevLine) && (isAllCaps || isTitleCase || prevLine.length <= 20) && !skipIndices.has(idx - 1)) {
                         addMerge(extendBackwards(idx - 1, lines), idx);
-                        console.log(`[Parser] Merged company continuation: "${prevLine}" + "${trimmed}"`);
                     }
                 }
             });
@@ -577,9 +574,6 @@
             }
 
             lines = mergedLines;
-            if (mergeMap.size > 0) {
-                console.log('[Parser] Merged company names:', Array.from(mergeMap.entries()).map(([s, e]) => `${s}-${e}`));
-            }
 
             // PRE-PROCESS: Merge multi-line addresses
             // Handles: "Add:No.6 Foluo Road Industrial" + "Park,Nanhai District,Foshan," + "Guangdong,China"
@@ -624,8 +618,6 @@
             const addressMergedLines = [];
             i = 0; // Reset i (already declared above)
 
-            console.log('[Address Merge v3] Starting address merge. Lines before:', lines);
-
             while (i < lines.length) {
                 const line = lines[i];
                 const lower = line.toLowerCase();
@@ -659,12 +651,9 @@
                     locationWordCount >= 2 ||
                     (hasLocationWord && endsWithComma);
 
-                console.log(`[Address Merge v3] Line ${i}: "${line}" | hasAddPrefix=${hasAddPrefix} | hasLocationWord=${hasLocationWord} | hasNumber=${hasNumber} | hasStrongAddressWord=${hasStrongAddressWord} | locationWordCount=${locationWordCount} | endsWithComma=${endsWithComma} | isAddressStart=${isAddressStart}`);
-
                 if (isAddressStart) {
                     // Start collecting address lines
                     const addressParts = [line];
-                    console.log(`[Address Merge v3] ADDRESS START FOUND at line ${i}`);
                     let j = i + 1;
 
                     // Look ahead and collect continuation lines
@@ -672,13 +661,11 @@
                         const nextLine = lines[j];
                         const nextLower = nextLine.toLowerCase();
 
-                        console.log(`[Address Merge v3] Checking continuation line ${j}: "${nextLine}"`);
-
                         // STOP if line is clearly not an address
-                        if (nextLine.includes('@')) { console.log('  -> STOP: has email'); break; }
-                        if (/^\+?\d[\d\s().-]{9,}$/.test(nextLine.replace(/\s/g, ''))) { console.log('  -> STOP: is phone'); break; }
-                        if (/^(tel|phone|mobile|fax|email|web|www)/i.test(nextLine.trim())) { console.log('  -> STOP: is label'); break; }
-                        if (COMPANY_SUFFIX_WORD_REGEX.test(nextLower) && !hasAddressLocationWord(nextLower)) { console.log('  -> STOP: is company'); break; }
+                        if (nextLine.includes('@')) break;
+                        if (/^\+?\d[\d\s().-]{9,}$/.test(nextLine.replace(/\s/g, ''))) break;
+                        if (/^(tel|phone|mobile|fax|email|web|www)/i.test(nextLine.trim())) break;
+                        if (COMPANY_SUFFIX_WORD_REGEX.test(nextLower) && !hasAddressLocationWord(nextLower)) break;
 
                         // CONTINUE if line looks like address continuation
                         // Must have actual address characteristics, not just be short!
@@ -693,14 +680,10 @@
                         const prevEndsWithComma = addressParts[addressParts.length - 1]?.trim().endsWith(',');
                         const looksLikeAddress = hasLocWord || (hasComma && hasNumber) || (prevEndsWithComma && (hasLocWord || hasNumber));
 
-                        console.log(`  -> hasLocWord=${hasLocWord} hasComma=${hasComma} hasNumber=${hasNumber} prevEndsWithComma=${prevEndsWithComma} => looksLikeAddress=${looksLikeAddress}`);
-
                         if (looksLikeAddress) {
                             addressParts.push(nextLine);
-                            console.log(`  -> ADDED to address parts`);
                             j++;
                         } else {
-                            console.log('  -> STOP: does not look like address');
                             break;
                         }
                     }
@@ -709,7 +692,6 @@
                     if (addressParts.length > 1) {
                         const merged = addressParts.join(' ').replace(/\s+/g, ' ').trim();
                         addressMergedLines.push(merged);
-                        console.log(`[Address] Merged ${addressParts.length} lines: "${merged}"`);
                     } else {
                         addressMergedLines.push(line);
                     }
@@ -721,7 +703,6 @@
             }
 
             lines = addressMergedLines;
-            console.log('[Address Merge v3] Lines AFTER merge:', lines);
 
             // Extract emails - must have proper format with domain
             const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
@@ -883,10 +864,7 @@
                 // Don't use as title if it looks like an address
                 const addressIndicators = ['building', 'bldg', 'floor', 'flr', 'street', 'st.', 'avenue', 'ave', 'road', 'rd', 'place', 'tower', 'unit', 'suite', 'block', 'blk', 'lot', 'phase', 'head office', 'main office', 'branch office'];
                 const looksLikeAddress = addressIndicators.some(ind => lineLower.includes(ind));
-                if (looksLikeAddress) {
-                    console.log(`[Parser] Skipping "${line}" - looks like address`);
-                    return;
-                }
+                if (looksLikeAddress) return;
 
                 // Calculate a score for this position candidate
                 let score = 10;
@@ -921,8 +899,6 @@
                 if (line !== line.toUpperCase() && line !== line.toLowerCase()) {
                     score += 10;
                 }
-
-                console.log(`[Parser] "${line}" score: ${score}`);
 
                 positionCandidates.push({ line, idx, score, keywords: matchedKeywords });
             });
@@ -1028,17 +1004,11 @@
                     if (STRONG_SUFFIX_REGEX.test(lineLower) && !hasAddressLocationWord(lineLower)) break; // Company
 
                     // Stop if line contains business/company indicators (not address)
-                    if (nonAddressIndicators.some(w => lineLower.includes(w))) {
-                        console.log(`[STEP 4] STOP: "${line}" contains business indicator`);
-                        break;
-                    }
+                    if (nonAddressIndicators.some(w => lineLower.includes(w))) break;
 
                     // Stop if line looks like brand names (multiple ALL CAPS words, no address keywords)
                     const allCapsWords = line.split(/\s+/).filter(w => w === w.toUpperCase() && w.length > 2 && /[A-Z]/.test(w));
-                    if (allCapsWords.length >= 2 && !hasAddressLocationWord(lineLower)) {
-                        console.log(`[STEP 4] STOP: "${line}" looks like brand names`);
-                        break;
-                    }
+                    if (allCapsWords.length >= 2 && !hasAddressLocationWord(lineLower)) break;
 
                     // Check if looks like address continuation
                     const isAddress = isAddressLikeLine(line);
@@ -1058,7 +1028,6 @@
 
                 if (addressParts.length > 0) {
                     categorized.address = addressParts.join(' ').replace(/\s+/g, ' ').trim();
-                    console.log(`[STEP 4] Collected ${addressParts.length} address lines: "${categorized.address}"`);
                 }
             }
 
@@ -1244,7 +1213,6 @@
             let cleanPosition = categorized.position || '';
             if (/^[A-Z]\s+[A-Z]/i.test(cleanPosition)) {
                 cleanPosition = cleanPosition.replace(/^[A-Z]\s+/, '');
-                console.log(`[Cleanup] Fixed position: "${categorized.position}" → "${cleanPosition}"`);
             }
 
             // Remove Chinese characters from position if they were incorrectly included
@@ -1257,11 +1225,8 @@
                 const englishPart = cleanName.replace(/[\u4e00-\u9fff]+/g, '').trim();
                 if (englishPart.length > 3) {
                     cleanName = englishPart;
-                    console.log(`[Cleanup] Extracted English name: "${cleanName}"`);
                 }
             }
-
-            console.log('[Parser v2] Final categorized address:', categorized.address);
 
             const result = {
                 name: cleanName,
@@ -1281,8 +1246,6 @@
 
         // Validate/correct parsing with Gemini AI
         const validateWithGemini = async (rawText, parsed) => {
-            console.log('[Gemini] Enhancing parsing to 99% accuracy...');
-
             try {
                 const prompt = `You are an expert business card data curator. Your goal is to polish OCR-extracted contact information to 99% accuracy.
 
@@ -1365,11 +1328,6 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
 
                 const corrected = JSON.parse(jsonText);
 
-                console.log('[Gemini] Enhanced:', {
-                    before: { name: parsed.name, company: parsed.company },
-                    after: { name: corrected.name, company: corrected.company }
-                });
-
                 // VALIDATION: Reject obviously wrong AI responses
                 const isValidName = (name) => {
                     if (!name || name.length < 2) return false;
@@ -1383,17 +1341,11 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                 const isValidCompany = (company) => {
                     if (!company) return false;
                     // Company name shouldn't be longer than 80 chars (likely concatenated garbage)
-                    if (company.length > 80) {
-                        console.log('[Gemini] REJECTED company - too long:', company.length);
-                        return false;
-                    }
+                    if (company.length > 80) return false;
                     // Company shouldn't contain personal names AND address parts together
                     const hasPersonalName = /\b(specialist|manager|director|officer|engineer|sales|corporate)\b/i.test(company);
                     const hasAddressPart = /\b(city|philippines|street|ave\.|avenue|road|floor|bldg)\b/i.test(company);
-                    if (hasPersonalName && hasAddressPart) {
-                        console.log('[Gemini] REJECTED company - contains job title and address');
-                        return false;
-                    }
+                    if (hasPersonalName && hasAddressPart) return false;
                     return true;
                 };
 
@@ -1417,12 +1369,6 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                     }
                 }
 
-                console.log('[Gemini] Final selection:', {
-                    name: bestName,
-                    company: bestCompany?.substring(0, 40),
-                    address: bestAddress?.substring(0, 40)
-                });
-
                 return {
                     ...parsed,
                     name: bestName,
@@ -1445,7 +1391,6 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
             const parsed = parseBusinessCard(text);
 
             if (!useAI) {
-                console.log('[Parser] AI validation disabled, using rule-based parsing only');
                 return { ...parsed, _aiValidated: false, _aiError: 'AI disabled' };
             }
 
@@ -1572,16 +1517,12 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
 
         // Tesseract OCR with preprocessing
         const tesseractOCR = async (imageSrc, onProgress) => {
-            console.log('[Tesseract] Starting OCR...');
-
             // Preprocess image for better recognition
             if (onProgress) onProgress('Preprocessing image...', 10);
             const processedImage = await preprocessImage(imageSrc);
-            console.log('[Tesseract] Image preprocessed');
 
             const worker = await Tesseract.createWorker('eng', 1, {
                 logger: m => {
-                    console.log('[Tesseract]', m.status, m.progress ? Math.round(m.progress * 100) + '%' : '');
                     if (onProgress && m.progress) onProgress(m.status, Math.round(m.progress * 100));
                 }
             });
@@ -1589,8 +1530,6 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
             const result = await worker.recognize(processedImage);
             await worker.terminate();
 
-            console.log('[Tesseract] Complete, confidence:', result.data.confidence);
-            console.log('[Tesseract] Raw text:', result.data.text);
             return { text: result.data.text, confidence: result.data.confidence };
         };
 
