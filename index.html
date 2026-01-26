@@ -988,6 +988,14 @@
 
             // If found, collect consecutive address lines
             if (addressStartIdx !== -1) {
+                // Words that indicate we've left the address and entered company/brand territory
+                const nonAddressIndicators = [
+                    'venture', 'distributor', 'dealer', 'authorized', 'exclusive', 'official',
+                    'supplier', 'manufacturer', 'importer', 'exporter', 'retailer', 'wholesale',
+                    'representative', 'agent', 'partner', 'member', 'affiliate', 'branch',
+                    'division', 'subsidiary', 'franchise', 'licensed', 'certified'
+                ];
+
                 for (let idx = addressStartIdx; idx < lines.length; idx++) {
                     if (usedLines.has(idx)) continue;
                     const line = lines[idx];
@@ -999,13 +1007,27 @@
                     if (/^(tel|phone|mobile|fax|email|web|www)/i.test(line.trim())) break; // Label
                     if (STRONG_SUFFIX_REGEX.test(lineLower) && !ADDRESS_LOCATION_WORDS.some(w => lineLower.includes(w))) break; // Company
 
+                    // Stop if line contains business/company indicators (not address)
+                    if (nonAddressIndicators.some(w => lineLower.includes(w))) {
+                        console.log(`[STEP 4] STOP: "${line}" contains business indicator`);
+                        break;
+                    }
+
+                    // Stop if line looks like brand names (multiple ALL CAPS words, no address keywords)
+                    const allCapsWords = line.split(/\s+/).filter(w => w === w.toUpperCase() && w.length > 2 && /[A-Z]/.test(w));
+                    if (allCapsWords.length >= 2 && !ADDRESS_LOCATION_WORDS.some(w => lineLower.includes(w))) {
+                        console.log(`[STEP 4] STOP: "${line}" looks like brand names`);
+                        break;
+                    }
+
                     // Check if looks like address continuation
                     const isAddress = isAddressLikeLine(line);
                     const hasComma = line.includes(',');
-                    const isShort = line.length < 50;
                     const endsWithComma = line.trim().endsWith(',');
+                    const hasAddressWord = ADDRESS_LOCATION_WORDS.some(w => lineLower.includes(w));
 
-                    if (isAddress || hasComma || (isShort && addressParts.length > 0) || endsWithComma) {
+                    // Only continue if it actually looks like an address (not just because it's short)
+                    if (isAddress || (hasComma && hasAddressWord) || endsWithComma) {
                         addressParts.push(line);
                         usedLines.add(idx);
                     } else if (addressParts.length > 0) {
