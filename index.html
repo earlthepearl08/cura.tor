@@ -957,24 +957,68 @@
                 }
             }
 
-            // STEP 4: Find address line
-            lines.forEach((line, idx) => {
-                if (usedLines.has(idx)) return;
-                const lineLower = line.toLowerCase();
+            // STEP 4: Find address lines (collect ALL consecutive address lines, not just the first)
+            const addressParts = [];
+            let addressStartIdx = -1;
 
-                // Skip lines that look like company names (use precompiled regex)
-                if (STRONG_SUFFIX_REGEX.test(lineLower)) return;
+            // Helper to check if a line looks like an address
+            const isAddressLikeLine = (line) => {
+                const lineLower = line.toLowerCase();
+                // Skip company names
+                if (STRONG_SUFFIX_REGEX.test(lineLower)) return false;
 
                 const hasAddressKeyword = addressKeywords.some(keyword => lineLower.includes(keyword));
+                const hasLocationWord = ADDRESS_LOCATION_WORDS.some(w => lineLower.includes(w));
                 const hasZipCode = /\b\d{4,6}\b/.test(line);
                 const hasPhaseBlock = /phase|block|lot|blk/i.test(line);
                 const hasMultipleCommas = (line.match(/,/g) || []).length >= 2;
+                const hasStreetNumber = /^#?\d+\s/.test(line) || /\bno\.?\s*\d/i.test(line);
 
-                if ((hasAddressKeyword || hasPhaseBlock || (hasZipCode && hasMultipleCommas)) && !categorized.address) {
-                    categorized.address = line;
-                    usedLines.add(idx);
+                return hasAddressKeyword || hasLocationWord || hasPhaseBlock || hasStreetNumber || (hasZipCode && hasMultipleCommas);
+            };
+
+            // Find first address line
+            for (let idx = 0; idx < lines.length; idx++) {
+                if (usedLines.has(idx)) continue;
+                if (isAddressLikeLine(lines[idx])) {
+                    addressStartIdx = idx;
+                    break;
                 }
-            });
+            }
+
+            // If found, collect consecutive address lines
+            if (addressStartIdx !== -1) {
+                for (let idx = addressStartIdx; idx < lines.length; idx++) {
+                    if (usedLines.has(idx)) continue;
+                    const line = lines[idx];
+                    const lineLower = line.toLowerCase();
+
+                    // Stop conditions
+                    if (line.includes('@')) break; // Email
+                    if (/^\+?\d[\d\s().-]{9,}$/.test(line.replace(/\s/g, ''))) break; // Phone
+                    if (/^(tel|phone|mobile|fax|email|web|www)/i.test(line.trim())) break; // Label
+                    if (STRONG_SUFFIX_REGEX.test(lineLower) && !ADDRESS_LOCATION_WORDS.some(w => lineLower.includes(w))) break; // Company
+
+                    // Check if looks like address continuation
+                    const isAddress = isAddressLikeLine(line);
+                    const hasComma = line.includes(',');
+                    const isShort = line.length < 50;
+                    const endsWithComma = line.trim().endsWith(',');
+
+                    if (isAddress || hasComma || (isShort && addressParts.length > 0) || endsWithComma) {
+                        addressParts.push(line);
+                        usedLines.add(idx);
+                    } else if (addressParts.length > 0) {
+                        // Already have address parts, this line doesn't look like address - stop
+                        break;
+                    }
+                }
+
+                if (addressParts.length > 0) {
+                    categorized.address = addressParts.join(' ').replace(/\s+/g, ' ').trim();
+                    console.log(`[STEP 4] Collected ${addressParts.length} address lines: "${categorized.address}"`);
+                }
+            }
 
             // STEP 5: Find company line - collect candidates and pick the best one
             const companyStrongIndicators = ['inc', 'inc.', 'corp', 'corporation', 'llc', 'ltd', 'enterprises', 'industries', 'international', 'construction', 'builders'];
