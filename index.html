@@ -1364,23 +1364,64 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                     after: { name: corrected.name, company: corrected.company }
                 });
 
-                // Merge corrected data with original (keep phones array)
-                // For address: prefer the LONGER one (merged multi-line addresses are more complete)
-                const bestAddress = (corrected.address && parsed.address)
-                    ? (corrected.address.length >= parsed.address.length ? corrected.address : parsed.address)
-                    : (corrected.address || parsed.address);
+                // VALIDATION: Reject obviously wrong AI responses
+                const isValidName = (name) => {
+                    if (!name || name.length < 2) return false;
+                    if (/^(unknown|n\/a|none|null|undefined)$/i.test(name.trim())) return false;
+                    // Name shouldn't be longer than 50 chars or contain address/company words
+                    if (name.length > 50) return false;
+                    if (/\b(inc|corp|llc|ltd|city|philippines|street|ave|road)\b/i.test(name)) return false;
+                    return true;
+                };
 
-                console.log('[Gemini] Address comparison:', {
-                    ai: corrected.address?.substring(0, 50),
-                    parsed: parsed.address?.substring(0, 50),
-                    chosen: bestAddress?.substring(0, 50)
+                const isValidCompany = (company) => {
+                    if (!company) return false;
+                    // Company name shouldn't be longer than 80 chars (likely concatenated garbage)
+                    if (company.length > 80) {
+                        console.log('[Gemini] REJECTED company - too long:', company.length);
+                        return false;
+                    }
+                    // Company shouldn't contain personal names AND address parts together
+                    const hasPersonalName = /\b(specialist|manager|director|officer|engineer|sales|corporate)\b/i.test(company);
+                    const hasAddressPart = /\b(city|philippines|street|ave\.|avenue|road|floor|bldg)\b/i.test(company);
+                    if (hasPersonalName && hasAddressPart) {
+                        console.log('[Gemini] REJECTED company - contains job title and address');
+                        return false;
+                    }
+                    return true;
+                };
+
+                const isValidAddress = (address) => {
+                    if (!address) return false;
+                    // Address shouldn't be longer than 200 chars
+                    if (address.length > 200) return false;
+                    return true;
+                };
+
+                // Select best values with validation
+                const bestName = isValidName(corrected.name) ? corrected.name : parsed.name;
+                const bestCompany = isValidCompany(corrected.company) ? corrected.company : parsed.company;
+                const bestPosition = corrected.position || parsed.position;
+
+                // For address: prefer the LONGER one but validate it
+                let bestAddress = parsed.address;
+                if (isValidAddress(corrected.address)) {
+                    if (!parsed.address || corrected.address.length >= parsed.address.length) {
+                        bestAddress = corrected.address;
+                    }
+                }
+
+                console.log('[Gemini] Final selection:', {
+                    name: bestName,
+                    company: bestCompany?.substring(0, 40),
+                    address: bestAddress?.substring(0, 40)
                 });
 
                 return {
                     ...parsed,
-                    name: corrected.name || parsed.name,
-                    position: corrected.position || parsed.position,
-                    company: corrected.company || parsed.company,
+                    name: bestName,
+                    position: bestPosition,
+                    company: bestCompany,
                     phone: corrected.phone || parsed.phone,
                     email: corrected.email || parsed.email,
                     address: bestAddress,
