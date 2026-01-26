@@ -446,8 +446,10 @@
         const TITLE_KEYWORD_REGEX = new RegExp(`\\b(${TITLE_KEYWORDS.join('|')})\\b`, 'i');
 
         const parseBusinessCard = (text) => {
+            console.log('[Parser v2] Starting parse...');
             const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             let lines = normalizedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            console.log('[Parser v2] Initial lines:', lines);
 
             // PRE-PROCESS: Merge fragmented company names
             // Handles: "BUILDERS,\nINC." | "Google\nLLC" | "Hedgefund\nCorporation Inc"
@@ -594,17 +596,24 @@
             const addressMergedLines = [];
             let i = 0;
 
+            console.log('[Address Merge v2] Starting address merge. Lines before:', lines);
+
             while (i < lines.length) {
                 const line = lines[i];
                 const lower = line.toLowerCase();
 
                 // Check if this line starts an address (has "Add:" prefix or is clearly an address start)
-                const isAddressStart = /^(add|address|addr)[\s.:]/i.test(line) ||
-                    (ADDRESS_LOCATION_WORDS.some(w => lower.includes(w)) && (lower.includes('no.') || /\d/.test(line)));
+                const hasAddPrefix = /^(add|address|addr)[\s.:]/i.test(line);
+                const hasLocationWord = ADDRESS_LOCATION_WORDS.some(w => lower.includes(w));
+                const hasNumber = lower.includes('no.') || /\d/.test(line);
+                const isAddressStart = hasAddPrefix || (hasLocationWord && hasNumber);
+
+                console.log(`[Address Merge v2] Line ${i}: "${line}" | hasAddPrefix=${hasAddPrefix} | hasLocationWord=${hasLocationWord} | hasNumber=${hasNumber} | isAddressStart=${isAddressStart}`);
 
                 if (isAddressStart) {
                     // Start collecting address lines
                     const addressParts = [line];
+                    console.log(`[Address Merge v2] ADDRESS START FOUND at line ${i}`);
                     let j = i + 1;
 
                     // Look ahead and collect continuation lines
@@ -612,23 +621,29 @@
                         const nextLine = lines[j];
                         const nextLower = nextLine.toLowerCase();
 
+                        console.log(`[Address Merge v2] Checking continuation line ${j}: "${nextLine}"`);
+
                         // STOP if line is clearly not an address
-                        if (nextLine.includes('@')) break; // Email
-                        if (/^\+?\d[\d\s().-]{9,}$/.test(nextLine.replace(/\s/g, ''))) break; // Phone
-                        if (/^(tel|phone|mobile|fax|email|web|www)/i.test(nextLine.trim())) break; // Label
-                        if (COMPANY_SUFFIX_WORD_REGEX.test(nextLower) && !ADDRESS_LOCATION_WORDS.some(w => nextLower.includes(w))) break; // Company
+                        if (nextLine.includes('@')) { console.log('  -> STOP: has email'); break; }
+                        if (/^\+?\d[\d\s().-]{9,}$/.test(nextLine.replace(/\s/g, ''))) { console.log('  -> STOP: is phone'); break; }
+                        if (/^(tel|phone|mobile|fax|email|web|www)/i.test(nextLine.trim())) { console.log('  -> STOP: is label'); break; }
+                        if (COMPANY_SUFFIX_WORD_REGEX.test(nextLower) && !ADDRESS_LOCATION_WORDS.some(w => nextLower.includes(w))) { console.log('  -> STOP: is company'); break; }
 
                         // CONTINUE if line looks like address continuation
-                        const looksLikeAddress =
-                            ADDRESS_LOCATION_WORDS.some(w => nextLower.includes(w)) || // Has location word
-                            nextLine.includes(',') || // Has comma
-                            /^[a-z]/.test(nextLine.trim()) || // Starts lowercase
-                            nextLine.length < 40; // Short line
+                        const hasLocWord = ADDRESS_LOCATION_WORDS.some(w => nextLower.includes(w));
+                        const hasComma = nextLine.includes(',');
+                        const startsLower = /^[a-z]/.test(nextLine.trim());
+                        const isShort = nextLine.length < 40;
+                        const looksLikeAddress = hasLocWord || hasComma || startsLower || isShort;
+
+                        console.log(`  -> hasLocWord=${hasLocWord} hasComma=${hasComma} startsLower=${startsLower} isShort=${isShort} => looksLikeAddress=${looksLikeAddress}`);
 
                         if (looksLikeAddress) {
                             addressParts.push(nextLine);
+                            console.log(`  -> ADDED to address parts`);
                             j++;
                         } else {
+                            console.log('  -> STOP: does not look like address');
                             break;
                         }
                     }
@@ -1099,9 +1114,32 @@
                 ? phones.join(' / ')
                 : phones[0] || '';
 
+            // CLEANUP: Fix common OCR artifacts
+            // Remove single-letter prefix from position (e.g., "A Sales Manager" → "Sales Manager")
+            // This happens when Chinese characters are misread
+            let cleanPosition = categorized.position || '';
+            if (/^[A-Z]\s+[A-Z]/i.test(cleanPosition)) {
+                cleanPosition = cleanPosition.replace(/^[A-Z]\s+/, '');
+                console.log(`[Cleanup] Fixed position: "${categorized.position}" → "${cleanPosition}"`);
+            }
+
+            // Remove Chinese characters from position if they were incorrectly included
+            cleanPosition = cleanPosition.replace(/[\u4e00-\u9fff]+\s*/g, '').trim();
+
+            // Clean up name - remove Chinese characters if mixed with English name
+            let cleanName = categorized.name || 'Unknown';
+            // If name has both Chinese and English, prefer the English part
+            if (/[\u4e00-\u9fff]/.test(cleanName) && /[A-Za-z]{2,}/.test(cleanName)) {
+                const englishPart = cleanName.replace(/[\u4e00-\u9fff]+/g, '').trim();
+                if (englishPart.length > 3) {
+                    cleanName = englishPart;
+                    console.log(`[Cleanup] Extracted English name: "${cleanName}"`);
+                }
+            }
+
             const result = {
-                name: categorized.name || 'Unknown',
-                position: categorized.position || '',
+                name: cleanName,
+                position: cleanPosition,
                 company: categorized.company || '',
                 phone: phoneDisplay, // All phones joined
                 phones: phones, // Array of all phones
