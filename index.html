@@ -583,28 +583,42 @@
 
             // PRE-PROCESS: Merge multi-line addresses
             // Handles: "Add:No.6 Foluo Road Industrial" + "Park,Nanhai District,Foshan," + "Guangdong,China"
-            const ADDRESS_LOCATION_WORDS = [
-                // Location types
+            // Words that can be matched with simple includes()
+            const ADDRESS_LOCATION_WORDS_LONG = [
+                // Location types (4+ chars, safe to use includes)
                 'park', 'district', 'city', 'province', 'state', 'country', 'village', 'subdivision',
                 'compound', 'complex', 'center', 'centre', 'plaza', 'mall', 'estate', 'heights',
                 // Countries
-                'china', 'usa', 'philippines', 'singapore', 'japan', 'korea', 'india', 'taiwan', 'malaysia',
+                'china', 'philippines', 'singapore', 'japan', 'korea', 'india', 'taiwan', 'malaysia',
                 // China cities
                 'guangdong', 'foshan', 'nanhai', 'shenzhen', 'guangzhou', 'shanghai', 'beijing',
                 // Philippine locations
                 'metro manila', 'manila', 'makati', 'pasig', 'taguig', 'quezon', 'cavite', 'laguna',
                 'cebu', 'davao', 'barangay', 'brgy', 'intramuros', 'bicutan', 'paranaque', 'muntinlupa',
-                'mandaluyong', 'san juan', 'caloocan', 'valenzuela', 'malabon', 'navotas', 'pateros',
-                // Street types (full + abbreviations)
-                'road', 'rd', 'rd.', 'street', 'st', 'st.', 'avenue', 'ave', 'ave.',
-                'boulevard', 'blvd', 'blvd.', 'drive', 'dr', 'dr.', 'lane', 'ln',
-                'highway', 'hwy', 'corner', 'cor', 'cor.',
-                // Building types (full + abbreviations)
-                'building', 'bldg', 'bldg.', 'floor', 'flr', 'flr.', 'room', 'rm', 'rm.',
-                'tower', 'twr', 'unit', 'suite', 'ste', 'level', 'lvl',
+                'mandaluyong', 'caloocan', 'valenzuela', 'malabon', 'navotas', 'pateros',
+                // Street types (full words only)
+                'road', 'street', 'avenue', 'boulevard', 'drive', 'lane', 'highway', 'corner',
+                // Building types (full words only)
+                'building', 'bldg', 'floor', 'room', 'tower', 'unit', 'suite', 'level',
                 // Other address parts
-                'industrial', 'block', 'blk', 'lot', 'phase', 'no.', 'number'
+                'industrial', 'block', 'phase', 'number'
             ];
+
+            // Short abbreviations that need word boundary matching (to avoid matching "SYSTECH" with "st")
+            const ADDRESS_ABBREV_PATTERN = /\b(st|rd|ave|blvd|dr|ln|hwy|cor|flr|rm|twr|ste|lvl|blk|lot|no)\b\.?/i;
+
+            // Combined check for address location words
+            const hasAddressLocationWord = (text) => {
+                const lower = text.toLowerCase();
+                // Check long words with simple includes
+                if (ADDRESS_LOCATION_WORDS_LONG.some(w => lower.includes(w))) return true;
+                // Check short abbreviations with word boundary
+                if (ADDRESS_ABBREV_PATTERN.test(text)) return true;
+                return false;
+            };
+
+            // Keep ADDRESS_LOCATION_WORDS for backward compatibility (used in other places)
+            const ADDRESS_LOCATION_WORDS = [...ADDRESS_LOCATION_WORDS_LONG];
 
             // SIMPLE DIRECT APPROACH: Find lines with "Add:" prefix and merge subsequent address-looking lines
             const addressMergedLines = [];
@@ -618,7 +632,7 @@
 
                 // Check if this line starts an address (has "Add:" prefix or is clearly an address start)
                 const hasAddPrefix = /^(add|address|addr)[\s.:]/i.test(line);
-                const hasLocationWord = ADDRESS_LOCATION_WORDS.some(w => lower.includes(w));
+                const hasLocationWord = hasAddressLocationWord(lower);
                 const hasNumber = lower.includes('no.') || /\d/.test(line);
 
                 // Strong address indicators that don't need numbers (include abbreviations)
@@ -664,10 +678,10 @@
                         if (nextLine.includes('@')) { console.log('  -> STOP: has email'); break; }
                         if (/^\+?\d[\d\s().-]{9,}$/.test(nextLine.replace(/\s/g, ''))) { console.log('  -> STOP: is phone'); break; }
                         if (/^(tel|phone|mobile|fax|email|web|www)/i.test(nextLine.trim())) { console.log('  -> STOP: is label'); break; }
-                        if (COMPANY_SUFFIX_WORD_REGEX.test(nextLower) && !ADDRESS_LOCATION_WORDS.some(w => nextLower.includes(w))) { console.log('  -> STOP: is company'); break; }
+                        if (COMPANY_SUFFIX_WORD_REGEX.test(nextLower) && !hasAddressLocationWord(nextLower)) { console.log('  -> STOP: is company'); break; }
 
                         // CONTINUE if line looks like address continuation
-                        const hasLocWord = ADDRESS_LOCATION_WORDS.some(w => nextLower.includes(w));
+                        const hasLocWord = hasAddressLocationWord(nextLower);
                         const hasComma = nextLine.includes(',');
                         const startsLower = /^[a-z]/.test(nextLine.trim());
                         const isShort = nextLine.length < 40;
@@ -968,7 +982,7 @@
                 if (STRONG_SUFFIX_REGEX.test(lineLower)) return false;
 
                 const hasAddressKeyword = addressKeywords.some(keyword => lineLower.includes(keyword));
-                const hasLocationWord = ADDRESS_LOCATION_WORDS.some(w => lineLower.includes(w));
+                const hasLocationWord = hasAddressLocationWord(lineLower);
                 const hasZipCode = /\b\d{4,6}\b/.test(line);
                 const hasPhaseBlock = /phase|block|lot|blk/i.test(line);
                 const hasMultipleCommas = (line.match(/,/g) || []).length >= 2;
@@ -1005,7 +1019,7 @@
                     if (line.includes('@')) break; // Email
                     if (/^\+?\d[\d\s().-]{9,}$/.test(line.replace(/\s/g, ''))) break; // Phone
                     if (/^(tel|phone|mobile|fax|email|web|www)/i.test(line.trim())) break; // Label
-                    if (STRONG_SUFFIX_REGEX.test(lineLower) && !ADDRESS_LOCATION_WORDS.some(w => lineLower.includes(w))) break; // Company
+                    if (STRONG_SUFFIX_REGEX.test(lineLower) && !hasAddressLocationWord(lineLower)) break; // Company
 
                     // Stop if line contains business/company indicators (not address)
                     if (nonAddressIndicators.some(w => lineLower.includes(w))) {
@@ -1015,7 +1029,7 @@
 
                     // Stop if line looks like brand names (multiple ALL CAPS words, no address keywords)
                     const allCapsWords = line.split(/\s+/).filter(w => w === w.toUpperCase() && w.length > 2 && /[A-Z]/.test(w));
-                    if (allCapsWords.length >= 2 && !ADDRESS_LOCATION_WORDS.some(w => lineLower.includes(w))) {
+                    if (allCapsWords.length >= 2 && !hasAddressLocationWord(lineLower)) {
                         console.log(`[STEP 4] STOP: "${line}" looks like brand names`);
                         break;
                     }
@@ -1024,7 +1038,7 @@
                     const isAddress = isAddressLikeLine(line);
                     const hasComma = line.includes(',');
                     const endsWithComma = line.trim().endsWith(',');
-                    const hasAddressWord = ADDRESS_LOCATION_WORDS.some(w => lineLower.includes(w));
+                    const hasAddressWord = hasAddressLocationWord(lineLower);
 
                     // Only continue if it actually looks like an address (not just because it's short)
                     if (isAddress || (hasComma && hasAddressWord) || endsWithComma) {
