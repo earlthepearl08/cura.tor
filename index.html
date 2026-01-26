@@ -683,6 +683,7 @@
             }
 
             lines = addressMergedLines;
+            console.log('[Address Merge v3] Lines AFTER merge:', lines);
 
             // Extract emails - must have proper format with domain
             const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
@@ -1156,6 +1157,8 @@
                 }
             }
 
+            console.log('[Parser v2] Final categorized address:', categorized.address);
+
             const result = {
                 name: cleanName,
                 position: cleanPosition,
@@ -1264,6 +1267,17 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                 });
 
                 // Merge corrected data with original (keep phones array)
+                // For address: prefer the LONGER one (merged multi-line addresses are more complete)
+                const bestAddress = (corrected.address && parsed.address)
+                    ? (corrected.address.length >= parsed.address.length ? corrected.address : parsed.address)
+                    : (corrected.address || parsed.address);
+
+                console.log('[Gemini] Address comparison:', {
+                    ai: corrected.address?.substring(0, 50),
+                    parsed: parsed.address?.substring(0, 50),
+                    chosen: bestAddress?.substring(0, 50)
+                });
+
                 return {
                     ...parsed,
                     name: corrected.name || parsed.name,
@@ -1271,7 +1285,7 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
                     company: corrected.company || parsed.company,
                     phone: corrected.phone || parsed.phone,
                     email: corrected.email || parsed.email,
-                    address: corrected.address || parsed.address,
+                    address: bestAddress,
                     _aiValidated: true
                 };
 
