@@ -584,12 +584,26 @@
             // PRE-PROCESS: Merge multi-line addresses
             // Handles: "Add:No.6 Foluo Road Industrial" + "Park,Nanhai District,Foshan," + "Guangdong,China"
             const ADDRESS_LOCATION_WORDS = [
+                // Location types
                 'park', 'district', 'city', 'province', 'state', 'country', 'village', 'subdivision',
+                'compound', 'complex', 'center', 'centre', 'plaza', 'mall', 'estate', 'heights',
+                // Countries
                 'china', 'usa', 'philippines', 'singapore', 'japan', 'korea', 'india', 'taiwan', 'malaysia',
+                // China cities
                 'guangdong', 'foshan', 'nanhai', 'shenzhen', 'guangzhou', 'shanghai', 'beijing',
+                // Philippine locations
                 'metro manila', 'manila', 'makati', 'pasig', 'taguig', 'quezon', 'cavite', 'laguna',
-                'cebu', 'davao', 'barangay', 'brgy', 'road', 'street', 'avenue', 'building', 'floor',
-                'industrial', 'tower', 'unit', 'block', 'no.'
+                'cebu', 'davao', 'barangay', 'brgy', 'intramuros', 'bicutan', 'paranaque', 'muntinlupa',
+                'mandaluyong', 'san juan', 'caloocan', 'valenzuela', 'malabon', 'navotas', 'pateros',
+                // Street types (full + abbreviations)
+                'road', 'rd', 'rd.', 'street', 'st', 'st.', 'avenue', 'ave', 'ave.',
+                'boulevard', 'blvd', 'blvd.', 'drive', 'dr', 'dr.', 'lane', 'ln',
+                'highway', 'hwy', 'corner', 'cor', 'cor.',
+                // Building types (full + abbreviations)
+                'building', 'bldg', 'bldg.', 'floor', 'flr', 'flr.', 'room', 'rm', 'rm.',
+                'tower', 'twr', 'unit', 'suite', 'ste', 'level', 'lvl',
+                // Other address parts
+                'industrial', 'block', 'blk', 'lot', 'phase', 'no.', 'number'
             ];
 
             // SIMPLE DIRECT APPROACH: Find lines with "Add:" prefix and merge subsequent address-looking lines
@@ -607,8 +621,12 @@
                 const hasLocationWord = ADDRESS_LOCATION_WORDS.some(w => lower.includes(w));
                 const hasNumber = lower.includes('no.') || /\d/.test(line);
 
-                // Strong address indicators that don't need numbers
-                const strongAddressWords = ['floor', 'building', 'tower', 'unit', 'suite', 'room', 'level', 'block', 'lot', 'phase'];
+                // Strong address indicators that don't need numbers (include abbreviations)
+                const strongAddressWords = [
+                    'floor', 'flr', 'flr.', 'building', 'bldg', 'bldg.', 'tower', 'twr',
+                    'unit', 'suite', 'ste', 'room', 'rm', 'rm.', 'level', 'lvl',
+                    'block', 'blk', 'lot', 'phase', 'compound', 'complex', 'plaza'
+                ];
                 const hasStrongAddressWord = strongAddressWords.some(w => lower.includes(w));
 
                 // Count location words - multiple = likely address
