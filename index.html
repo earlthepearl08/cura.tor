@@ -596,7 +596,7 @@
             const addressMergedLines = [];
             let i = 0;
 
-            console.log('[Address Merge v2] Starting address merge. Lines before:', lines);
+            console.log('[Address Merge v3] Starting address merge. Lines before:', lines);
 
             while (i < lines.length) {
                 const line = lines[i];
@@ -606,14 +606,33 @@
                 const hasAddPrefix = /^(add|address|addr)[\s.:]/i.test(line);
                 const hasLocationWord = ADDRESS_LOCATION_WORDS.some(w => lower.includes(w));
                 const hasNumber = lower.includes('no.') || /\d/.test(line);
-                const isAddressStart = hasAddPrefix || (hasLocationWord && hasNumber);
 
-                console.log(`[Address Merge v2] Line ${i}: "${line}" | hasAddPrefix=${hasAddPrefix} | hasLocationWord=${hasLocationWord} | hasNumber=${hasNumber} | isAddressStart=${isAddressStart}`);
+                // Strong address indicators that don't need numbers
+                const strongAddressWords = ['floor', 'building', 'tower', 'unit', 'suite', 'room', 'level', 'block', 'lot', 'phase'];
+                const hasStrongAddressWord = strongAddressWords.some(w => lower.includes(w));
+
+                // Count location words - multiple = likely address
+                const locationWordCount = ADDRESS_LOCATION_WORDS.filter(w => lower.includes(w)).length;
+
+                // Address start if:
+                // - Has "Add:" prefix
+                // - Has location word + number (original logic)
+                // - Has strong address word (floor, building, etc.)
+                // - Has multiple location words
+                // - Ends with comma (often indicates address continuation)
+                const endsWithComma = line.trim().endsWith(',');
+                const isAddressStart = hasAddPrefix ||
+                    (hasLocationWord && hasNumber) ||
+                    hasStrongAddressWord ||
+                    locationWordCount >= 2 ||
+                    (hasLocationWord && endsWithComma);
+
+                console.log(`[Address Merge v3] Line ${i}: "${line}" | hasAddPrefix=${hasAddPrefix} | hasLocationWord=${hasLocationWord} | hasNumber=${hasNumber} | hasStrongAddressWord=${hasStrongAddressWord} | locationWordCount=${locationWordCount} | endsWithComma=${endsWithComma} | isAddressStart=${isAddressStart}`);
 
                 if (isAddressStart) {
                     // Start collecting address lines
                     const addressParts = [line];
-                    console.log(`[Address Merge v2] ADDRESS START FOUND at line ${i}`);
+                    console.log(`[Address Merge v3] ADDRESS START FOUND at line ${i}`);
                     let j = i + 1;
 
                     // Look ahead and collect continuation lines
@@ -621,7 +640,7 @@
                         const nextLine = lines[j];
                         const nextLower = nextLine.toLowerCase();
 
-                        console.log(`[Address Merge v2] Checking continuation line ${j}: "${nextLine}"`);
+                        console.log(`[Address Merge v3] Checking continuation line ${j}: "${nextLine}"`);
 
                         // STOP if line is clearly not an address
                         if (nextLine.includes('@')) { console.log('  -> STOP: has email'); break; }
