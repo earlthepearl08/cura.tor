@@ -449,797 +449,345 @@
             const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             let lines = normalizedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-            // PRE-PROCESS: Merge fragmented company names
-            // Handles: "BUILDERS,\nINC." | "Google\nLLC" | "Hedgefund\nCorporation Inc"
+            // ============================================
+            // PHASE 1: EXTRACT (from raw text)
+            // Extract emails, phones, websites FIRST
+            // ============================================
 
-            // Helper: Check if line is a valid company name fragment
-            const isValidFragment = (line) => {
-                const lower = line.toLowerCase();
-                return HAS_LETTERS_REGEX.test(line) &&
-                       !line.includes('@') &&
-                       !PHONE_REGEX.test(line) &&
-                       !MERGE_ADDRESS_KW.some(kw => lower.includes(kw)) &&
-                       line.length < 50;
-            };
-
-            // Helper: Check if line ends with a company suffix (uses precompiled regex)
-            const endsWithSuffix = (line) => COMPANY_SUFFIX_END_REGEX.test(line.toLowerCase());
-
-            // Helper: Check if line IS exactly a suffix
-            const isExactSuffix = (line) => {
-                const lower = line.toLowerCase().trim();
-                return COMPANY_END_WORDS.some(suf => lower === suf || lower === suf.replace('.', ''));
-            };
-
-            // Helper: Extend merge backwards for ALL CAPS single words
-            const extendBackwards = (startIdx, lines) => {
-                while (startIdx > 0) {
-                    const prev = lines[startIdx - 1];
-                    const isAllCaps = prev === prev.toUpperCase() && /[A-Z]/.test(prev);
-                    const isSingleWord = prev.split(/\s+/).length === 1;
-                    if (isAllCaps && isSingleWord && !prev.includes('@') && !/\d{3}/.test(prev) && !endsWithSuffix(prev)) {
-                        startIdx--;
-                    } else break;
-                }
-                return startIdx;
-            };
-
-            // Identify line types
-            const suffixLines = [];      // Lines that ARE just a suffix
-            const suffixEndLines = [];   // Lines that END with a suffix
-            const commaLines = [];       // ALL CAPS lines ending with comma
-
-            lines.forEach((line, idx) => {
-                const isAllCaps = line === line.toUpperCase() && /[A-Z]/.test(line);
-                if (isExactSuffix(line)) suffixLines.push(idx);
-                else if (endsWithSuffix(line)) suffixEndLines.push(idx);
-                if (isAllCaps && line.endsWith(',')) commaLines.push(idx);
-            });
-
-            // Build merge map
-            const mergeMap = new Map();
-            const skipIndices = new Set();
-
-            const addMerge = (start, end) => {
-                mergeMap.set(start, end);
-                for (let m = start; m <= end; m++) skipIndices.add(m);
-            };
-
-            // Process standalone suffix lines (e.g., "LLC")
-            suffixLines.forEach(suffixIdx => {
-                if (skipIndices.has(suffixIdx)) return;
-
-                // Try 1: Look for comma-ending line within 3 lines back
-                for (let k = suffixIdx - 1; k >= Math.max(0, suffixIdx - 3); k--) {
-                    if (commaLines.includes(k)) {
-                        addMerge(extendBackwards(k, lines), suffixIdx);
-                        return;
-                    }
-                }
-
-                // Try 2: Check immediate previous line
-                if (suffixIdx > 0 && isValidFragment(lines[suffixIdx - 1]) && !isExactSuffix(lines[suffixIdx - 1])) {
-                    addMerge(extendBackwards(suffixIdx - 1, lines), suffixIdx);
-                }
-            });
-
-            // Process lines ending with suffix (e.g., "Corporation Inc")
-            suffixEndLines.forEach(idx => {
-                if (skipIndices.has(idx) || idx === 0) return;
-                if (isValidFragment(lines[idx - 1]) && !endsWithSuffix(lines[idx - 1])) {
-                    addMerge(extendBackwards(idx - 1, lines), idx);
-                }
-            });
-
-            // Process company continuation words (e.g., "JIVO" + "ENERGY" -> "JIVO ENERGY")
-            lines.forEach((line, idx) => {
-                if (skipIndices.has(idx) || idx === 0) return;
-                const trimmed = line.trim();
-                // Check if this line is a company continuation word
-                if (COMPANY_CONTINUATION_REGEX.test(trimmed)) {
-                    const prevLine = lines[idx - 1];
-                    // Merge if previous line looks like a company name fragment
-                    // (short, has letters, is ALL CAPS or Title Case, not already merged)
-                    const isAllCaps = prevLine === prevLine.toUpperCase() && /[A-Z]/.test(prevLine);
-                    const isTitleCase = /^[A-Z][a-z]*(\s+[A-Z][a-z]*)*$/.test(prevLine);
-                    if (isValidFragment(prevLine) && (isAllCaps || isTitleCase || prevLine.length <= 20) && !skipIndices.has(idx - 1)) {
-                        addMerge(extendBackwards(idx - 1, lines), idx);
-                    }
-                }
-            });
-
-            // Build merged lines
-            const mergedLines = [];
-            let i = 0;
-            while (i < lines.length) {
-                if (mergeMap.has(i)) {
-                    const endIdx = mergeMap.get(i);
-                    // Merge all lines in range, handling comma lines specially
-                    let merged = lines[i];
-                    const commaIdx = commaLines.find(c => c > i && c <= endIdx);
-                    if (commaIdx !== undefined && commaIdx !== i) merged += ' ' + lines[commaIdx];
-                    if (!merged.toLowerCase().includes(lines[endIdx].toLowerCase())) {
-                        merged += ' ' + lines[endIdx];
-                    }
-                    mergedLines.push(merged.replace(/\s+/g, ' ').trim());
-                    // Add non-merge lines in range (e.g., "ELECTRICAL CONTRACTOR")
-                    for (let m = i + 1; m < endIdx; m++) {
-                        if (m !== commaIdx) mergedLines.push(lines[m]);
-                    }
-                    i = endIdx + 1;
-                } else if (!skipIndices.has(i)) {
-                    mergedLines.push(lines[i]);
-                    i++;
-                } else i++;
-            }
-
-            lines = mergedLines;
-
-            // PRE-PROCESS: Merge multi-line addresses
-            // Handles: "Add:No.6 Foluo Road Industrial" + "Park,Nanhai District,Foshan," + "Guangdong,China"
-            // Words that can be matched with simple includes()
-            const ADDRESS_LOCATION_WORDS_LONG = [
-                // Location types (4+ chars, safe to use includes)
-                'park', 'district', 'city', 'province', 'state', 'country', 'village', 'subdivision',
-                'compound', 'complex', 'center', 'centre', 'plaza', 'mall', 'estate', 'heights',
-                // Countries
-                'china', 'philippines', 'singapore', 'japan', 'korea', 'india', 'taiwan', 'malaysia',
-                // China cities
-                'guangdong', 'foshan', 'nanhai', 'shenzhen', 'guangzhou', 'shanghai', 'beijing',
-                // Philippine locations
-                'metro manila', 'manila', 'makati', 'pasig', 'taguig', 'quezon', 'cavite', 'laguna',
-                'cebu', 'davao', 'barangay', 'brgy', 'intramuros', 'bicutan', 'paranaque', 'muntinlupa',
-                'mandaluyong', 'caloocan', 'valenzuela', 'malabon', 'navotas', 'pateros',
-                // Street types (full words only)
-                'road', 'street', 'avenue', 'boulevard', 'drive', 'lane', 'highway', 'corner',
-                // Building types (full words only)
-                'building', 'bldg', 'floor', 'room', 'tower', 'unit', 'suite', 'level',
-                // Other address parts
-                'industrial', 'block', 'phase', 'number'
-            ];
-
-            // Short abbreviations that need word boundary matching (to avoid matching "SYSTECH" with "st")
-            const ADDRESS_ABBREV_PATTERN = /\b(st|rd|ave|blvd|dr|ln|hwy|cor|flr|rm|twr|ste|lvl|blk|lot|no)\b\.?/i;
-
-            // Combined check for address location words
-            const hasAddressLocationWord = (text) => {
-                const lower = text.toLowerCase();
-                // Check long words with simple includes
-                if (ADDRESS_LOCATION_WORDS_LONG.some(w => lower.includes(w))) return true;
-                // Check short abbreviations with word boundary
-                if (ADDRESS_ABBREV_PATTERN.test(text)) return true;
-                return false;
-            };
-
-            // Keep ADDRESS_LOCATION_WORDS for backward compatibility (used in other places)
-            const ADDRESS_LOCATION_WORDS = [...ADDRESS_LOCATION_WORDS_LONG];
-
-            // SIMPLE DIRECT APPROACH: Find lines with "Add:" prefix and merge subsequent address-looking lines
-            const addressMergedLines = [];
-            i = 0; // Reset i (already declared above)
-
-            while (i < lines.length) {
-                const line = lines[i];
-                const lower = line.toLowerCase();
-
-                // Check if this line starts an address (has "Add:" prefix or is clearly an address start)
-                const hasAddPrefix = /^(add|address|addr)[\s.:]/i.test(line);
-                const hasLocationWord = hasAddressLocationWord(lower);
-                const hasNumber = lower.includes('no.') || /\d/.test(line);
-
-                // Strong address indicators that don't need numbers (include abbreviations)
-                const strongAddressWords = [
-                    'floor', 'flr', 'flr.', 'building', 'bldg', 'bldg.', 'tower', 'twr',
-                    'unit', 'suite', 'ste', 'room', 'rm', 'rm.', 'level', 'lvl',
-                    'block', 'blk', 'lot', 'phase', 'compound', 'complex', 'plaza'
-                ];
-                const hasStrongAddressWord = strongAddressWords.some(w => lower.includes(w));
-
-                // Count location words - multiple = likely address
-                const locationWordCount = ADDRESS_LOCATION_WORDS.filter(w => lower.includes(w)).length;
-
-                // Address start if:
-                // - Has "Add:" prefix
-                // - Has location word + number (original logic)
-                // - Has strong address word (floor, building, etc.)
-                // - Has multiple location words
-                // - Ends with comma (often indicates address continuation)
-                const endsWithComma = line.trim().endsWith(',');
-                const isAddressStart = hasAddPrefix ||
-                    (hasLocationWord && hasNumber) ||
-                    hasStrongAddressWord ||
-                    locationWordCount >= 2 ||
-                    (hasLocationWord && endsWithComma);
-
-                if (isAddressStart) {
-                    // Start collecting address lines
-                    const addressParts = [line];
-                    let j = i + 1;
-
-                    // Look ahead and collect continuation lines
-                    while (j < lines.length) {
-                        const nextLine = lines[j];
-                        const nextLower = nextLine.toLowerCase();
-
-                        // STOP if line is clearly not an address
-                        if (nextLine.includes('@')) break;
-                        if (/^\+?\d[\d\s().-]{9,}$/.test(nextLine.replace(/\s/g, ''))) break;
-                        if (/^(tel|phone|mobile|fax|email|web|www)/i.test(nextLine.trim())) break;
-                        if (COMPANY_SUFFIX_WORD_REGEX.test(nextLower) && !hasAddressLocationWord(nextLower)) break;
-
-                        // CONTINUE if line looks like address continuation
-                        // Must have actual address characteristics, not just be short!
-                        const hasLocWord = hasAddressLocationWord(nextLower);
-                        const hasComma = nextLine.includes(',');
-                        const hasNumber = /\d/.test(nextLine);
-
-                        // Only continue if line has address characteristics:
-                        // - Has location word (city, street, etc.)
-                        // - Has comma AND number (likely "City, 12345")
-                        // - Previous line ended with comma and this has location word
-                        const prevEndsWithComma = addressParts[addressParts.length - 1]?.trim().endsWith(',');
-                        const looksLikeAddress = hasLocWord || (hasComma && hasNumber) || (prevEndsWithComma && (hasLocWord || hasNumber));
-
-                        if (looksLikeAddress) {
-                            addressParts.push(nextLine);
-                            j++;
-                        } else {
-                            break;
-                        }
-                    }
-
-                    // Merge all collected address parts
-                    if (addressParts.length > 1) {
-                        const merged = addressParts.join(' ').replace(/\s+/g, ' ').trim();
-                        addressMergedLines.push(merged);
-                    } else {
-                        addressMergedLines.push(line);
-                    }
-                    i = j; // Skip to after the merged lines
-                } else {
-                    addressMergedLines.push(line);
-                    i++;
-                }
-            }
-
-            lines = addressMergedLines;
-
-            // Extract emails - must have proper format with domain
+            // --- Extract Emails ---
+            const cleanedTextForEmail = normalizedText
+                .replace(/\bI\s*([a-zA-Z][a-zA-Z0-9._+-]*)@/gi, '$1@')
+                .replace(/\s+([a-zA-Z0-9._+-]+@)/g, ' $1');
             const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
-            let emails = (normalizedText.match(emailRegex) || []).filter(e => e.length > 5 && e.includes('.'));
+            const emails = [...new Set((cleanedTextForEmail.match(emailRegex) || [])
+                .filter(e => e.length > 5 && e.includes('.'))
+                .sort((a, b) => {
+                    const generic = ['info', 'sales', 'support', 'contact', 'admin', 'office'];
+                    const aGen = generic.some(g => a.toLowerCase().startsWith(g));
+                    const bGen = generic.some(g => b.toLowerCase().startsWith(g));
+                    return aGen - bGen; // Personal emails first
+                }))];
 
-            // Sort emails: prefer personal emails (with person names) over generic company emails
-            const genericEmailPrefixes = ['info', 'sales', 'support', 'contact', 'admin', 'hello', 'office', 'enquiry', 'inquiry', 'marketing'];
-            emails.sort((a, b) => {
-                const aPrefix = a.split('@')[0].toLowerCase();
-                const bPrefix = b.split('@')[0].toLowerCase();
-                const aIsGeneric = genericEmailPrefixes.some(p => aPrefix.includes(p));
-                const bIsGeneric = genericEmailPrefixes.some(p => bPrefix.includes(p));
-                if (aIsGeneric && !bIsGeneric) return 1;  // b comes first (personal email)
-                if (!aIsGeneric && bIsGeneric) return -1; // a comes first (personal email)
-                return 0;
-            });
-
-            // Extract phone numbers - need at least 7 digits total, handle various formats
-            // Look for lines with "Mobile", "Tel", "Phone" or standalone number patterns
+            // --- Extract Phones ---
             const phonePatterns = [];
-
-            // Pattern 1: Numbers with Mobile/Tel/Phone prefix
-            const labeledPhoneRegex = /(?:mobile|tel|phone|fax|cell)[\s.:]*(?:no)?[\s.:]*([+\d\s()/-]{7,})/gi;
             let match;
-            while ((match = labeledPhoneRegex.exec(normalizedText)) !== null) {
-                phonePatterns.push(match[1]);
-            }
 
-            // Pattern 2: Standalone phone numbers (7+ digits with optional formatting)
-            // Supports: (123) 456-7890, 123.456.7890, 123-456-7890, +63 928 520 1886, (0928) 520-1886, etc.
-            const standalonePhoneRegex = /(?:^|[\s:])(\+?63[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{4}|\+?63[\s.-]?\d{10}|\(?\d{3,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{4}|0\d{3}[\s.-]?\d{3}[\s.-]?\d{4}|0\d{3}[\s.-]?\d{7}|\d{3,4}[\s.-]\d{3,4}[\s.-]\d{3,4})/gm;
-            while ((match = standalonePhoneRegex.exec(normalizedText)) !== null) {
-                phonePatterns.push(match[1]);
-            }
+            // International: +XX followed by 7-15 digits
+            const intlRegex = /(\+\d{1,3}[\s.-]*\d[\d\s.-]{6,14}\d)/gm;
+            while ((match = intlRegex.exec(normalizedText)) !== null) phonePatterns.push(match[1]);
 
-            // Clean and deduplicate phones
+            // Labeled: "Mobile:", "Tel:", etc.
+            const labeledRegex = /(?:mobile|tel|phone|fax|cell)[\s.:]*(?:no)?[\s.:]*([+\d\s()/-]{7,})/gi;
+            while ((match = labeledRegex.exec(normalizedText)) !== null) phonePatterns.push(match[1]);
+
+            // Philippine landline: +63 2 or 02
+            const phLandline = /(\+?63[\s.-]?2[\s.-]?\d{4}[\s.-]?\d{4}|\(?0?2\)?[\s.-]?\d{4}[\s.-]?\d{4})/gm;
+            while ((match = phLandline.exec(normalizedText)) !== null) phonePatterns.push(match[1]);
+
+            // Philippine mobile: +63 9XX or 09XX
+            const phMobile = /(\+?63[\s.-]?9\d{2}[\s.-]?\d{3}[\s.-]?\d{4}|09\d{2}[\s.-]?\d{3}[\s.-]?\d{4})/gm;
+            while ((match = phMobile.exec(normalizedText)) !== null) phonePatterns.push(match[1]);
+
+            // Generic standalone: 7-12 digits with formatting
+            const genericPhone = /(?:^|[\s:])(\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4})/gm;
+            while ((match = genericPhone.exec(normalizedText)) !== null) phonePatterns.push(match[1]);
+
+            // Clean and dedupe phones
             const phones = [...new Set(phonePatterns
                 .map(p => p.replace(/[\s()-]/g, '').replace(/^[:.]/, '').trim())
                 .filter(p => {
-                    const digitsOnly = p.replace(/\D/g, '');
-                    return digitsOnly.length >= 7 && digitsOnly.length <= 15;
-                })
-            )];
+                    const digits = p.replace(/\D/g, '');
+                    return digits.length >= 7 && digits.length <= 15;
+                }))];
 
-            // Extract websites
+            // --- Extract Websites ---
             const websiteRegex = /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/\S*)?/gi;
-            const websites = (normalizedText.match(websiteRegex) || []).filter(w => !w.includes('@'));
+            const websites = [...new Set((normalizedText.match(websiteRegex) || [])
+                .filter(w => !w.includes('@') && w.length > 4))];
 
-            // Common company suffixes
-            const companySuffixes = [
-                'inc', 'inc.', 'incorporated', 'corp', 'corp.', 'corporation',
-                'llc', 'l.l.c.', 'ltd', 'ltd.', 'limited', 'co', 'co.',
-                'company', 'enterprises', 'solutions', 'services', 'group',
-                'technologies', 'tech', 'systems', 'industries', 'international',
-                'holdings', 'partners', 'associates', 'consulting', 'agency',
-                'engineering', 'construction', 'trading', 'realty', 'properties'
-            ];
+            // ============================================
+            // PHASE 2: MARK USED LINES
+            // Mark lines that contain extracted data
+            // ============================================
 
-            // Address keywords - expanded for international addresses
-            const addressKeywords = [
-                // Street types
-                'street', 'st.', 'avenue', 'ave', 'ave.', 'road', 'rd', 'rd.',
-                'boulevard', 'blvd', 'drive', 'dr.', 'lane', 'ln', 'way', 'highway', 'hwy',
-                // Building/unit
-                'floor', 'flr', 'suite', 'ste', 'unit', 'building', 'bldg', 'tower', 'plaza',
-                'phase', 'block', 'blk', 'lot', 'village', 'subdivision', 'subd', 'compound', 'heights', 'homes',
-                // Area types
-                'city', 'town', 'province', 'state', 'county', 'district', 'zone', 'area',
-                'industrial', 'park', 'estate', 'complex',
-                // Philippine - Metro Manila
-                'barangay', 'brgy', 'brgy.', 'metro manila', 'ncr', 'makati', 'quezon city', 'manila', 'pasig', 'taguig', 'bgc',
-                'mandaluyong', 'san juan', 'pasay', 'paranaque', 'muntinlupa', 'alabang', 'las pinas', 'marikina',
-                'caloocan', 'malabon', 'navotas', 'valenzuela', 'ortigas', 'eastwood', 'cubao',
-                // Philippine - Calabarzon & Central Luzon
-                'cavite', 'laguna', 'batangas', 'rizal', 'bulacan', 'pampanga', 'bacoor', 'imus', 'dasmarinas',
-                'sta. rosa', 'santa rosa', 'calamba', 'antipolo', 'cainta', 'taytay', 'san fernando', 'angeles', 'clark', 'subic',
-                // Philippine - Other regions
-                'cebu', 'davao', 'iloilo', 'bacolod', 'cagayan de oro', 'baguio', 'pangasinan', 'ilocos',
-                // China specific
-                'guangdong', 'shenzhen', 'foshan', 'dongguan', 'guangzhou', 'shanghai', 'beijing', 'nanhai', 'china', 'zhejiang', 'jiangsu',
-                // Other international
-                'usa', 'uk', 'singapore', 'hong kong', 'japan', 'korea', 'taiwan', 'thailand', 'vietnam', 'indonesia', 'malaysia', 'india',
-                // Office indicators
-                'head office', 'main office', 'branch office', 'place', 'center', 'centre',
-                // Common address prefixes
-                'add:', 'add.', 'address:', 'addr:', 'no.', 'no:'
-            ];
+            const usedLines = new Set();
+            const isPhoneLine = (line) => {
+                const cleaned = line.replace(/[\s\-().]/g, '');
+                return phones.some(p => cleaned.includes(p.slice(-7))) || /^\+?\d[\d\s().-]{7,}$/.test(cleaned);
+            };
 
-            // Categorize each line
-            const categorized = {
+            lines.forEach((line, idx) => {
+                const lower = line.toLowerCase();
+                // Email line
+                if (emails.some(e => lower.includes(e.toLowerCase()))) usedLines.add(idx);
+                // Phone line
+                if (isPhoneLine(line)) usedLines.add(idx);
+                // Website line
+                if (websites.some(w => lower.includes(w.toLowerCase().replace(/^www\./, '')))) usedLines.add(idx);
+                // Label-only lines
+                if (/^(email|e-mail|tel|telephone|mobile|phone|fax|address|website|web)[\s.:]*$/i.test(line)) usedLines.add(idx);
+                // Empty/punctuation lines
+                if (/^[:.\s]*$/.test(line) || line.length <= 2) usedLines.add(idx);
+            });
+
+            // ============================================
+            // PHASE 3: PREPROCESS
+            // Merge company and address fragments
+            // ============================================
+
+            // --- Merge Company Fragments ---
+            // e.g., "JIVO" + "ENERGY" → "JIVO ENERGY"
+            const processedLines = [];
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i];
+                const lower = line.toLowerCase();
+                const nextLine = lines[i + 1];
+                const nextLower = nextLine?.toLowerCase();
+
+                // Check if next line is a company continuation word
+                if (nextLine && COMPANY_CONTINUATION_REGEX.test(nextLine.trim())) {
+                    const isAllCaps = line === line.toUpperCase() && /[A-Z]/.test(line);
+                    const isShort = line.length <= 25;
+                    const notPerson = !/^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(line); // Not "John Smith"
+                    if ((isAllCaps || isShort) && notPerson && !line.includes('@')) {
+                        processedLines.push(`${line} ${nextLine}`.trim());
+                        // Transfer usedLines status
+                        if (usedLines.has(i) || usedLines.has(i + 1)) {
+                            usedLines.add(processedLines.length - 1);
+                        }
+                        i += 2;
+                        continue;
+                    }
+                }
+
+                // Check if this line + next forms a company (e.g., "BUILDERS," + "INC.")
+                if (nextLine && COMPANY_END_WORDS.some(s => nextLower === s || nextLower === s.replace('.', ''))) {
+                    processedLines.push(`${line} ${nextLine}`.replace(/\s+/g, ' ').trim());
+                    i += 2;
+                    continue;
+                }
+
+                processedLines.push(line);
+                i++;
+            }
+            lines = processedLines;
+
+            // Rebuild usedLines for new indices
+            const newUsedLines = new Set();
+            lines.forEach((line, idx) => {
+                const lower = line.toLowerCase();
+                if (emails.some(e => lower.includes(e.toLowerCase()))) newUsedLines.add(idx);
+                if (isPhoneLine(line)) newUsedLines.add(idx);
+                if (websites.some(w => lower.includes(w.toLowerCase().replace(/^www\./, '')))) newUsedLines.add(idx);
+                if (/^(email|e-mail|tel|telephone|mobile|phone|fax|address|website|web)[\s.:]*$/i.test(line)) newUsedLines.add(idx);
+                if (/^[:.\s]*$/.test(line) || line.length <= 2) newUsedLines.add(idx);
+            });
+
+            // ============================================
+            // PHASE 4: CATEGORIZE (single pass)
+            // Name → Position → Company → Address
+            // ============================================
+
+            const result = {
                 name: null,
                 position: null,
                 company: null,
-                phones: phones, // Store ALL phone numbers
-                phone: phones[0] || '', // Primary phone for backward compatibility
+                address: null,
+                phone: phones.length > 1 ? phones.join(' / ') : phones[0] || '',
+                phones: phones,
                 email: emails[0] || '',
                 website: websites[0] || '',
-                address: null,
-                otherLines: []
-            };
-
-            // Lines that contain extracted data (to exclude from other processing)
-            const usedLines = new Set();
-
-            // Mark lines containing emails, phones, websites, or label-only lines
-            lines.forEach((line, idx) => {
-                const lineLower = line.toLowerCase();
-                // Mark email lines
-                if (emails.some(e => lineLower.includes(e.toLowerCase()))) usedLines.add(idx);
-                // Mark phone lines - check if line has phone numbers or is a phone label
-                const hasPhoneDigits = phones.some(p => {
-                    const last7 = p.slice(-7);
-                    return line.replace(/[\s-]/g, '').includes(last7);
-                });
-                if (hasPhoneDigits || /^(mobile|tel|phone|fax|cell)[\s.:]*no?\.?$/i.test(line.trim())) {
-                    usedLines.add(idx);
-                }
-                // Mark website lines
-                if (websites.some(w => lineLower.includes(w.toLowerCase()))) usedLines.add(idx);
-                // Mark label-only lines like "Email", "Tel. No.", etc.
-                if (/^(email|e-mail|tel|telephone|mobile|phone|fax|address|website|web)[\s.:]*$/i.test(line.trim())) {
-                    usedLines.add(idx);
-                }
-                // Mark lines that are just colons or punctuation with short text
-                if (/^[:.\s]*$/.test(line) || line.length <= 2) {
-                    usedLines.add(idx);
-                }
-            });
-
-            // STEP 1: Find name with professional suffix (highest priority - these are definitely names)
-            lines.forEach((line, idx) => {
-                if (usedLines.has(idx) || categorized.name) return;
-                const lineLower = line.toLowerCase();
-
-                // Use precompiled regex for professional suffix check
-                if (PROFESSIONAL_SUFFIX_REGEX.test(lineLower)) {
-                    categorized.name = line;
-                    usedLines.add(idx);
-                }
-            });
-
-            // STEP 2: Find position/title line FIRST (helps identify name)
-            // Collect ALL potential position lines with scores, then pick the best one
-            const positionCandidates = [];
-
-            lines.forEach((line, idx) => {
-                if (usedLines.has(idx)) return;
-                const lineLower = line.toLowerCase();
-
-                // Use precompiled regex for title keyword check
-                if (!TITLE_KEYWORD_REGEX.test(lineLower)) return;
-
-                // Find which keywords matched for scoring
-                const matchedKeywords = TITLE_KEYWORDS.filter(kw => lineLower.includes(kw));
-
-                // Don't use as title if it looks like a company name with strong suffix
-                if (STRONG_SUFFIX_REGEX.test(lineLower)) return;
-
-                // Don't use as title if it looks like an address
-                const addressIndicators = ['building', 'bldg', 'floor', 'flr', 'street', 'st.', 'avenue', 'ave', 'road', 'rd', 'place', 'tower', 'unit', 'suite', 'block', 'blk', 'lot', 'phase', 'head office', 'main office', 'branch office'];
-                const looksLikeAddress = addressIndicators.some(ind => lineLower.includes(ind));
-                if (looksLikeAddress) return;
-
-                // Calculate a score for this position candidate
-                let score = 10;
-
-                // PENALTY: Lines that look like service/feature lists (dot-separated items)
-                // e.g., ".SALES .SERVICES" or "ENGINEERING . MAINTENANCE"
-                const dotSeparatedItems = line.split(/[.•·]/).filter(s => s.trim().length > 0);
-                if (dotSeparatedItems.length >= 2) {
-                    // Looks like a bullet list - big penalty
-                    score -= 50;
-                }
-
-                // PENALTY: All caps service descriptors (like "SALES" alone or in a list)
-                const serviceWords = ['sales', 'services', 'maintenance', 'engineering', 'construction', 'consulting', 'trading'];
-                const words = lineLower.split(/\s+/);
-                const serviceWordCount = words.filter(w => serviceWords.includes(w.replace(/[^a-z]/g, ''))).length;
-                if (serviceWordCount >= 2) {
-                    score -= 40; // Multiple service words = probably a service list
-                }
-
-                // BONUS: Multi-word titles like "account manager", "project manager"
-                if (matchedKeywords.some(k => k.includes(' '))) {
-                    score += 30;
-                }
-
-                // BONUS: Line is short and focused (typical job title length)
-                if (line.length < 30 && words.length <= 4) {
-                    score += 20;
-                }
-
-                // BONUS: Title-case or mixed case (not ALL CAPS service lists)
-                if (line !== line.toUpperCase() && line !== line.toLowerCase()) {
-                    score += 10;
-                }
-
-                positionCandidates.push({ line, idx, score, keywords: matchedKeywords });
-            });
-
-            // Pick the best position candidate
-            let positionIdx = -1;
-            if (positionCandidates.length > 0) {
-                positionCandidates.sort((a, b) => b.score - a.score);
-                // Only use if score is positive (not a service list)
-                if (positionCandidates[0].score > 0) {
-                    categorized.position = positionCandidates[0].line;
-                    positionIdx = positionCandidates[0].idx;
-                    usedLines.add(positionIdx);
-                }
-            }
-
-            // STEP 3: If we found a position, the line BEFORE it is likely the person's name
-            // (unless we already found a name with professional suffix)
-            if (!categorized.name && positionIdx > 0) {
-                // Look at the line immediately before the position
-                for (let checkIdx = positionIdx - 1; checkIdx >= 0; checkIdx--) {
-                    if (usedLines.has(checkIdx)) continue;
-
-                    const candidateLine = lines[checkIdx];
-                    const candidateLower = candidateLine.toLowerCase();
-                    const words = candidateLine.split(/\s+/);
-
-                    // NEVER use a line with company suffix as a name (use precompiled regex)
-                    if (STRONG_SUFFIX_REGEX.test(candidateLower)) continue;
-
-                    // Skip lines that look like service/feature lists (dot-separated)
-                    const dotItems = candidateLine.split(/[.•·]/).filter(s => s.trim().length > 0);
-                    if (dotItems.length >= 2) continue;
-
-                    // Skip lines that start with dots/bullets (service list items)
-                    if (/^[.•·\s]/.test(candidateLine)) continue;
-
-                    // Check if this looks like a person's name (not a company descriptor)
-                    const looksLikeName =
-                        words.length >= 2 &&
-                        words.length <= 4 &&
-                        !candidateLine.includes('@') &&
-                        !/\d{3}/.test(candidateLine) &&
-                        // Exclude common service/business descriptors
-                        !['event', 'management', 'services', 'solutions', 'consulting', 'agency', 'industrial', 'controls', 'systems', 'engineering', 'maintenance', 'sales', 'trading', 'construction'].some(w => candidateLower.includes(w));
-
-                    if (looksLikeName) {
-                        categorized.name = candidateLine;
-                        usedLines.add(checkIdx);
-                        break;
-                    }
-                }
-            }
-
-            // STEP 4: Find address lines (collect ALL consecutive address lines, not just the first)
-            const addressParts = [];
-            let addressStartIdx = -1;
-
-            // Helper to check if a line looks like an address
-            const isAddressLikeLine = (line) => {
-                const lineLower = line.toLowerCase();
-                // Skip company names
-                if (STRONG_SUFFIX_REGEX.test(lineLower)) return false;
-
-                const hasAddressKeyword = addressKeywords.some(keyword => lineLower.includes(keyword));
-                const hasLocationWord = hasAddressLocationWord(lineLower);
-                const hasZipCode = /\b\d{4,6}\b/.test(line);
-                const hasPhaseBlock = /phase|block|lot|blk/i.test(line);
-                const hasMultipleCommas = (line.match(/,/g) || []).length >= 2;
-                const hasStreetNumber = /^#?\d+\s/.test(line) || /\bno\.?\s*\d/i.test(line);
-
-                return hasAddressKeyword || hasLocationWord || hasPhaseBlock || hasStreetNumber || (hasZipCode && hasMultipleCommas);
-            };
-
-            // Find first address line
-            for (let idx = 0; idx < lines.length; idx++) {
-                if (usedLines.has(idx)) continue;
-                if (isAddressLikeLine(lines[idx])) {
-                    addressStartIdx = idx;
-                    break;
-                }
-            }
-
-            // If found, collect consecutive address lines
-            if (addressStartIdx !== -1) {
-                // Words that indicate we've left the address and entered company/brand territory
-                const nonAddressIndicators = [
-                    'venture', 'distributor', 'dealer', 'authorized', 'exclusive', 'official',
-                    'supplier', 'manufacturer', 'importer', 'exporter', 'retailer', 'wholesale',
-                    'representative', 'agent', 'partner', 'member', 'affiliate', 'branch',
-                    'division', 'subsidiary', 'franchise', 'licensed', 'certified'
-                ];
-
-                for (let idx = addressStartIdx; idx < lines.length; idx++) {
-                    if (usedLines.has(idx)) continue;
-                    const line = lines[idx];
-                    const lineLower = line.toLowerCase();
-
-                    // Stop conditions
-                    if (line.includes('@')) break; // Email
-                    if (/^\+?\d[\d\s().-]{9,}$/.test(line.replace(/\s/g, ''))) break; // Phone
-                    if (/^(tel|phone|mobile|fax|email|web|www)/i.test(line.trim())) break; // Label
-                    if (STRONG_SUFFIX_REGEX.test(lineLower) && !hasAddressLocationWord(lineLower)) break; // Company
-
-                    // Stop if line contains business/company indicators (not address)
-                    if (nonAddressIndicators.some(w => lineLower.includes(w))) break;
-
-                    // Stop if line looks like brand names (multiple ALL CAPS words, no address keywords)
-                    const allCapsWords = line.split(/\s+/).filter(w => w === w.toUpperCase() && w.length > 2 && /[A-Z]/.test(w));
-                    if (allCapsWords.length >= 2 && !hasAddressLocationWord(lineLower)) break;
-
-                    // Check if looks like address continuation
-                    const isAddress = isAddressLikeLine(line);
-                    const hasComma = line.includes(',');
-                    const endsWithComma = line.trim().endsWith(',');
-                    const hasAddressWord = hasAddressLocationWord(lineLower);
-
-                    // Only continue if it actually looks like an address (not just because it's short)
-                    if (isAddress || (hasComma && hasAddressWord) || endsWithComma) {
-                        addressParts.push(line);
-                        usedLines.add(idx);
-                    } else if (addressParts.length > 0) {
-                        // Already have address parts, this line doesn't look like address - stop
-                        break;
-                    }
-                }
-
-                if (addressParts.length > 0) {
-                    categorized.address = addressParts.join(' ').replace(/\s+/g, ' ').trim();
-                }
-            }
-
-            // STEP 5: Find company line - collect candidates and pick the best one
-            const companyStrongIndicators = ['inc', 'inc.', 'corp', 'corporation', 'llc', 'ltd', 'enterprises', 'industries', 'international', 'construction', 'builders'];
-            const companyCandidates = [];
-
-            lines.forEach((line, idx) => {
-                if (usedLines.has(idx)) return;
-                const lineLower = line.toLowerCase();
-
-                // Use precompiled regex for company suffix check
-                if (COMPANY_SUFFIX_WORD_REGEX.test(lineLower)) {
-                    // Score the company candidate
-                    let score = line.length;
-
-                    // Strong bonus for definite company indicators (INC, CORP, LLC, etc.)
-                    if (companyStrongIndicators.some(ind => lineLower.includes(ind))) {
-                        score += 100;
-                    }
-
-                    // Bonus for ALL CAPS
-                    if (line === line.toUpperCase() && /[A-Z]/.test(line)) {
-                        score += 20;
-                    }
-
-                    // PENALTY: If it looks like a person's name (2 words, both capitalized proper names)
-                    const words = line.split(/\s+/);
-                    if (words.length === 2 && words.every(w => /^[A-Z][a-z]*$/.test(w) || /^[A-Z]+$/.test(w))) {
-                        // Could be a person's name like "ROBIN REYES" - reduce score unless it has strong company indicators
-                        if (!companyStrongIndicators.some(ind => lineLower.includes(ind))) {
-                            score -= 50;
-                        }
-                    }
-
-                    companyCandidates.push({ line, idx, score });
-                }
-            });
-
-            // Pick the best company candidate
-            if (companyCandidates.length > 0) {
-                companyCandidates.sort((a, b) => b.score - a.score);
-                // Only use if score is positive (not penalized too much)
-                if (companyCandidates[0].score > 0) {
-                    categorized.company = companyCandidates[0].line;
-                    usedLines.add(companyCandidates[0].idx);
-                }
-            }
-
-            // If no name with professional suffix, find name from remaining lines
-            if (!categorized.name) {
-                lines.forEach((line, idx) => {
-                    if (usedLines.has(idx) || categorized.name) return;
-
-                    const lineLower = line.toLowerCase();
-                    const words = line.split(/[\s,]+/).filter(w => w.length > 0);
-
-                    // NEVER use lines with company suffixes as names (use precompiled regex)
-                    if (STRONG_SUFFIX_REGEX.test(lineLower)) return;
-
-                    // Name patterns: 2-5 words, mostly letters, may have comma for suffix
-                    const isLikelyName =
-                        words.length >= 2 &&
-                        words.length <= 5 &&
-                        !line.includes('@') &&
-                        !/\d{3}/.test(line) && // No long number sequences
-                        line.length < 40 &&
-                        words.every(w => /^[A-Za-z'.,-]+$/.test(w));
-
-                    if (isLikelyName) {
-                        categorized.name = line;
-                        usedLines.add(idx);
-                    }
-                });
-            }
-
-            // If no name found, use first unused line that looks name-like
-            if (!categorized.name) {
-                for (let idx = 0; idx < lines.length; idx++) {
-                    if (usedLines.has(idx)) continue;
-                    const line = lines[idx];
-                    const lineLower = line.toLowerCase();
-                    const words = line.split(/\s+/);
-
-                    // NEVER use lines with company suffixes as names (use precompiled regex)
-                    if (STRONG_SUFFIX_REGEX.test(lineLower)) continue;
-
-                    // Simple heuristic: first line with 2-4 words, no numbers, no special chars
-                    if (words.length >= 2 && words.length <= 4 && !/\d/.test(line) && line.length < 40) {
-                        categorized.name = line;
-                        usedLines.add(idx);
-                        break;
-                    }
-                }
-            }
-
-            // If still no name, just use first unused line (but still avoid company names)
-            if (!categorized.name) {
-                const firstUnused = lines.findIndex((line, idx) => {
-                    if (usedLines.has(idx)) return false;
-                    // Use precompiled regex
-                    return !STRONG_SUFFIX_REGEX.test(line.toLowerCase());
-                });
-                if (firstUnused !== -1) {
-                    categorized.name = lines[firstUnused];
-                    usedLines.add(firstUnused);
-                }
-            }
-
-            // If no company found, try to find one from remaining lines
-            if (!categorized.company) {
-                const remainingLines = lines.filter((_, idx) => !usedLines.has(idx));
-                // Company names are often in ALL CAPS
-                const possibleCompany = remainingLines.find(line => {
-                    const isAllCaps = line === line.toUpperCase() && line.length > 3 && /[A-Z]/.test(line);
-                    return isAllCaps && !/\d{4}/.test(line); // Not a phone or zip
-                });
-                if (possibleCompany) {
-                    categorized.company = possibleCompany;
-                    usedLines.add(lines.indexOf(possibleCompany));
-                }
-            }
-
-            // Collect remaining lines as potential address
-            const remainingLines = lines.filter((_, idx) => !usedLines.has(idx));
-            if (!categorized.address && remainingLines.length > 0) {
-                // Find lines that look like address parts
-                const isAddressLine = (line) => {
-                    const lower = line.toLowerCase();
-                    // Has address keyword
-                    if (addressKeywords.some(kw => lower.includes(kw))) return true;
-                    // Has numbers (street numbers, zip codes, building numbers)
-                    if (/\d/.test(line)) return true;
-                    // Looks like location continuation (city, country, etc.) - ends with comma or is short
-                    if (line.length < 30 && /,/.test(line)) return true;
-                    // Is a country or region name
-                    if (/\b(china|usa|philippines|singapore|japan|korea|india|uk|australia|canada|germany|france)\b/i.test(line)) return true;
-                    return false;
-                };
-
-                // Find consecutive address lines starting from first address-like line
-                const addressLines = [];
-                let foundFirstAddress = false;
-                let consecutiveNonAddress = 0;
-
-                for (const line of remainingLines) {
-                    if (isAddressLine(line)) {
-                        // Check if line starts with "Add:" or similar prefix and clean it
-                        const cleanedLine = line.replace(/^(add|address|addr)[\s.:]+/i, '').trim();
-                        addressLines.push(cleanedLine || line);
-                        foundFirstAddress = true;
-                        consecutiveNonAddress = 0;
-                    } else if (foundFirstAddress) {
-                        // Allow 1 non-address line in between (might be part of address)
-                        consecutiveNonAddress++;
-                        if (consecutiveNonAddress > 1) break;
-                        // Short lines after address start are likely address continuations
-                        if (line.length < 40 && !/@/.test(line) && !/^(mobile|tel|phone|fax)/i.test(line)) {
-                            addressLines.push(line);
-                        }
-                    }
-                }
-
-                if (addressLines.length > 0) {
-                    // Join all address lines, use comma or space depending on context
-                    categorized.address = addressLines
-                        .map(l => l.trim())
-                        .filter(l => l.length > 0)
-                        .join(', ')
-                        .replace(/,\s*,/g, ',') // Remove double commas
-                        .replace(/\s+/g, ' '); // Normalize spaces
-                }
-            }
-
-            // Format multiple phones for display
-            const phoneDisplay = phones.length > 1
-                ? phones.join(' / ')
-                : phones[0] || '';
-
-            // CLEANUP: Fix common OCR artifacts
-            // Remove single-letter prefix from position (e.g., "A Sales Manager" → "Sales Manager")
-            // This happens when Chinese characters are misread
-            let cleanPosition = categorized.position || '';
-            if (/^[A-Z]\s+[A-Z]/i.test(cleanPosition)) {
-                cleanPosition = cleanPosition.replace(/^[A-Z]\s+/, '');
-            }
-
-            // Remove Chinese characters from position if they were incorrectly included
-            cleanPosition = cleanPosition.replace(/[\u4e00-\u9fff]+\s*/g, '').trim();
-
-            // Clean up name - remove Chinese characters if mixed with English name
-            let cleanName = categorized.name || 'Unknown';
-            // If name has both Chinese and English, prefer the English part
-            if (/[\u4e00-\u9fff]/.test(cleanName) && /[A-Za-z]{2,}/.test(cleanName)) {
-                const englishPart = cleanName.replace(/[\u4e00-\u9fff]+/g, '').trim();
-                if (englishPart.length > 3) {
-                    cleanName = englishPart;
-                }
-            }
-
-            const result = {
-                name: cleanName,
-                position: cleanPosition,
-                company: categorized.company || '',
-                phone: phoneDisplay, // All phones joined
-                phones: phones, // Array of all phones
-                email: categorized.email,
-                website: categorized.website,
-                address: categorized.address || '',
                 notes: '',
-                rawText: text // Keep for AI validation
+                rawText: text
             };
+
+            // --- Helper Functions ---
+            const hasAddressWord = (text) => {
+                const lower = text.toLowerCase();
+                const addressWords = ['floor', 'flr', 'building', 'bldg', 'tower', 'unit', 'suite', 'room', 'street', 'st.', 'avenue', 'ave', 'road', 'rd', 'city', 'district', 'province', 'barangay', 'brgy', 'manila', 'makati', 'quezon', 'cebu', 'davao', 'china', 'philippines', 'singapore', 'park', 'compound', 'block', 'blk', 'lot', 'phase'];
+                if (addressWords.some(w => lower.includes(w))) return true;
+                if (/\b(st|rd|ave|blvd|flr|rm|no)\b\.?/i.test(text)) return true;
+                return false;
+            };
+
+            const looksLikePhone = (line) => /^\+?\d[\d\s().-]{7,}$/.test(line.replace(/\s+/g, ''));
+
+            const looksLikePersonName = (line) => {
+                const words = line.split(/\s+/).filter(w => w.length > 0);
+                if (words.length < 2 || words.length > 4) return false;
+                if (line.includes('@') || /\d{3}/.test(line)) return false;
+                if (STRONG_SUFFIX_REGEX.test(line.toLowerCase())) return false;
+                // All words should be mostly letters
+                return words.every(w => /^[A-Za-z'.,-]+$/.test(w));
+            };
+
+            const looksLikeCompany = (line) => {
+                const lower = line.toLowerCase();
+                // Has company suffix (Inc, Corp, LLC, Ltd, etc.)
+                if (COMPANY_SUFFIX_WORD_REGEX.test(lower)) return true;
+                // Is a continuation word alone (Energy, Solutions, etc.)
+                if (COMPANY_CONTINUATION_REGEX.test(line.trim())) return true;
+                // Has business words (Manufacturing, Company, Limited, etc.)
+                if (/\b(manufacturing|company|limited|private|pvt|ltd|inc|corp|llc|enterprises|industries|international)\b/i.test(line)) return true;
+                // Long ALL CAPS with business context (5+ words)
+                const words = line.split(/\s+/);
+                if (line === line.toUpperCase() && words.length >= 5 && /[A-Z]/.test(line)) return true;
+                return false;
+            };
+
+            // --- Find Position First (helps find name) ---
+            let positionIdx = -1;
+            lines.forEach((line, idx) => {
+                if (newUsedLines.has(idx) || result.position) return;
+                const lower = line.toLowerCase();
+
+                if (!TITLE_KEYWORD_REGEX.test(lower)) return;
+                if (STRONG_SUFFIX_REGEX.test(lower)) return;
+                if (hasAddressWord(line)) return;
+
+                // Score position candidates
+                let score = 10;
+                if (line.length < 40) score += 10;
+                if (line !== line.toUpperCase()) score += 10; // Not ALL CAPS
+                if (/manager|director|officer|engineer|specialist|consultant/i.test(line)) score += 20;
+
+                if (score > 20) {
+                    result.position = line;
+                    positionIdx = idx;
+                    newUsedLines.add(idx);
+                }
+            });
+
+            // --- Find Name (line before position, or best candidate) ---
+            if (positionIdx > 0) {
+                for (let idx = positionIdx - 1; idx >= 0; idx--) {
+                    if (newUsedLines.has(idx)) continue;
+                    const line = lines[idx];
+                    if (looksLikePersonName(line) && !looksLikeCompany(line)) {
+                        result.name = line;
+                        newUsedLines.add(idx);
+                        break;
+                    }
+                }
+            }
+
+            // Fallback: find best name candidate
+            if (!result.name) {
+                let bestName = null;
+                let bestScore = 0;
+
+                lines.forEach((line, idx) => {
+                    if (newUsedLines.has(idx)) return;
+                    if (!looksLikePersonName(line)) return;
+                    if (looksLikeCompany(line)) return;
+
+                    let score = 10;
+                    const words = line.split(/\s+/);
+
+                    // Title Case bonus (strong signal)
+                    if (words.every(w => /^[A-Z][a-z]+$/.test(w))) score += 50;
+                    // 2-3 words bonus (typical name length)
+                    if (words.length <= 3) score += 20;
+                    // First/second line bonus (names usually at top)
+                    if (idx === 0) score += 30;
+                    if (idx === 1) score += 20;
+                    // ALL CAPS small penalty (less than Title Case bonus)
+                    if (line === line.toUpperCase() && words.length <= 3) score -= 10;
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestName = { line, idx };
+                    }
+                });
+
+                if (bestName) {
+                    result.name = bestName.line;
+                    newUsedLines.add(bestName.idx);
+                }
+            }
+
+            // --- Find Company ---
+            let bestCompany = null;
+            let bestCompanyScore = 0;
+
+            lines.forEach((line, idx) => {
+                if (newUsedLines.has(idx)) return;
+                const lower = line.toLowerCase();
+
+                // Check if line looks like a company
+                const hasSuffix = COMPANY_SUFFIX_WORD_REGEX.test(lower);
+                const hasContinuationWord = COMPANY_CONTINUATION_WORDS.some(w => lower.includes(w));
+                const hasBusinessWord = /\b(manufacturing|company|limited|private|pvt|enterprises|industries|international|solutions|systems|technologies|group)\b/i.test(line);
+
+                if (!hasSuffix && !hasContinuationWord && !hasBusinessWord) return;
+
+                let score = line.length;
+                // Strong company indicators
+                if (['inc', 'corp', 'llc', 'ltd', 'limited', 'private'].some(s => lower.includes(s))) score += 100;
+                // Continuation words (Energy, Group, Systems, etc.)
+                if (hasContinuationWord) score += 50;
+                // ALL CAPS companies
+                if (line === line.toUpperCase() && /[A-Z]/.test(line)) score += 30;
+                // Longer companies more likely
+                if (line.length > 20) score += 20;
+
+                // Penalty for 2-word Title Case names (might be person)
+                const words = line.split(/\s+/);
+                if (words.length === 2 && words.every(w => /^[A-Z][a-z]+$/.test(w))) score -= 50;
+
+                if (score > bestCompanyScore) {
+                    bestCompanyScore = score;
+                    bestCompany = { line, idx };
+                }
+            });
+
+            if (bestCompany && bestCompanyScore > 0) {
+                result.company = bestCompany.line;
+                newUsedLines.add(bestCompany.idx);
+            }
+
+            // --- Find Address ---
+            const addressParts = [];
+            lines.forEach((line, idx) => {
+                if (newUsedLines.has(idx)) return;
+                if (looksLikePhone(line)) return;
+                if (looksLikeCompany(line) && !hasAddressWord(line)) return;
+
+                if (hasAddressWord(line) || /^#?\d+\s/.test(line) || /\bno\.?\s*\d/i.test(line)) {
+                    let cleaned = line.replace(/^(add|address|addr)[\s.:]+/i, '').trim();
+                    addressParts.push(cleaned);
+                    newUsedLines.add(idx);
+                }
+            });
+
+            if (addressParts.length > 0) {
+                result.address = addressParts.join(', ').replace(/,\s*,/g, ',').replace(/\s+/g, ' ').trim();
+            }
+
+            // ============================================
+            // PHASE 5: CLEANUP
+            // Fix OCR artifacts
+            // ============================================
+
+            // Clean name
+            if (result.name) {
+                // Remove Chinese characters if mixed with English
+                if (/[\u4e00-\u9fff]/.test(result.name) && /[A-Za-z]{2,}/.test(result.name)) {
+                    const english = result.name.replace(/[\u4e00-\u9fff]+/g, '').trim();
+                    if (english.length > 3) result.name = english;
+                }
+            } else {
+                result.name = 'Unknown';
+            }
+
+            // Clean position
+            if (result.position) {
+                result.position = result.position
+                    .replace(/^[A-Z]\s+(?=[A-Z])/i, '') // Remove single-letter prefix
+                    .replace(/[\u4e00-\u9fff]+\s*/g, '') // Remove Chinese
+                    .trim();
+            }
 
             return result;
         };
@@ -1261,36 +809,42 @@ Email: ${parsed.email}
 Address: ${parsed.address}
 
 YOUR TASK: Improve accuracy to 99% by:
-1. **Fix spacing**: "JohnSmith" → "John Smith", "Acme Inc" → "Acme Inc."
-2. **Proper capitalization**: "ACME INC" → "Acme Inc.", "john smith" → "John Smith"
-3. **Validate name/company**: Person names are 2-4 words. Companies have Inc/Corp/LLC/Solutions/Services
-4. **Standardize phone**: Use consistent format (keep country code if present)
-5. **Clean artifacts**: Remove OCR errors like extra spaces, weird characters
-6. **Infer missing data**: If position is missing but context suggests a role, add it
-7. **Format company properly**: "ACME, INC." → "Acme, Inc."
-8. **CRITICAL - Merge fragmented company names**: OCR often splits company names across lines. Look in raw text for patterns like:
-   - "Google" on one line, "LLC" on another → combine to "Google LLC"
-   - "JIVO" on one line, "ENERGY" on another → combine to "Jivo Energy"
-   - Brand name + continuation word (Energy, Group, Systems, Solutions, Technologies, Industries, Holdings, etc.)
-   - Company name in logo text that appears separately from suffix
-   If the parsed company is incomplete, search the RAW text for the full company name and combine ALL the parts.
-9. **CRITICAL - Merge multi-line addresses**: Addresses often span 2-4 lines. Look in raw text for:
-   - Street/building info on one line, district/city on another, country on third
-   - Example: "No.6 Foluo Road Industrial" + "Park,Nanhai District,Foshan," + "Guangdong,China" → full address
-   - Include ALL address parts: street, building, district, city, province/state, country
-   - Remove "Add:" or "Address:" prefixes but keep ALL location data
 
-Return ONLY valid JSON (no markdown formatting):
+1. **CRITICAL - Fix name capitalization**:
+   - "GHIE CALLANGAN" → "Ghie Callangan"
+   - "john smith" → "John Smith"
+   - Always use Title Case for person names
+
+2. **CRITICAL - Name vs Company**:
+   - Person names are 2-3 words, Title Case (e.g., "Ghie Callangan", "Antonio Nang")
+   - Companies have business words (Inc, Corp, LLC, Ltd, Co., System, Solar, Trading, etc.)
+   - If the parsed name looks like a company, find the real person name in raw text
+
+3. **Fix company name**:
+   - Merge fragmented names: "Google" + "LLC" → "Google LLC"
+   - Proper formatting: "ACME, INC." → "Acme, Inc."
+
+4. **CRITICAL - Address from ANY country**:
+   - Merge multi-line addresses into one complete address
+   - Works for any country: China, Philippines, USA, Europe, etc.
+   - Remove "Add:" or "Address:" prefixes
+   - Include: street, building, district, city, province/state, country, postal code
+
+5. **Clean OCR artifacts**: Remove extra spaces, weird characters
+
+6. **Standardize phone**: Keep country code, use consistent format
+
+Return ONLY valid JSON (no markdown):
 {
-  "name": "Properly Capitalized Name",
+  "name": "Title Case Person Name",
   "position": "Job Title",
   "company": "Company Name Inc.",
   "phone": "formatted phone",
   "email": "email@domain.com",
-  "address": "Full Street Address, District, City, Country"
+  "address": "Complete Address, City, Country"
 }
 
-CRITICAL: Ensure name is a person, company has business indicators. If you swap them, verify it makes sense.`;
+CRITICAL: Name MUST be a person (Title Case, 2-3 words). Company MUST have business indicators.`;
 
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_VISION_API_KEY}`, {
                     method: 'POST',
@@ -1328,46 +882,55 @@ CRITICAL: Ensure name is a person, company has business indicators. If you swap 
 
                 const corrected = JSON.parse(jsonText);
 
-                // VALIDATION: Reject obviously wrong AI responses
-                const isValidName = (name) => {
-                    if (!name || name.length < 2) return false;
-                    if (/^(unknown|n\/a|none|null|undefined)$/i.test(name.trim())) return false;
-                    // Name shouldn't be longer than 50 chars or contain address/company words
-                    if (name.length > 50) return false;
-                    if (/\b(inc|corp|llc|ltd|city|philippines|street|ave|road)\b/i.test(name)) return false;
-                    return true;
+                // VALIDATION: Only reject clearly garbage AI responses
+                const isGarbage = (str) => {
+                    if (!str || str.length < 2) return true;
+                    if (/^(unknown|n\/a|none|null|undefined)$/i.test(str.trim())) return true;
+                    // Reject if too long (likely concatenated everything)
+                    if (str.length > 150) return true;
+                    return false;
                 };
 
-                const isValidCompany = (company) => {
-                    if (!company) return false;
-                    // Company name shouldn't be longer than 80 chars (likely concatenated garbage)
-                    if (company.length > 80) return false;
-                    // Company shouldn't contain personal names AND address parts together
-                    const hasPersonalName = /\b(specialist|manager|director|officer|engineer|sales|corporate)\b/i.test(company);
-                    const hasAddressPart = /\b(city|philippines|street|ave\.|avenue|road|floor|bldg)\b/i.test(company);
-                    if (hasPersonalName && hasAddressPart) return false;
-                    return true;
+                // Helper: Check if AI name is better than parsed name
+                const isAINameBetter = (aiName, parsedName) => {
+                    if (isGarbage(aiName)) return false;
+                    if (!parsedName || parsedName === 'Unknown') return true;
+                    // Prefer AI if it has proper capitalization (Title Case)
+                    const aiIsTitleCase = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$/.test(aiName);
+                    const parsedIsAllCaps = parsedName === parsedName.toUpperCase();
+                    if (aiIsTitleCase && parsedIsAllCaps) return true;
+                    // Prefer AI if parsed name contains company words
+                    if (/\b(inc|corp|llc|ltd|system|solar|trading|industrial)\b/i.test(parsedName)) return true;
+                    return true; // Default: trust AI
                 };
 
-                const isValidAddress = (address) => {
-                    if (!address) return false;
-                    // Address shouldn't be longer than 200 chars
-                    if (address.length > 200) return false;
-                    return true;
+                // Helper: Check if AI company is better
+                const isAICompanyBetter = (aiCompany, parsedCompany) => {
+                    if (isGarbage(aiCompany)) return false;
+                    if (!parsedCompany) return true;
+                    // Reject if AI company contains person name mixed with address
+                    const hasPersonTitle = /\b(specialist|manager|director|officer|engineer)\b/i.test(aiCompany);
+                    const hasAddress = /\b(street|road|city|floor|bldg)\b/i.test(aiCompany);
+                    if (hasPersonTitle && hasAddress) return false;
+                    return true; // Default: trust AI
                 };
 
-                // Select best values with validation
-                const bestName = isValidName(corrected.name) ? corrected.name : parsed.name;
-                const bestCompany = isValidCompany(corrected.company) ? corrected.company : parsed.company;
+                // Helper: Check if AI address is better
+                const isAIAddressBetter = (aiAddress, parsedAddress) => {
+                    if (isGarbage(aiAddress)) return false;
+                    if (!parsedAddress) return true;
+                    // Prefer AI address if it's longer and contains location words
+                    if (aiAddress.length >= parsedAddress.length) return true;
+                    // Prefer AI if parsed address is a tagline
+                    if (/quality|products|services|solutions/i.test(parsedAddress)) return true;
+                    return true; // Default: trust AI
+                };
+
+                // Select best values - TRUST AI MORE
+                const bestName = isAINameBetter(corrected.name, parsed.name) ? corrected.name : parsed.name;
+                const bestCompany = isAICompanyBetter(corrected.company, parsed.company) ? corrected.company : parsed.company;
                 const bestPosition = corrected.position || parsed.position;
-
-                // For address: prefer the LONGER one but validate it
-                let bestAddress = parsed.address;
-                if (isValidAddress(corrected.address)) {
-                    if (!parsed.address || corrected.address.length >= parsed.address.length) {
-                        bestAddress = corrected.address;
-                    }
-                }
+                const bestAddress = isAIAddressBetter(corrected.address, parsed.address) ? corrected.address : parsed.address;
 
                 return {
                     ...parsed,
