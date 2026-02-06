@@ -445,9 +445,108 @@
         const TITLE_KEYWORDS = ['ceo', 'cto', 'cfo', 'coo', 'president', 'vice president', 'vp', 'director', 'manager', 'supervisor', 'lead', 'engineer', 'developer', 'designer', 'analyst', 'consultant', 'sales', 'marketing', 'executive', 'officer', 'associate', 'specialist', 'coordinator', 'administrator', 'assistant', 'founder', 'partner', 'owner', 'chairman', 'secretary', 'accountant', 'attorney', 'lawyer', 'doctor', 'nurse', 'representative', 'agent', 'broker', 'realtor', 'architect', 'account manager', 'project manager', 'general manager'];
         const TITLE_KEYWORD_REGEX = new RegExp(`\\b(${TITLE_KEYWORDS.join('|')})\\b`, 'i');
 
+        // === INTERNATIONAL SUPPORT ===
+
+        // Honorific/Professional title prefixes (goes before name)
+        const HONORIFIC_TITLES = [
+            // Engineering
+            'engr', 'engr.', 'engineer', 'ing', 'ing.',
+            // Medical
+            'dr', 'dr.', 'doctor', 'md', 'm.d.', 'dds', 'd.d.s.',
+            // Social
+            'mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'miss',
+            // Religious
+            'rev', 'rev.', 'reverend', 'fr', 'fr.', 'father', 'pastor', 'bishop',
+            // Academic
+            'prof', 'prof.', 'professor',
+            // Legal
+            'atty', 'atty.', 'attorney', 'esq', 'esq.',
+            // Military
+            'gen', 'gen.', 'col', 'col.', 'maj', 'maj.', 'capt', 'capt.',
+            // Other
+            'sir', 'dame', 'lord', 'lady'
+        ];
+        const HONORIFIC_REGEX = new RegExp(`^(${HONORIFIC_TITLES.join('|')})\\s+`, 'i');
+
+        // International company suffixes
+        const INTERNATIONAL_COMPANY_SUFFIXES = [
+            // Japanese
+            '株式会社', 'かぶしきがいしゃ', 'カブシキガイシャ', // Kabushiki Kaisha (KK)
+            '有限会社', 'ゆうげんがいしゃ', 'ユウゲンガイシャ', // Yugen Kaisha (YK)
+            '合同会社', 'ごうどうがいしゃ', 'ゴウドウガイシャ', // Godo Kaisha (GK)
+            // Chinese (Simplified & Traditional)
+            '有限公司', '股份有限公司', '集团', '集團',
+            // Korean
+            '주식회사', '유한회사',
+            // Thai
+            'บริษัท', 'จำกัด',
+            // Vietnamese
+            'công ty', 'cổ phần',
+            // Indonesian/Malay
+            'pt', 'pt.', 'sdn bhd', 'sdn. bhd.',
+            // Indian
+            'pvt ltd', 'pvt. ltd.', 'private limited'
+        ];
+
+        // International address keywords
+        const INTERNATIONAL_ADDRESS_KEYWORDS = [
+            // Japanese
+            '都', '道', '府', '県', // Prefecture
+            '市', '区', '町', '村', // City/Ward
+            '丁目', '番地', '号',  // Address numbers
+            // Chinese (Simplified & Traditional)
+            '省', '市', '区', '縣', '路', '街', '道', '巷', '弄', '號', '号', '楼', '樓', '层', '層',
+            // Korean
+            '시', '구', '동', '로', '길',
+            // Thai
+            'ถนน', 'ซอย', 'แขวง', 'เขต', 'จังหวัด',
+            // Vietnamese
+            'tỉnh', 'thành phố', 'quận', 'phường', 'đường',
+            // Indonesian/Malay
+            'jalan', 'jln', 'gang', 'gg', 'rt', 'rw', 'kelurahan', 'kecamatan',
+            // Indian languages (transliterated)
+            'nagar', 'marg', 'road', 'gali'
+        ];
+
         const parseBusinessCard = (text) => {
             const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             let lines = normalizedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+            // ============================================
+            // PHASE 0: TABLE FORMAT DETECTION & RESTRUCTURING
+            // Detect if text is in columnar/tabular format and restructure
+            // ============================================
+
+            const detectTableFormat = (lines) => {
+                // Check if multiple lines have significant whitespace gaps (indicating columns)
+                const tabularLines = lines.filter(line => {
+                    // Split by 3+ spaces or tabs
+                    const segments = line.split(/\s{3,}|\t+/);
+                    // Must have 2+ segments, each non-empty
+                    return segments.length >= 2 && segments.filter(s => s.trim().length > 0).length >= 2;
+                });
+                // If 40%+ of lines are tabular, it's likely a table format
+                return tabularLines.length >= Math.max(2, lines.length * 0.4);
+            };
+
+            const restructureTableText = (lines) => {
+                // Extract all columns from all lines
+                const columns = [];
+                lines.forEach(line => {
+                    const segments = line.split(/\s{3,}|\t+/).map(s => s.trim()).filter(s => s);
+                    segments.forEach((segment, colIdx) => {
+                        if (!columns[colIdx]) columns[colIdx] = [];
+                        columns[colIdx].push(segment);
+                    });
+                });
+                // Flatten columns into linear text (read column by column)
+                return columns.flat();
+            };
+
+            if (detectTableFormat(lines)) {
+                console.log('[Parser] Table format detected, restructuring...');
+                lines = restructureTableText(lines);
+            }
 
             // ============================================
             // PHASE 1: EXTRACT (from raw text)
@@ -605,9 +704,16 @@
             // --- Helper Functions ---
             const hasAddressWord = (text) => {
                 const lower = text.toLowerCase();
-                const addressWords = ['floor', 'flr', 'building', 'bldg', 'tower', 'unit', 'suite', 'room', 'street', 'st.', 'avenue', 'ave', 'road', 'rd', 'city', 'district', 'province', 'barangay', 'brgy', 'manila', 'makati', 'quezon', 'cebu', 'davao', 'china', 'philippines', 'singapore', 'park', 'compound', 'block', 'blk', 'lot', 'phase'];
+                const addressWords = [
+                    // English
+                    'floor', 'flr', 'building', 'bldg', 'tower', 'unit', 'suite', 'room', 'street', 'st.', 'avenue', 'ave', 'road', 'rd', 'city', 'district', 'province', 'barangay', 'brgy', 'manila', 'makati', 'quezon', 'cebu', 'davao', 'china', 'philippines', 'singapore', 'park', 'compound', 'block', 'blk', 'lot', 'phase'
+                ];
                 if (addressWords.some(w => lower.includes(w))) return true;
                 if (/\b(st|rd|ave|blvd|flr|rm|no)\b\.?/i.test(text)) return true;
+
+                // Check for international address keywords (CJK and others)
+                if (INTERNATIONAL_ADDRESS_KEYWORDS.some(keyword => text.includes(keyword))) return true;
+
                 return false;
             };
 
@@ -615,21 +721,42 @@
 
             const looksLikePersonName = (line) => {
                 const words = line.split(/\s+/).filter(w => w.length > 0);
+
+                // Check for professional title prefix (Engr., Dr., Mr., etc.)
+                const firstWord = words[0] || '';
+                const hasHonorific = HONORIFIC_TITLES.some(title =>
+                    firstWord.toLowerCase().replace(/\./g, '') === title.replace(/\./g, '')
+                );
+
+                // If has honorific, be more flexible (2-6 words OK)
+                if (hasHonorific) {
+                    if (words.length < 2 || words.length > 6) return false;
+                    // Don't check strict character patterns if has honorific
+                    if (line.includes('@') || /\d{4}/.test(line)) return false;
+                    return true;
+                }
+
+                // Standard name detection (no title)
                 if (words.length < 2 || words.length > 4) return false;
                 if (line.includes('@') || /\d{3}/.test(line)) return false;
                 if (STRONG_SUFFIX_REGEX.test(line.toLowerCase())) return false;
-                // All words should be mostly letters
-                return words.every(w => /^[A-Za-z'.,-]+$/.test(w));
+
+                // Accept Unicode letters (not just A-Z) for international names
+                return words.every(w => /^[\p{L}'.,-]+$/u.test(w) || /^[A-Za-z'.,-]+$/.test(w));
             };
 
             const looksLikeCompany = (line) => {
                 const lower = line.toLowerCase();
-                // Has company suffix (Inc, Corp, LLC, Ltd, etc.)
+                // Has English company suffix (Inc, Corp, LLC, Ltd, etc.)
                 if (COMPANY_SUFFIX_WORD_REGEX.test(lower)) return true;
                 // Is a continuation word alone (Energy, Solutions, etc.)
                 if (COMPANY_CONTINUATION_REGEX.test(line.trim())) return true;
                 // Has business words (Manufacturing, Company, Limited, etc.)
                 if (/\b(manufacturing|company|limited|private|pvt|ltd|inc|corp|llc|enterprises|industries|international)\b/i.test(line)) return true;
+
+                // Check for international company suffixes (CJK and others)
+                if (INTERNATIONAL_COMPANY_SUFFIXES.some(suffix => line.includes(suffix))) return true;
+
                 // Long ALL CAPS with business context (5+ words)
                 const words = line.split(/\s+/);
                 if (line === line.toUpperCase() && words.length >= 5 && /[A-Z]/.test(line)) return true;
@@ -795,7 +922,7 @@
         // Validate/correct parsing with Gemini AI
         const validateWithGemini = async (rawText, parsed) => {
             try {
-                const prompt = `You are an expert business card data curator. Your goal is to polish OCR-extracted contact information to 99% accuracy.
+                const prompt = `You are an expert multilingual business card data curator. Your goal is to polish OCR-extracted contact information to 99% accuracy for ANY language and country.
 
 RAW OCR TEXT:
 ${rawText}
@@ -810,41 +937,52 @@ Address: ${parsed.address}
 
 YOUR TASK: Improve accuracy to 99% by:
 
-1. **CRITICAL - Fix name capitalization**:
-   - "GHIE CALLANGAN" → "Ghie Callangan"
-   - "john smith" → "John Smith"
-   - Always use Title Case for person names
+1. **CRITICAL - Fix name with flexibility**:
+   - Fix capitalization appropriately for the language
+   - KEEP professional titles: "ENGR. JOHN DOE" → "Engr. John Doe"
+   - Support all formats: "Dr. Maria Santos, MD", "李明", "สมชาย", "Müller"
+   - ANY length OK: 1-6+ words accepted
+   - If name has title prefix (Engr., Dr., Mr., Prof., Atty., Rev.), KEEP IT
 
-2. **CRITICAL - Name vs Company**:
-   - Person names are 2-3 words, Title Case (e.g., "Ghie Callangan", "Antonio Nang")
-   - Companies have business words (Inc, Corp, LLC, Ltd, Co., System, Solar, Trading, etc.)
-   - If the parsed name looks like a company, find the real person name in raw text
+2. **CRITICAL - Name vs Company (be intelligent)**:
+   - Person names can have: titles, suffixes, any language, any case
+   - Companies have: business suffixes (Inc, LLC, 株式会社, 有限公司, บริษัท) OR business words
+   - If unsure, prefer keeping original parsing
 
-3. **Fix company name**:
-   - Merge fragmented names: "Google" + "LLC" → "Google LLC"
-   - Proper formatting: "ACME, INC." → "Acme, Inc."
+3. **Fix company name (multilingual)**:
+   - Merge fragments: "Google" + "LLC" → "Google LLC"
+   - Support: English (Inc, Corp), Japanese (株式会社), Chinese (有限公司), Thai (บริษัท), etc.
+   - Proper formatting for the language
 
-4. **CRITICAL - Address from ANY country**:
-   - Merge multi-line addresses into one complete address
-   - Works for any country: China, Philippines, USA, Europe, etc.
-   - Remove "Add:" or "Address:" prefixes
-   - Include: street, building, district, city, province/state, country, postal code
+4. **CRITICAL - Address from ANY country (be thorough)**:
+   - Merge ALL address lines into ONE complete string
+   - Support: Japanese (東京都...), Chinese (北京市...), Thai (ถนน...), ALL languages
+   - Remove prefixes: "Add:", "Address:", "住所:"
+   - Include: ALL parts (street, building, floor, district, city, province, country, postal)
+   - NO length limits - addresses can be 200+ characters!
 
-5. **Clean OCR artifacts**: Remove extra spaces, weird characters
+5. **Clean OCR artifacts**: Fix spacing, remove weird chars, keep real content
 
-6. **Standardize phone**: Keep country code, use consistent format
+6. **Standardize phone**: Keep country code (+81, +66, +86, +63, etc.), format consistently
 
-Return ONLY valid JSON (no markdown):
+EXAMPLES of correct name handling:
+- "ENGR. JOHN DOE" → "Engr. John Doe" (keep title!)
+- "DR. MARIA SANTOS, MD" → "Dr. Maria Santos, MD"  (keep title and suffix!)
+- "MR. & MRS. SMITH" → "Mr. & Mrs. Smith"
+- "李明" → "李明" (keep non-Latin as-is)
+- "JOSÉ GARCÍA" → "José García" (preserve accents)
+
+Return ONLY valid JSON (no markdown, no code blocks):
 {
-  "name": "Title Case Person Name",
+  "name": "Person Name (with title if present)",
   "position": "Job Title",
-  "company": "Company Name Inc.",
-  "phone": "formatted phone",
+  "company": "Company Name with Suffix",
+  "phone": "+XX formatted phone",
   "email": "email@domain.com",
-  "address": "Complete Address, City, Country"
+  "address": "Complete Full Address, All Parts, City, Country"
 }
 
-CRITICAL: Name MUST be a person (Title Case, 2-3 words). Company MUST have business indicators.`;
+IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. Non-Latin text is valid.`;
 
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_VISION_API_KEY}`, {
                     method: 'POST',
@@ -882,45 +1020,37 @@ CRITICAL: Name MUST be a person (Title Case, 2-3 words). Company MUST have busin
 
                 const corrected = JSON.parse(jsonText);
 
-                // VALIDATION: Only reject clearly garbage AI responses
+                // VALIDATION: Only reject clearly garbage AI responses (simplified - trust AI more!)
                 const isGarbage = (str) => {
                     if (!str || str.length < 2) return true;
                     if (/^(unknown|n\/a|none|null|undefined)$/i.test(str.trim())) return true;
-                    // Reject if too long (likely concatenated everything)
-                    if (str.length > 150) return true;
+                    // Removed 150-char limit - international addresses can be long!
                     return false;
                 };
 
-                // Helper: Check if AI name is better than parsed name
+                // Helper: Check if AI name is better than parsed name (simplified!)
                 const isAINameBetter = (aiName, parsedName) => {
                     if (isGarbage(aiName)) return false;
                     if (!parsedName || parsedName === 'Unknown') return true;
-                    // Prefer AI if it has proper capitalization (Title Case)
-                    const aiIsTitleCase = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$/.test(aiName);
-                    const parsedIsAllCaps = parsedName === parsedName.toUpperCase();
-                    if (aiIsTitleCase && parsedIsAllCaps) return true;
+                    // Removed strict Title Case check - accept titles, all caps, non-Latin, etc.
                     // Prefer AI if parsed name contains company words
                     if (/\b(inc|corp|llc|ltd|system|solar|trading|industrial)\b/i.test(parsedName)) return true;
                     return true; // Default: trust AI
                 };
 
-                // Helper: Check if AI company is better
+                // Helper: Check if AI company is better (simplified!)
                 const isAICompanyBetter = (aiCompany, parsedCompany) => {
                     if (isGarbage(aiCompany)) return false;
                     if (!parsedCompany) return true;
-                    // Reject if AI company contains person name mixed with address
-                    const hasPersonTitle = /\b(specialist|manager|director|officer|engineer)\b/i.test(aiCompany);
-                    const hasAddress = /\b(street|road|city|floor|bldg)\b/i.test(aiCompany);
-                    if (hasPersonTitle && hasAddress) return false;
-                    return true; // Default: trust AI
+                    // Simplified: trust AI unless it's obvious garbage
+                    return true;
                 };
 
-                // Helper: Check if AI address is better
+                // Helper: Check if AI address is better (simplified!)
                 const isAIAddressBetter = (aiAddress, parsedAddress) => {
                     if (isGarbage(aiAddress)) return false;
                     if (!parsedAddress) return true;
-                    // Prefer AI address if it's longer and contains location words
-                    if (aiAddress.length >= parsedAddress.length) return true;
+                    // Trust AI - removed length restrictions
                     // Prefer AI if parsed address is a tagline
                     if (/quality|products|services|solutions/i.test(parsedAddress)) return true;
                     return true; // Default: trust AI
