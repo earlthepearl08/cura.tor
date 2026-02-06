@@ -52,7 +52,12 @@ const Scanner: React.FC = () => {
     }, []);
 
     const capture = useCallback(async () => {
-        const imageSrc = webcamRef.current?.getScreenshot();
+        // Capture at the camera's native resolution (not CSS size) for sharp images
+        const video = webcamRef.current?.video;
+        const screenshotDims = video
+            ? { width: video.videoWidth, height: video.videoHeight }
+            : undefined;
+        const imageSrc = webcamRef.current?.getScreenshot(screenshotDims);
         if (imageSrc) {
             const cropped = await cropToViewfinder(imageSrc);
             setImgSrc(cropped);
