@@ -23,12 +23,12 @@ const Home = () => {
         <div className="flex flex-col items-center justify-center min-h-screen p-6">
             <header className="text-center mb-12">
                 <div className="relative inline-block">
-                    <h1 className="text-4xl font-bold gradient-text mb-2">CardScanner</h1>
+                    <h1 className="text-4xl font-bold gradient-text mb-2">CURA.TOR</h1>
                     <div className="absolute -top-1 -right-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg animate-pulse">
                         NEW
                     </div>
                 </div>
-                <p className="text-brand-400">Professional OCR Calling Card Manager</p>
+                <p className="text-brand-400">Smart Contact Curation</p>
             </header>
 
             <div className="grid grid-cols-3 gap-3 w-full max-w-md">
