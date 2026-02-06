@@ -3,10 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Camera, Upload, Users, Settings, PenLine, ChevronRight } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { getOCREngine } from '@/services/ocr';
+import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 
 const Home = () => {
     const [contactCount, setContactCount] = useState(0);
     const [ocrEngine, setOcrEngineState] = useState(getOCREngine());
+    const { isConnected, user, isSyncing } = useGoogleDrive();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -136,9 +138,14 @@ const Home = () => {
             <div className="w-full max-w-md card-elevated rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-slate-500"></div>
+                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-slate-500'}`}></div>
                         <div>
-                            <p className="text-xs font-medium text-slate-300">Local Storage</p>
+                            <p className="text-xs font-medium text-slate-300">
+                                {isConnected ? 'Synced to Google Drive' : 'Local Storage'}
+                            </p>
+                            {isConnected && isSyncing && (
+                                <p className="text-[10px] text-slate-500">Syncing...</p>
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-500">
