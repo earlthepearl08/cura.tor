@@ -14,16 +14,50 @@ const Scanner: React.FC = () => {
     const { isProcessing, processImage, result, error, reset } = useOCR();
     const navigate = useNavigate();
 
-    const capture = useCallback(() => {
-        // Capture at high resolution (quality is set on Webcam component via screenshotQuality)
-        const imageSrc = webcamRef.current?.getScreenshot({
-            width: 1920,
-            height: 1080
+    const cropToViewfinder = useCallback((imageSrc: string): Promise<string> => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d')!;
+
+                const targetRatio = 1.586; // Business card aspect ratio (matches viewfinder)
+                const imgRatio = img.width / img.height;
+
+                let sx: number, sy: number, sw: number, sh: number;
+
+                if (imgRatio > targetRatio) {
+                    // Image is wider than target — crop sides
+                    sh = img.height;
+                    sw = sh * targetRatio;
+                    sx = (img.width - sw) / 2;
+                    sy = 0;
+                } else {
+                    // Image is taller than target — crop top/bottom
+                    sw = img.width;
+                    sh = sw / targetRatio;
+                    sx = 0;
+                    sy = (img.height - sh) / 2;
+                }
+
+                canvas.width = sw;
+                canvas.height = sh;
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+
+                resolve(canvas.toDataURL('image/jpeg', 0.95));
+            };
+            img.onerror = () => resolve(imageSrc); // Fallback to original
+            img.src = imageSrc;
         });
+    }, []);
+
+    const capture = useCallback(async () => {
+        const imageSrc = webcamRef.current?.getScreenshot();
         if (imageSrc) {
-            setImgSrc(imageSrc);
+            const cropped = await cropToViewfinder(imageSrc);
+            setImgSrc(cropped);
         }
-    }, [webcamRef]);
+    }, [webcamRef, cropToViewfinder]);
 
     const retake = () => {
         setImgSrc(null);
@@ -141,8 +175,8 @@ const Scanner: React.FC = () => {
                         )}
                     </div>
                 ) : (
-                    <div className="w-full max-w-md rounded-2xl overflow-hidden glass relative border-2 border-emerald-500/50">
-                        <img src={imgSrc} alt="captured" className="w-full h-auto" />
+                    <div className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-emerald-500/50">
+                        <img src={imgSrc} alt="captured" className="w-full h-full object-cover" />
                         {/* Processing Overlay */}
                         {isProcessing && (
                             <div className="absolute inset-0 bg-brand-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
