@@ -10,8 +10,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured' });
+    console.error('GEMINI_API_KEY not found in environment variables');
+    return res.status(500).json({ error: 'API key not configured. Please add GEMINI_API_KEY to Vercel environment variables.' });
   }
+
+  console.log('Gemini API request received, API key present:', apiKey ? 'Yes' : 'No');
 
   try {
     const { imageData, prompt } = req.body;
@@ -56,9 +59,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Gemini API error:', errorData);
-      return res.status(response.status).json({ error: 'Gemini API request failed', details: errorData });
+      const errorText = await response.text();
+      console.error('Gemini API error:', response.status, errorText);
+      try {
+        const errorData = JSON.parse(errorText);
+        return res.status(response.status).json({ error: 'Gemini API request failed', details: errorData });
+      } catch {
+        return res.status(response.status).json({ error: 'Gemini API request failed', details: errorText });
+      }
     }
 
     const data = await response.json();
