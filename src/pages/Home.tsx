@@ -22,7 +22,12 @@ const Home = () => {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen p-6">
             <header className="text-center mb-12">
-                <h1 className="text-4xl font-bold gradient-text mb-2">CardScanner</h1>
+                <div className="relative inline-block">
+                    <h1 className="text-4xl font-bold gradient-text mb-2">CardScanner</h1>
+                    <div className="absolute -top-2 -right-8 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg animate-pulse">
+                        NEW
+                    </div>
+                </div>
                 <p className="text-brand-400">Professional OCR Calling Card Manager</p>
             </header>
 
