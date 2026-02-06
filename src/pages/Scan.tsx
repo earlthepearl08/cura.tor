@@ -60,13 +60,30 @@ const Scanner: React.FC = () => {
     const videoConstraints = {
         width: { ideal: 1920 },
         height: { ideal: 1080 },
-        facingMode: "environment", // Use back camera
-        focusMode: "continuous", // Continuous autofocus
-        advanced: [
-            { focusMode: "continuous" },
-            { focusDistance: { ideal: 0.25 } } // Focus at ~25cm for business cards
-        ]
+        facingMode: "environment" // Use back camera
     };
+
+    const applyCameraFocus = useCallback(async () => {
+        try {
+            const stream = webcamRef.current?.stream;
+            if (!stream) return;
+
+            const videoTrack = stream.getVideoTracks()[0];
+            const capabilities = videoTrack.getCapabilities?.();
+
+            // Apply continuous autofocus if supported
+            if (capabilities && 'focusMode' in capabilities) {
+                await videoTrack.applyConstraints({
+                    advanced: [
+                        { focusMode: 'continuous' } as any,
+                        { focusDistance: { ideal: 0.25 } } as any
+                    ]
+                });
+            }
+        } catch (err) {
+            console.log('Focus constraints not supported:', err);
+        }
+    }, []);
 
     return (
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
@@ -91,7 +108,10 @@ const Scanner: React.FC = () => {
                             ref={webcamRef}
                             screenshotFormat="image/jpeg"
                             videoConstraints={videoConstraints}
-                            onUserMedia={() => setIsCameraReady(true)}
+                            onUserMedia={() => {
+                                setIsCameraReady(true);
+                                applyCameraFocus();
+                            }}
                             className="w-full h-full object-cover"
                         />
                         {/* Viewfinder Overlay */}
