@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
@@ -41,9 +41,10 @@ const Contacts: React.FC = () => {
         }
     };
 
-    const handleExport = (type: 'csv' | 'excel') => {
+    const handleExport = (type: 'csv' | 'excel' | 'vcard') => {
         if (type === 'csv') exportService.toCSV(contacts);
-        else exportService.toExcel(contacts);
+        else if (type === 'excel') exportService.toExcel(contacts);
+        else if (type === 'vcard') exportService.toVCardAll(contacts);
         setShowExportOptions(false);
     };
 
@@ -104,6 +105,66 @@ const Contacts: React.FC = () => {
         return matchesSearch && matchesFolder;
     });
 
+    const renderContactCard = (contact: Contact) => (
+        <div key={contact.id} className="glass rounded-2xl overflow-hidden border border-brand-800/10 hover:border-brand-500/20 transition-all group">
+            <div className="p-4 flex gap-4">
+                {/* Image Preview */}
+                <div className="h-16 w-16 rounded-xl overflow-hidden bg-brand-900 flex-shrink-0 border border-brand-800">
+                    <img src={contact.imageData} alt={contact.name} className="h-full w-full object-cover" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <h3 className="font-bold text-slate-100 truncate">{contact.name}</h3>
+                            <p className="text-xs text-brand-400 font-medium uppercase tracking-wider">{contact.position}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => exportService.toVCard(contact)}
+                                className="text-brand-700 hover:text-sky-400 p-1"
+                                title="Save as vCard"
+                            >
+                                <FileDown size={16} />
+                            </button>
+                            <button onClick={() => openEditModal(contact)} className="text-brand-700 hover:text-brand-400 p-1">
+                                <Edit3 size={16} />
+                            </button>
+                            <button onClick={() => deleteContact(contact.id)} className="text-brand-700 hover:text-red-400 p-1">
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mt-2 text-xs text-slate-400 space-y-1">
+                        <div className="flex items-center gap-2">
+                            <Building2 size={12} className="text-brand-500" />
+                            <span className="truncate">{contact.company}</span>
+                        </div>
+                        {contact.email[0] && (
+                            <a href={`mailto:${contact.email[0]}`} className="flex items-center gap-2 hover:text-sky-400 transition-colors">
+                                <Mail size={12} className="text-brand-500" />
+                                <span className="truncate">{contact.email[0]}</span>
+                            </a>
+                        )}
+                        {contact.phone[0] && (
+                            <a href={`tel:${contact.phone[0]}`} className="flex items-center gap-2 hover:text-emerald-400 transition-colors">
+                                <Phone size={12} className="text-brand-500" />
+                                <span className="truncate">{contact.phone[0]}</span>
+                            </a>
+                        )}
+                        {contact.notes && (
+                            <div className="flex items-center gap-2 text-amber-400/70">
+                                <StickyNote size={12} className="text-amber-500/50" />
+                                <span className="truncate">{contact.notes}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
     // Group contacts by folder
     const groupedContacts = filteredContacts.reduce((acc, contact) => {
         const folder = contact.folder || 'Uncategorized';
@@ -141,6 +202,12 @@ const Contacts: React.FC = () => {
                                     className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors"
                                 >
                                     Export as Excel
+                                </button>
+                                <button
+                                    onClick={() => handleExport('vcard')}
+                                    className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors"
+                                >
+                                    Export as vCard (.vcf)
                                 </button>
                             </div>
                         )}
@@ -219,115 +286,13 @@ const Contacts: React.FC = () => {
                                 <span className="text-xs text-brand-600">({folderContacts.length})</span>
                             </div>
                             <div className="space-y-4">
-                                {folderContacts.map((contact) => (
-                                    <div key={contact.id} className="glass rounded-2xl overflow-hidden border border-brand-800/10 hover:border-brand-500/20 transition-all group">
-                                        <div className="p-4 flex gap-4">
-                                            {/* Image Preview */}
-                                            <div className="h-16 w-16 rounded-xl overflow-hidden bg-brand-900 flex-shrink-0 border border-brand-800">
-                                                <img src={contact.imageData} alt={contact.name} className="h-full w-full object-cover" />
-                                            </div>
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-start justify-between">
-                                                    <div>
-                                                        <h3 className="font-bold text-slate-100 truncate">{contact.name}</h3>
-                                                        <p className="text-xs text-brand-400 font-medium uppercase tracking-wider">{contact.position}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <button onClick={() => openEditModal(contact)} className="text-brand-700 hover:text-brand-400 p-1">
-                                                            <Edit3 size={16} />
-                                                        </button>
-                                                        <button onClick={() => deleteContact(contact.id)} className="text-brand-700 hover:text-red-400 p-1">
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="mt-2 text-xs text-slate-400 space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <Building2 size={12} className="text-brand-500" />
-                                                        <span className="truncate">{contact.company}</span>
-                                                    </div>
-                                                    {contact.email[0] && (
-                                                        <div className="flex items-center gap-2">
-                                                            <Mail size={12} className="text-brand-500" />
-                                                            <span className="truncate">{contact.email[0]}</span>
-                                                        </div>
-                                                    )}
-                                                    {contact.phone[0] && (
-                                                        <div className="flex items-center gap-2">
-                                                            <Phone size={12} className="text-brand-500" />
-                                                            <span className="truncate">{contact.phone[0]}</span>
-                                                        </div>
-                                                    )}
-                                                    {contact.notes && (
-                                                        <div className="flex items-center gap-2 text-amber-400/70">
-                                                            <StickyNote size={12} className="text-amber-500/50" />
-                                                            <span className="truncate">{contact.notes}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                {folderContacts.map((contact) => renderContactCard(contact))}
                             </div>
                         </div>
                     ))
                 ) : (
                     // Show flat list when folder is selected
-                    filteredContacts.map((contact) => (
-                        <div key={contact.id} className="glass rounded-2xl overflow-hidden border border-brand-800/10 hover:border-brand-500/20 transition-all group">
-                            <div className="p-4 flex gap-4">
-                                {/* Image Preview */}
-                                <div className="h-16 w-16 rounded-xl overflow-hidden bg-brand-900 flex-shrink-0 border border-brand-800">
-                                    <img src={contact.imageData} alt={contact.name} className="h-full w-full object-cover" />
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <h3 className="font-bold text-slate-100 truncate">{contact.name}</h3>
-                                            <p className="text-xs text-brand-400 font-medium uppercase tracking-wider">{contact.position}</p>
-                                        </div>
-                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                            <button onClick={() => openEditModal(contact)} className="text-brand-700 hover:text-brand-400 p-1">
-                                                <Edit3 size={16} />
-                                            </button>
-                                            <button onClick={() => deleteContact(contact.id)} className="text-brand-700 hover:text-red-400 p-1">
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-2 text-xs text-slate-400 space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <Building2 size={12} className="text-brand-500" />
-                                            <span className="truncate">{contact.company}</span>
-                                        </div>
-                                        {contact.email[0] && (
-                                            <div className="flex items-center gap-2">
-                                                <Mail size={12} className="text-brand-500" />
-                                                <span className="truncate">{contact.email[0]}</span>
-                                            </div>
-                                        )}
-                                        {contact.phone[0] && (
-                                            <div className="flex items-center gap-2">
-                                                <Phone size={12} className="text-brand-500" />
-                                                <span className="truncate">{contact.phone[0]}</span>
-                                            </div>
-                                        )}
-                                        {contact.notes && (
-                                            <div className="flex items-center gap-2 text-amber-400/70">
-                                                <StickyNote size={12} className="text-amber-500/50" />
-                                                <span className="truncate">{contact.notes}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ))
+                    filteredContacts.map((contact) => renderContactCard(contact))
                 )}
             </div>
 

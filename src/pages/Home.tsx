@@ -51,7 +51,7 @@ const Home = () => {
                         <text x="138" y="42" fontFamily="Inter, sans-serif" fontSize="28" fontWeight="800" fill="url(#logoGrad)" letterSpacing="-1">.TOR</text>
                     </svg>
                     <div className="absolute -top-1 right-8 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg animate-pulse">
-                        NEW
+                        BETA
                     </div>
                 </div>
                 <p className="text-slate-500 text-xs tracking-widest uppercase">Smart Contact Curation</p>
@@ -150,7 +150,7 @@ const Home = () => {
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-500">
                         <span className="px-2 py-1 bg-slate-800/50 rounded-md">
-                            {ocrEngine === 'gemini-vision' ? 'Gemini Vision' : 'Tesseract'}
+                            {ocrEngine === 'cloud-vision' ? 'Cloud Vision' : 'Tesseract'}
                         </span>
                     </div>
                 </div>

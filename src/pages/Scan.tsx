@@ -143,6 +143,21 @@ const Scanner: React.FC = () => {
                 ) : (
                     <div className="w-full max-w-md rounded-2xl overflow-hidden glass relative border-2 border-emerald-500/50">
                         <img src={imgSrc} alt="captured" className="w-full h-auto" />
+                        {/* Processing Overlay */}
+                        {isProcessing && (
+                            <div className="absolute inset-0 bg-brand-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+                                <div className="relative w-16 h-16">
+                                    <div className="absolute inset-0 border-4 border-brand-700 rounded-full"></div>
+                                    <div className="absolute inset-0 border-4 border-transparent border-t-sky-400 rounded-full animate-spin"></div>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-sm font-semibold text-sky-400">Analyzing Card</p>
+                                    <p className="text-[10px] text-slate-500 mt-1">Extracting contact info...</p>
+                                </div>
+                                {/* Scan line animation */}
+                                <div className="absolute inset-x-4 h-0.5 bg-gradient-to-r from-transparent via-sky-400 to-transparent animate-scan-line"></div>
+                            </div>
+                        )}
                     </div>
                 )}
 

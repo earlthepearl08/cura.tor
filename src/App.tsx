@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from '@/pages/Home';
 import Scan from '@/pages/Scan';
@@ -5,8 +6,13 @@ import Upload from '@/pages/Upload';
 import Contacts from '@/pages/Contacts';
 import ManualInput from '@/pages/ManualInput';
 import Settings from '@/pages/Settings';
+import { getTheme } from '@/hooks/useTheme';
 
 function App() {
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', getTheme());
+    }, []);
+
     return (
         <Router>
             <div className="min-height-screen bg-brand-950">

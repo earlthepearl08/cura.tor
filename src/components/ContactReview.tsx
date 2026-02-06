@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3 } from 'lucide-react';
-import { OCRResult } from '@/services/ocr';
+import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles } from 'lucide-react';
+import { OCRResult, ocrService } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import { storage } from '@/services/storage';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
@@ -25,7 +25,10 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
 
     const [duplicateWarning, setDuplicateWarning] = useState<DuplicateResult | null>(null);
     const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
-    const [isEditMode, setIsEditMode] = useState(true); // Start in edit mode for better UX
+    const [isEditMode, setIsEditMode] = useState(true);
+    const [showRawText, setShowRawText] = useState(false);
+    const [rawText, setRawText] = useState(ocrResult.rawText);
+    const [isReparsing, setIsReparsing] = useState(false);
 
     // Check for duplicates when form data changes
     useEffect(() => {
@@ -52,6 +55,32 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         return () => clearTimeout(debounce);
     }, [formData.name, formData.email, formData.phone, formData.company]);
 
+    const handleReparse = async () => {
+        if (!rawText.trim()) return;
+        setIsReparsing(true);
+        try {
+            // Try Gemini AI parsing first, then rule-based fallback
+            let parsed;
+            try {
+                parsed = await ocrService.parseWithGemini(rawText);
+            } catch {
+                parsed = ocrService.parseText(rawText);
+            }
+            setFormData({
+                ...formData,
+                name: parsed.name || formData.name,
+                position: parsed.position || formData.position,
+                company: parsed.company || formData.company,
+                phone: parsed.phone.length > 0 ? parsed.phone.join(', ') : formData.phone,
+                email: parsed.email.length > 0 ? parsed.email.join(', ') : formData.email,
+                address: parsed.address || formData.address,
+            });
+        } catch (error) {
+            console.error('Reparse failed:', error);
+        }
+        setIsReparsing(false);
+    };
+
     const handleSave = async (forceSave: boolean = false) => {
         // Show warning if duplicate detected and not forcing save
         if (duplicateWarning && !forceSave) {
@@ -68,7 +97,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
             email: formData.email.split(',').map(e => e.trim()).filter(e => e),
             address: formData.address,
             notes: formData.notes,
-            rawText: ocrResult.rawText,
+            rawText: rawText,
             imageData: imageData,
             confidence: ocrResult.confidence,
             isVerified: true,
@@ -113,6 +142,64 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                 {/* Card Preview */}
                 <div className="w-full aspect-[1.586/1] rounded-2xl overflow-hidden glass border border-brand-800 shadow-2xl">
                     <img src={imageData} alt="original card" className="w-full h-full object-cover" />
+                </div>
+
+                {/* Confidence + Raw Text Toggle */}
+                <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            ocrResult.confidence >= 80
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : ocrResult.confidence >= 50
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-red-500/20 text-red-400'
+                        }`}>
+                            OCR Confidence {Math.round(ocrResult.confidence)}%
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => setShowRawText(!showRawText)}
+                        className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider hover:text-slate-300 transition-colors"
+                    >
+                        <FileText size={12} />
+                        {showRawText ? 'Hide Raw' : 'View Raw'}
+                        {showRawText ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                </div>
+
+                {/* Raw OCR Text - Editable with Reparse */}
+                {showRawText && (
+                    <div className="space-y-2">
+                        <textarea
+                            value={rawText}
+                            onChange={(e) => setRawText(e.target.value)}
+                            rows={6}
+                            className="w-full glass border border-brand-800 rounded-xl p-4 text-xs text-slate-300 font-mono leading-relaxed resize-none focus:ring-1 focus:ring-brand-500"
+                            placeholder="Raw OCR text..."
+                        />
+                        <button
+                            onClick={handleReparse}
+                            disabled={isReparsing}
+                            className="w-full py-2.5 glass border border-brand-700 rounded-xl text-xs font-semibold text-brand-300 hover:bg-white/5 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {isReparsing ? (
+                                <>
+                                    <div className="animate-spin h-3.5 w-3.5 border-2 border-brand-400 border-t-transparent rounded-full"></div>
+                                    Reparsing...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles size={14} />
+                                    Reparse with AI
+                                </>
+                            )}
+                        </button>
+                    </div>
+                )}
+
+                {/* Contact Details Label */}
+                <div className="px-1">
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Contact Details</span>
                 </div>
 
                 {/* Form Fields */}

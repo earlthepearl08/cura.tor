@@ -12,18 +12,7 @@ export interface OCRResult {
     confidence: number;
 }
 
-export type OCREngine = 'tesseract' | 'gemini-vision';
-
-// Gemini API Key - users should set this in localStorage
-const GEMINI_API_KEY_STORAGE_KEY = 'gemini_api_key';
-
-export const getGeminiApiKey = (): string | null => {
-    return localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY);
-};
-
-export const setGeminiApiKey = (key: string): void => {
-    localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, key);
-};
+export type OCREngine = 'tesseract' | 'cloud-vision';
 
 export const getOCREngine = (): OCREngine => {
     return (localStorage.getItem('ocr_engine') as OCREngine) || 'tesseract';
@@ -40,7 +29,7 @@ const JOB_TITLES = [
     // Directors & VPs
     'director', 'vp', 'vice president', 'head of', 'president',
     // Managers
-    'manager', 'supervisor', 'lead', 'team lead', 'coordinator',
+    'manager', 'supervisor', 'lead', 'team lead', 'coordinator', 'leader', 'team leader', 'project leader',
     // Technical
     'engineer', 'developer', 'architect', 'analyst', 'consultant',
     'programmer', 'designer', 'specialist', 'technician',
@@ -68,7 +57,15 @@ const COMPANY_SUFFIXES = [
     'solutions', 'services', 'technologies', 'tech',
     'systems', 'partners', 'associates',
     'international', 'global', 'worldwide',
-    'philippines', 'ph', 'usa', 'uk'
+    'foundation', 'institute', 'university', 'college',
+    'hospital', 'medical', 'health', 'healthcare',
+    'pharma', 'pharmaceutical', 'manufacturers', 'manufacturing',
+    'association', 'society', 'organization', 'federation', 'council',
+    'products', 'product', 'packaging', 'supply', 'supplies',
+    'provider', 'providers', 'industries', 'industrial',
+    'trading', 'construction', 'development', 'developers',
+    'agency', 'studio', 'laboratories', 'labs',
+    'bank', 'financial', 'insurance', 'realty', 'properties'
 ];
 
 // Address keywords
@@ -94,110 +91,150 @@ export class OCRService {
     private isInitializing: boolean = false;
     private currentEngine: OCREngine = getOCREngine();
 
-    /**
-     * Process image using Gemini Vision API (direct multimodal)
-     * Bypasses OCR entirely - sends image directly to Gemini
-     */
-    async processImageWithGeminiVision(imageSrc: string): Promise<OCRResult> {
-        console.log('[Gemini Vision] Starting direct image analysis...');
+    private apiKey = 'AIzaSyDp5v_RuQZsNlrqJOKJ1TgAZq2n3GZ8nBg';
 
-        // Hardcoded Gemini API key
-        const geminiApiKey = 'AIzaSyDp5v_RuQZsNlrqJOKJ1TgAZq2n3GZ8nBg';
+    /**
+     * Process image using Google Cloud Vision API for OCR,
+     * then Gemini AI for intelligent parsing (with rule-based fallback)
+     */
+    async processImageWithCloudVision(imageSrc: string): Promise<OCRResult> {
+        console.log('[Cloud Vision] Starting image analysis...');
 
         try {
             const base64Image = imageSrc.replace(/^data:image\/\w+;base64,/, '');
 
-            const prompt = `You are an expert at extracting contact information from business cards. Analyze this business card image and extract ALL contact details with perfect accuracy.
-
-**CRITICAL REQUIREMENTS:**
-1. **Support ALL languages** - English, Japanese (日本語), Chinese (中文), Thai (ภาษาไทย), Korean (한국어), Spanish, etc.
-2. **Preserve professional titles** - Keep "Engr.", "Dr.", "Mr.", "Prof.", "Atty.", etc. as part of the name
-3. **Handle ANY card design** - Stylized fonts, logos, vertical/horizontal layouts, multi-column formats
-4. **Extract complete addresses** - Include ALL parts (building, floor, street, district, city, province, postal code, country)
-5. **Recognize visual context** - Use logos, colors, layout to understand company vs personal info
-
-**OUTPUT FORMAT (strict JSON only):**
-{
-  "name": "Full name with title if present (e.g., 'Engr. John Doe', '田中太郎', 'Dr. Maria Santos')",
-  "position": "Job title (e.g., 'Chief Engineer', '営業部長', 'Managing Director')",
-  "company": "Company name with suffix (e.g., 'TechCorp Inc.', '株式会社サンプル', 'บริษัท ไทยเทค จำกัด')",
-  "phone": ["All phone numbers as array"],
-  "email": ["All email addresses as array"],
-  "address": "Complete full address with ALL components, NO character limit",
-  "confidence": 95
-}
-
-**EXAMPLES of correct output:**
-- Japanese: {"name": "田中 太郎", "position": "営業部長", "company": "株式会社テクノロジー", ...}
-- Thai: {"name": "สมชาย ใจดี", "company": "บริษัท ไทยเทค จำกัด", ...}
-- With title: {"name": "Engr. Juan dela Cruz", "position": "Senior Engineer", ...}
-
-Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
-
-            // Call Gemini API directly with hardcoded key
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+                `https://vision.googleapis.com/v1/images:annotate?key=${this.apiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                {
-                                    inline_data: {
-                                        mime_type: 'image/jpeg',
-                                        data: base64Image
-                                    }
-                                }
+                        requests: [{
+                            image: { content: base64Image },
+                            features: [
+                                { type: 'TEXT_DETECTION', maxResults: 1 }
                             ]
-                        }],
-                        generationConfig: {
-                            temperature: 0.1,
-                            maxOutputTokens: 1000
-                        }
+                        }]
                     })
                 }
             );
 
             if (!response.ok) {
                 const errorData = await response.json();
+                throw new Error(errorData.error?.message || `Cloud Vision API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('[Cloud Vision] Response received:', data);
+
+            const annotations = data?.responses?.[0]?.textAnnotations;
+            if (!annotations || annotations.length === 0) {
+                throw new Error('No text detected in image');
+            }
+
+            // First annotation contains the full text
+            const fullText = annotations[0].description || '';
+            console.log('[Cloud Vision] Full text extracted:', fullText);
+
+            if (!fullText.trim()) {
+                throw new Error('Empty text from Cloud Vision');
+            }
+
+            // Try AI parsing first (Gemini), fallback to rule-based parser
+            let parsedData;
+            try {
+                parsedData = await this.parseWithGemini(fullText);
+                console.log('[Cloud Vision] Gemini AI parsing succeeded:', parsedData);
+            } catch (geminiError) {
+                console.log('[Cloud Vision] Gemini parsing failed, using rule-based parser:', geminiError);
+                parsedData = this.parseText(fullText);
+            }
+
+            return {
+                ...parsedData,
+                rawText: fullText,
+                confidence: 90
+            };
+
+        } catch (error) {
+            console.error('[Cloud Vision] Error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Use Gemini AI to intelligently parse raw OCR text into structured contact data.
+     * Much more accurate than rule-based parsing for complex cards.
+     */
+    async parseWithGemini(rawText: string): Promise<Omit<OCRResult, 'rawText' | 'confidence'>> {
+        console.log('[Gemini] Parsing text with AI...');
+
+        const prompt = `You are a business card parser. Parse this business card text and extract contact information.
+
+IMPORTANT RULES:
+- "name" must be the PERSON's full name, NOT a company name, brand name, or tagline
+- Brand names (like CLEARPACK, SAMSUNG, etc.) are NOT person names
+- Taglines/slogans (like "THE CLEAR CHOICE FOR PACKAGING") are NOT company names
+- Look for the actual registered company name (usually includes Ltd, Inc, Corp, PTE, etc.)
+- Phone numbers should include country codes if present
+- Return ALL phone numbers and email addresses found
+
+Business card text:
+${rawText}
+
+Return ONLY a valid JSON object with these exact fields (no markdown, no explanation):
+{"name": "", "position": "", "company": "", "phone": [], "email": [], "address": ""}`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
+        try {
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 1024
+                        }
+                    }),
+                    signal: controller.signal
+                }
+            );
+
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error?.message || `Gemini API error: ${response.status}`);
             }
 
             const data = await response.json();
-            console.log('[Gemini Vision] Response received:', data);
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error('No response from Gemini');
 
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!text) {
-                throw new Error('Empty response from Gemini Vision');
-            }
+            console.log('[Gemini] Raw response:', text);
 
             // Extract JSON from response (handle markdown code blocks)
-            let jsonText = text.trim();
-            if (jsonText.startsWith('```')) {
-                jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            }
+            const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+            const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error('No JSON in Gemini response');
 
-            const parsed = JSON.parse(jsonText);
+            const parsed = JSON.parse(jsonMatch[0]);
 
-            // Validate and structure the result
-            const result: OCRResult = {
+            return {
                 name: parsed.name || '',
                 position: parsed.position || '',
                 company: parsed.company || '',
-                phone: Array.isArray(parsed.phone) ? parsed.phone : (parsed.phone ? [parsed.phone] : []),
-                email: Array.isArray(parsed.email) ? parsed.email : (parsed.email ? [parsed.email] : []),
-                address: parsed.address || '',
-                rawText: `Gemini Vision Direct Analysis\n\nExtracted by AI multimodal vision (no OCR step)`,
-                confidence: parsed.confidence || 95
+                phone: Array.isArray(parsed.phone) ? parsed.phone : parsed.phone ? [parsed.phone] : [],
+                email: Array.isArray(parsed.email) ? parsed.email : parsed.email ? [parsed.email] : [],
+                address: parsed.address || ''
             };
-
-            console.log('[Gemini Vision] Extracted data:', result);
-            return result;
-
         } catch (error) {
-            console.error('[Gemini Vision] Error:', error);
+            clearTimeout(timeout);
             throw error;
         }
     }
@@ -238,8 +275,8 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         console.log(`[OCR] Starting image processing with engine: ${selectedEngine}`);
 
         // Route to appropriate engine
-        if (selectedEngine === 'gemini-vision') {
-            return this.processImageWithGeminiVision(imageSrc);
+        if (selectedEngine === 'cloud-vision') {
+            return this.processImageWithCloudVision(imageSrc);
         }
 
         // Default: Tesseract OCR
@@ -338,7 +375,7 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         });
     }
 
-    private parseText(text: string): Omit<OCRResult, 'rawText' | 'confidence'> {
+    parseText(text: string): Omit<OCRResult, 'rawText' | 'confidence'> {
         const result = {
             name: '',
             position: '',
@@ -364,9 +401,9 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         // Step 2: Extract phone numbers (high confidence - regex)
         result.phone = this.extractPhones(normalizedText);
 
-        // Mark lines containing phones/emails as used
+        // Mark lines containing phones/emails/URLs as used
         for (let i = 0; i < lines.length; i++) {
-            if (this.isPhoneLine(lines[i], result.phone) || this.isEmailLine(lines[i], result.email)) {
+            if (this.isPhoneLine(lines[i], result.phone) || this.isEmailLine(lines[i], result.email) || this.isURL(lines[i])) {
                 usedLines.add(i);
             }
         }
@@ -432,14 +469,27 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
                 return digitCount >= 7 && digitCount <= 15;
             });
 
-        // Remove duplicates (same digits)
-        const seen = new Set<string>();
-        return cleaned.filter(phone => {
-            const digits = phone.replace(/\D/g, '');
-            if (seen.has(digits)) return false;
-            seen.add(digits);
-            return true;
-        });
+        // Remove duplicates: exact digit match AND substring matches (keep longest)
+        const withDigits = cleaned.map(phone => ({
+            phone,
+            digits: phone.replace(/\D/g, '')
+        }));
+
+        // Sort by digit length descending so longer numbers come first
+        withDigits.sort((a, b) => b.digits.length - a.digits.length);
+
+        const kept: typeof withDigits = [];
+        for (const item of withDigits) {
+            // Skip if these digits are already contained in a longer number we kept
+            const isSubset = kept.some(k => k.digits.includes(item.digits));
+            // Skip exact duplicates
+            const isExact = kept.some(k => k.digits === item.digits);
+            if (!isSubset && !isExact) {
+                kept.push(item);
+            }
+        }
+
+        return kept.map(k => k.phone);
     }
 
     private isPhoneLine(line: string, phones: string[]): boolean {
@@ -507,27 +557,88 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         // Try to extract company from email domain
         const emailDomainCompany = this.getCompanyFromEmail(emails);
 
-        // Look for lines with company suffixes
+        // Score each line for company likelihood
+        let bestIndex = -1;
+        let bestScore = 0;
+
         for (let i = 0; i < lines.length; i++) {
             if (usedLines.has(i)) continue;
 
             const line = lines[i];
             const lineLower = line.toLowerCase();
+            let score = 0;
+
+            // Skip URLs - they're not company names
+            if (this.isURL(line)) continue;
 
             // Check for company suffixes
-            const hasCompanySuffix = COMPANY_SUFFIXES.some(suffix => {
+            for (const suffix of COMPANY_SUFFIXES) {
                 const regex = new RegExp(`\\b${suffix}\\b`, 'i');
-                return regex.test(lineLower);
-            });
-
-            if (hasCompanySuffix) {
-                return { company: line, lineIndex: i };
+                if (regex.test(lineLower)) {
+                    score += 3;
+                    break;
+                }
             }
 
-            // Check for ALL CAPS lines (often company names/logos)
-            if (line === line.toUpperCase() && line.length > 3 && /^[A-Z\s&]+$/.test(line)) {
-                return { company: line, lineIndex: i };
+            // ALL CAPS lines that are text-only (no numbers) are likely company/brand names
+            if (line === line.toUpperCase() && line.length > 3 && /^[A-Z\s&.,\-']+$/.test(line)) {
+                score += 2;
             }
+
+            // Lines with ® or ™ are likely company names
+            if (/[®™©]/.test(line)) {
+                score += 3;
+            }
+
+            // Skip if it looks like a person's name
+            if (this.looksLikeName(line)) {
+                score -= 2;
+            }
+
+            // Always penalize taglines/slogans heavily - even if they contain company-like words
+            if (this.looksLikeTagline(line)) {
+                score -= 5;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        if (bestIndex >= 0) {
+            // Forward+backward merge: combine adjacent lines that are part of the company name
+            let startIndex = bestIndex;
+            let endIndex = bestIndex;
+
+            // Merge backward
+            for (let i = bestIndex - 1; i >= 0; i--) {
+                if (usedLines.has(i)) break;
+                if (this.isCompanyPart(lines[i]) && !this.looksLikeName(lines[i])) {
+                    startIndex = i;
+                } else {
+                    break;
+                }
+            }
+
+            // Merge forward
+            for (let i = bestIndex + 1; i < lines.length; i++) {
+                if (usedLines.has(i)) break;
+                if (this.isCompanyPart(lines[i]) && !this.looksLikeName(lines[i])) {
+                    endIndex = i;
+                } else {
+                    break;
+                }
+            }
+
+            // Build the full company name
+            const companyParts: string[] = [];
+            for (let i = startIndex; i <= endIndex; i++) {
+                companyParts.push(lines[i]);
+                usedLines.add(i);
+            }
+
+            return { company: companyParts.join(' '), lineIndex: startIndex };
         }
 
         // If we found a company from email, use that
@@ -539,14 +650,81 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         for (let i = 0; i < lines.length; i++) {
             if (usedLines.has(i)) continue;
             const line = lines[i];
-            // Skip if it looks like a person's name (2-3 words, proper case)
             if (this.looksLikeName(line)) continue;
-            // Skip if contains email or phone
             if (/@/.test(line) || /\d{3,}/.test(line)) continue;
             return { company: line, lineIndex: i };
         }
 
         return { company: '', lineIndex: -1 };
+    }
+
+    private looksLikeTagline(text: string): boolean {
+        const lower = text.trim().toLowerCase();
+
+        // Common tagline/slogan patterns
+        const taglinePatterns = [
+            /^your\s+/i,              // "Your Trusted Partner"
+            /^we\s+/i,               // "We Build Solutions"
+            /^where\s+/i,            // "Where Quality Meets..."
+            /^the\s+best\b/i,        // "The Best in..."
+            /^leading\s+/i,          // "Leading the way..."
+            /^committed\s+to\b/i,    // "Committed to excellence"
+            /^excellence\s+in\b/i,   // "Excellence in..."
+            /^delivering\b/i,        // "Delivering quality..."
+            /^building\s+/i,         // "Building the future"
+            /^creating\s+/i,         // "Creating value"
+            /^making\s+/i,           // "Making a difference"
+            /^powering\s+/i,         // "Powering innovation"
+            /^trusted\b/i,           // "Trusted by..."
+            /^innovative\b/i,        // "Innovative solutions"
+            /^quality\b/i,           // "Quality first"
+            /choice\s+for\b/i,       // "Choice for packaging"
+            /clear\s+choice/i,       // "Clear choice for..."
+            /^best\s+/i,             // "Best in class"
+            /^premier\b/i,           // "Premier provider"
+            /^total\s+/i,            // "Total solutions"
+            /^complete\s+/i,         // "Complete package"
+        ];
+
+        for (const pattern of taglinePatterns) {
+            if (pattern.test(lower)) return true;
+        }
+
+        // Tagline keywords that are very common in slogans
+        const taglineWords = ['trusted', 'partner', 'excellence', 'innovation', 'passion',
+            'commitment', 'integrity', 'driven', 'beyond', 'together', 'future',
+            'smarter', 'better', 'faster', 'world-class', 'premier'];
+        const wordCount = taglineWords.filter(w => lower.includes(w)).length;
+        if (wordCount >= 2) return true;
+
+        return false;
+    }
+
+    private isURL(line: string): boolean {
+        return /(?:www\.|https?:\/\/|\.com|\.org|\.net|\.ph|\.sg|\.co\.\w+)/i.test(line.trim());
+    }
+
+    private isCompanyPart(line: string): boolean {
+        const lower = line.toLowerCase();
+
+        // Never merge URLs into company names
+        if (this.isURL(line)) return false;
+
+        // Has a company suffix (use word boundary regex, not substring includes)
+        for (const suffix of COMPANY_SUFFIXES) {
+            const regex = new RegExp(`\\b${suffix}\\b`, 'i');
+            if (regex.test(lower)) return true;
+        }
+
+        // ALL CAPS text-only line (brand/company name)
+        if (line === line.toUpperCase() && line.length > 2 && /^[A-Z\s&.,\-']+$/.test(line)) {
+            return true;
+        }
+
+        // Parenthetical continuation like "(Phil. Rep. Office)"
+        if (/^\(/.test(line.trim())) return true;
+
+        return false;
     }
 
     private getCompanyFromEmail(emails: string[]): string | null {
@@ -556,9 +734,20 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         const domain = email.split('@')[1];
         if (!domain) return null;
 
-        // Remove common email providers
+        const parts = domain.split('.');
         const genericDomains = ['gmail', 'yahoo', 'hotmail', 'outlook', 'icloud', 'mail', 'aol'];
-        const domainName = domain.split('.')[0].toLowerCase();
+
+        // For subdomains like ph.clearpack.com, skip country code prefixes
+        // and use the main domain name
+        const countryCodes = ['ph', 'sg', 'my', 'id', 'th', 'vn', 'jp', 'kr', 'cn', 'tw',
+            'in', 'au', 'us', 'uk', 'de', 'fr', 'hk', 'nz', 'br', 'mx', 'ca'];
+
+        let domainName = parts[0].toLowerCase();
+
+        // If first part is a country code and there are more parts, use the next part
+        if (countryCodes.includes(domainName) && parts.length >= 3) {
+            domainName = parts[1].toLowerCase();
+        }
 
         if (genericDomains.includes(domainName)) return null;
 
@@ -588,47 +777,56 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
     }
 
     private extractName(lines: string[], usedLines: Set<number>, result: Omit<OCRResult, 'rawText' | 'confidence'>): string {
-        // First pass: look for lines that strongly look like names
+        // Helper to check if a line should be skipped
+        const shouldSkipLine = (line: string): boolean => {
+            if (result.email.some(e => line.toLowerCase().includes(e))) return true;
+            if (/@/.test(line)) return true;
+            if (this.isPhoneLine(line, result.phone)) return true;
+            if (line.length < 3) return true;
+            if (/[®™©]/.test(line)) return true;
+            const specialChars = (line.match(/[|@#$%^&*()_+=\[\]{}\\/<>]/g) || []).length;
+            if (specialChars > 1) return true;
+            return false;
+        };
+
+        // First pass: look for MULTI-WORD names (2+ words) - highest confidence
         for (let i = 0; i < lines.length; i++) {
             if (usedLines.has(i)) continue;
-
             const line = lines[i];
+            if (shouldSkipLine(line)) continue;
 
-            // Skip lines with email or phone content
-            if (result.email.some(e => line.toLowerCase().includes(e))) continue;
-            if (/@/.test(line)) continue;
-            if (this.isPhoneLine(line, result.phone)) continue;
-
-            // Skip very short lines (likely OCR artifacts)
-            if (line.length < 3) continue;
-
-            // Skip lines with too many special characters (OCR noise)
-            const specialChars = (line.match(/[|@#$%^&*()_+=\[\]{}\\/<>]/g) || []).length;
-            if (specialChars > 1) continue;
-
-            if (this.looksLikeName(line)) {
+            const words = line.trim().split(/\s+/);
+            if (words.length >= 2 && this.looksLikeName(line)) {
                 return line;
             }
         }
 
-        // Second pass: look for any reasonable text line near the top
+        // Second pass: single-word names (less confident, might be brand names)
+        for (let i = 0; i < lines.length; i++) {
+            if (usedLines.has(i)) continue;
+            const line = lines[i];
+            if (shouldSkipLine(line)) continue;
+
+            const words = line.trim().split(/\s+/);
+            if (words.length === 1 && this.looksLikeName(line)) {
+                // Extra caution: reject single ALL CAPS words (likely brand names)
+                if (/^[A-Z]+$/.test(line.trim())) continue;
+                return line;
+            }
+        }
+
+        // Third pass: look for any reasonable text line near the top
         for (let i = 0; i < Math.min(lines.length, 5); i++) {
             if (usedLines.has(i)) continue;
             const line = lines[i];
+            if (shouldSkipLine(line)) continue;
 
-            // Skip lines with problematic content
             if (/@/.test(line)) continue;
             if (/\d{4,}/.test(line)) continue;
-            if (this.isPhoneLine(line, result.phone)) continue;
-            if (line.length < 3) continue;
 
-            // Skip lines with too many special characters
-            const specialChars = (line.match(/[|@#$%^&*()_+=\[\]{}\\/<>]/g) || []).length;
-            if (specialChars > 1) continue;
-
-            // Accept if it's mostly letters
+            // Accept if it's mostly letters and not a known non-name
             const letterRatio = (line.match(/[a-zA-Z]/g) || []).length / line.length;
-            if (letterRatio > 0.7) {
+            if (letterRatio > 0.7 && !this.looksLikeTagline(line)) {
                 return line;
             }
         }
@@ -640,6 +838,9 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         // Trim and check basic structure
         const trimmed = text.trim();
 
+        // Reject lines with brand/trademark symbols (®™©)
+        if (/[®™©]/.test(trimmed)) return false;
+
         // Names are typically 2-4 words
         const words = trimmed.split(/\s+/);
         if (words.length < 1 || words.length > 5) return false;
@@ -647,6 +848,52 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         // Should be mostly letters
         const letterRatio = (trimmed.match(/[a-zA-Z]/g) || []).length / trimmed.length;
         if (letterRatio < 0.8) return false;
+
+        // Reject known country names
+        const countries = [
+            'philippines', 'singapore', 'malaysia', 'indonesia', 'thailand',
+            'vietnam', 'japan', 'korea', 'china', 'taiwan', 'india',
+            'australia', 'usa', 'united states', 'canada', 'uk',
+            'united kingdom', 'germany', 'france', 'italy', 'spain',
+            'hong kong', 'macau', 'brunei', 'myanmar', 'cambodia', 'laos',
+            'saudi arabia', 'united arab emirates', 'qatar', 'bahrain',
+            'kuwait', 'oman', 'egypt', 'south africa', 'brazil', 'mexico',
+            'new zealand', 'south korea', 'north korea', 'sri lanka'
+        ];
+        const lower = trimmed.toLowerCase();
+        if (countries.includes(lower)) return false;
+
+        // Reject lines containing common company/organization words
+        // This must stay in sync with COMPANY_SUFFIXES
+        const companyWords = [
+            'inc', 'corp', 'llc', 'ltd', 'company', 'incorporated', 'limited', 'corporation',
+            'enterprises', 'group', 'holdings', 'partners', 'associates',
+            'services', 'solutions', 'systems', 'technologies', 'tech', 'industries', 'industrial',
+            'international', 'global', 'worldwide',
+            'foundation', 'institute', 'university', 'college', 'association', 'society',
+            'organization', 'federation', 'council',
+            'hospital', 'medical', 'health', 'healthcare',
+            'pharma', 'pharmaceutical', 'manufacturers', 'manufacturing',
+            'products', 'packaging', 'supply', 'supplies', 'provider', 'providers',
+            'trading', 'construction', 'development', 'developers',
+            'agency', 'studio', 'laboratories', 'labs',
+            'bank', 'financial', 'insurance', 'realty', 'properties',
+            'pte'
+        ];
+        for (const w of companyWords) {
+            const regex = new RegExp(`\\b${w}\\b`, 'i');
+            if (regex.test(lower)) return false;
+        }
+
+        // Reject lines starting with articles/determiners (not real names)
+        const articles = ['the', 'a', 'an', 'your', 'our', 'their', 'this', 'that', 'for', 'of'];
+        const firstWord = words[0].toLowerCase();
+        if (articles.includes(firstWord)) return false;
+
+        // Reject common non-name words that appear as ALL CAPS headings
+        const nonNameWords = ['clear', 'choice', 'best', 'quality', 'premium', 'trusted',
+            'leading', 'innovative', 'smart', 'total', 'complete', 'perfect', 'first'];
+        if (words.some(w => nonNameWords.includes(w.toLowerCase()))) return false;
 
         // Should be proper case or all caps (for styled cards)
         const isProperCase = words.every(word =>

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Cpu, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock } from 'lucide-react';
+import { ArrowLeft, Cpu, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
+import { useTheme } from '@/hooks/useTheme';
 
 const Settings = () => {
     const navigate = useNavigate();
+    const { theme, toggleTheme } = useTheme();
     const [ocrEngine, setOcrEngineState] = useState<OCREngine>(getOCREngine());
     const [saved, setSaved] = useState(false);
     const { isConnected, user, isSyncing, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
@@ -44,6 +46,39 @@ const Settings = () => {
             </div>
 
             <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+                {/* Appearance */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Appearance</p>
+                    <div className="card-elevated rounded-2xl p-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                                    theme === 'dark' ? 'bg-indigo-500/20' : 'bg-amber-500/20'
+                                }`}>
+                                    {theme === 'dark'
+                                        ? <Moon className="w-5 h-5 text-indigo-400" />
+                                        : <Sun className="w-5 h-5 text-amber-500" />
+                                    }
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-sm">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</p>
+                                    <p className="text-xs text-slate-500">Tap to switch</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={toggleTheme}
+                                className={`w-12 h-7 rounded-full relative transition-colors ${
+                                    theme === 'light' ? 'bg-amber-500' : 'bg-brand-700'
+                                }`}
+                            >
+                                <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform ${
+                                    theme === 'light' ? 'translate-x-6' : 'translate-x-1'
+                                }`} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 {/* OCR Engine Selection */}
                 <div className="space-y-4">
                     <h2 className="text-sm font-bold text-brand-400 uppercase tracking-wider">OCR Engine</h2>
@@ -76,42 +111,42 @@ const Settings = () => {
                         )}
                     </button>
 
-                    {/* Gemini Vision Option */}
+                    {/* Cloud Vision Option */}
                     <button
-                        onClick={() => setOcrEngineState('gemini-vision')}
+                        onClick={() => setOcrEngineState('cloud-vision')}
                         className={`w-full p-4 rounded-2xl transition-all flex items-start gap-4 ${
-                            ocrEngine === 'gemini-vision'
-                                ? 'glass border-2 border-purple-500/50'
+                            ocrEngine === 'cloud-vision'
+                                ? 'glass border-2 border-sky-500/50'
                                 : 'glass border border-brand-800/50 hover:border-brand-700/50'
                         }`}
                     >
                         <div className={`p-3 rounded-xl ${
-                            ocrEngine === 'gemini-vision' ? 'bg-purple-500/20' : 'bg-brand-800/50'
+                            ocrEngine === 'cloud-vision' ? 'bg-sky-500/20' : 'bg-brand-800/50'
                         }`}>
-                            <Sparkles size={20} className={ocrEngine === 'gemini-vision' ? 'text-purple-400' : 'text-brand-600'} />
+                            <Sparkles size={20} className={ocrEngine === 'cloud-vision' ? 'text-sky-400' : 'text-brand-600'} />
                         </div>
                         <div className="flex-1 text-left">
                             <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold">Gemini Vision</span>
-                                <span className="text-[10px] px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded-full">
-                                    AI DIRECT
+                                <span className="font-semibold">Cloud Vision</span>
+                                <span className="text-[10px] px-2 py-0.5 bg-sky-500/20 text-sky-400 rounded-full">
+                                    CLOUD OCR
                                 </span>
                                 <span className="text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">
                                     BEST
                                 </span>
                             </div>
                             <p className="text-xs text-brand-500 mb-2">
-                                AI multimodal vision. Handles ANY card design, ALL languages, stylized fonts. No API key needed - powered by the app.
+                                Google Cloud Vision API. Superior text detection for all card designs and languages.
                             </p>
                             <ul className="text-[10px] text-brand-600 space-y-0.5">
                                 <li>✓ Best for international cards (Japanese, Thai, Chinese, Korean)</li>
-                                <li>✓ Understands visual context (logos, layouts)</li>
+                                <li>✓ High accuracy text detection</li>
                                 <li>✓ Works with stylized/difficult fonts</li>
-                                <li>✓ Powered by server - no configuration required</li>
+                                <li>✓ Powered by Google Cloud - no configuration required</li>
                             </ul>
                         </div>
-                        {ocrEngine === 'gemini-vision' && (
-                            <Check size={20} className="text-purple-400 flex-shrink-0" />
+                        {ocrEngine === 'cloud-vision' && (
+                            <Check size={20} className="text-sky-400 flex-shrink-0" />
                         )}
                     </button>
                 </div>
