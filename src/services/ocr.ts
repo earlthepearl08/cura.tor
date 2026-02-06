@@ -101,7 +101,12 @@ export class OCRService {
     async processImageWithGeminiVision(imageSrc: string): Promise<OCRResult> {
         console.log('[Gemini Vision] Starting direct image analysis...');
 
+        // Hardcoded Gemini API key
+        const geminiApiKey = 'AIzaSyDp5v_RuQZsNlrqJOKJ1TgAZq2n3GZ8nBg';
+
         try {
+            const base64Image = imageSrc.replace(/^data:image\/\w+;base64,/, '');
+
             const prompt = `You are an expert at extracting contact information from business cards. Analyze this business card image and extract ALL contact details with perfect accuracy.
 
 **CRITICAL REQUIREMENTS:**
@@ -129,19 +134,35 @@ export class OCRService {
 
 Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
 
-            // Call our secure backend API instead of Gemini directly
-            const response = await fetch('/api/gemini', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    imageData: imageSrc,
-                    prompt: prompt
-                })
-            });
+            // Call Gemini API directly with hardcoded key
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                {
+                                    inline_data: {
+                                        mime_type: 'image/jpeg',
+                                        data: base64Image
+                                    }
+                                }
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 1000
+                        }
+                    })
+                }
+            );
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || `API error: ${response.status}`);
+                throw new Error(errorData.error?.message || `Gemini API error: ${response.status}`);
             }
 
             const data = await response.json();
