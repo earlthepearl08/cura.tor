@@ -12,6 +12,27 @@ export interface OCRResult {
     confidence: number;
 }
 
+export type OCREngine = 'tesseract' | 'gemini-vision';
+
+// Gemini API Key - users should set this in localStorage
+const GEMINI_API_KEY_STORAGE_KEY = 'gemini_api_key';
+
+export const getGeminiApiKey = (): string | null => {
+    return localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY);
+};
+
+export const setGeminiApiKey = (key: string): void => {
+    localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, key);
+};
+
+export const getOCREngine = (): OCREngine => {
+    return (localStorage.getItem('ocr_engine') as OCREngine) || 'tesseract';
+};
+
+export const setOCREngine = (engine: OCREngine): void => {
+    localStorage.setItem('ocr_engine', engine);
+};
+
 // Common job titles for position detection
 const JOB_TITLES = [
     // C-Level
@@ -71,6 +92,117 @@ const ADDRESS_KEYWORDS = [
 export class OCRService {
     private worker: any = null;
     private isInitializing: boolean = false;
+    private currentEngine: OCREngine = getOCREngine();
+
+    /**
+     * Process image using Gemini Vision API (direct multimodal)
+     * Bypasses OCR entirely - sends image directly to Gemini
+     */
+    async processImageWithGeminiVision(imageSrc: string): Promise<OCRResult> {
+        console.log('[Gemini Vision] Starting direct image analysis...');
+
+        const apiKey = getGeminiApiKey();
+        if (!apiKey) {
+            throw new Error('Gemini API key not configured. Please add your API key in Settings.');
+        }
+
+        try {
+            // Convert image to base64 (remove data URL prefix if present)
+            const base64Image = imageSrc.replace(/^data:image\/\w+;base64,/, '');
+
+            const prompt = `You are an expert at extracting contact information from business cards. Analyze this business card image and extract ALL contact details with perfect accuracy.
+
+**CRITICAL REQUIREMENTS:**
+1. **Support ALL languages** - English, Japanese (日本語), Chinese (中文), Thai (ภาษาไทย), Korean (한국어), Spanish, etc.
+2. **Preserve professional titles** - Keep "Engr.", "Dr.", "Mr.", "Prof.", "Atty.", etc. as part of the name
+3. **Handle ANY card design** - Stylized fonts, logos, vertical/horizontal layouts, multi-column formats
+4. **Extract complete addresses** - Include ALL parts (building, floor, street, district, city, province, postal code, country)
+5. **Recognize visual context** - Use logos, colors, layout to understand company vs personal info
+
+**OUTPUT FORMAT (strict JSON only):**
+{
+  "name": "Full name with title if present (e.g., 'Engr. John Doe', '田中太郎', 'Dr. Maria Santos')",
+  "position": "Job title (e.g., 'Chief Engineer', '営業部長', 'Managing Director')",
+  "company": "Company name with suffix (e.g., 'TechCorp Inc.', '株式会社サンプル', 'บริษัท ไทยเทค จำกัด')",
+  "phone": ["All phone numbers as array"],
+  "email": ["All email addresses as array"],
+  "address": "Complete full address with ALL components, NO character limit",
+  "confidence": 95
+}
+
+**EXAMPLES of correct output:**
+- Japanese: {"name": "田中 太郎", "position": "営業部長", "company": "株式会社テクノロジー", ...}
+- Thai: {"name": "สมชาย ใจดี", "company": "บริษัท ไทยเทค จำกัด", ...}
+- With title: {"name": "Engr. Juan dela Cruz", "position": "Senior Engineer", ...}
+
+Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
+
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                {
+                                    inline_data: {
+                                        mime_type: 'image/jpeg',
+                                        data: base64Image
+                                    }
+                                }
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 1000
+                        }
+                    })
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || `Gemini API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('[Gemini Vision] Response received:', data);
+
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) {
+                throw new Error('Empty response from Gemini Vision');
+            }
+
+            // Extract JSON from response (handle markdown code blocks)
+            let jsonText = text.trim();
+            if (jsonText.startsWith('```')) {
+                jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            }
+
+            const parsed = JSON.parse(jsonText);
+
+            // Validate and structure the result
+            const result: OCRResult = {
+                name: parsed.name || '',
+                position: parsed.position || '',
+                company: parsed.company || '',
+                phone: Array.isArray(parsed.phone) ? parsed.phone : (parsed.phone ? [parsed.phone] : []),
+                email: Array.isArray(parsed.email) ? parsed.email : (parsed.email ? [parsed.email] : []),
+                address: parsed.address || '',
+                rawText: `Gemini Vision Direct Analysis\n\nExtracted by AI multimodal vision (no OCR step)`,
+                confidence: parsed.confidence || 95
+            };
+
+            console.log('[Gemini Vision] Extracted data:', result);
+            return result;
+
+        } catch (error) {
+            console.error('[Gemini Vision] Error:', error);
+            throw error;
+        }
+    }
 
     private async getWorker(): Promise<any> {
         // Prevent multiple simultaneous initializations
@@ -103,9 +235,16 @@ export class OCRService {
         return this.worker;
     }
 
-    async processImage(imageSrc: string): Promise<OCRResult> {
-        console.log('[OCR] Starting image processing...');
+    async processImage(imageSrc: string, engine?: OCREngine): Promise<OCRResult> {
+        const selectedEngine = engine || getOCREngine();
+        console.log(`[OCR] Starting image processing with engine: ${selectedEngine}`);
 
+        // Route to appropriate engine
+        if (selectedEngine === 'gemini-vision') {
+            return this.processImageWithGeminiVision(imageSrc);
+        }
+
+        // Default: Tesseract OCR
         try {
             // Preprocess image for better OCR
             console.log('[OCR] Preprocessing image...');

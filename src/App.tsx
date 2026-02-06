@@ -4,8 +4,7 @@ import Scan from '@/pages/Scan';
 import Upload from '@/pages/Upload';
 import Contacts from '@/pages/Contacts';
 import ManualInput from '@/pages/ManualInput';
-
-const Settings = () => <div className="p-8 h-screen bg-brand-950"><h1 className="text-2xl font-bold text-white">Settings Coming Soon</h1></div>;
+import Settings from '@/pages/Settings';
 
 function App() {
     return (
