@@ -2701,7 +2701,24 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
             // Export menu state
             const [showExportMenu, setShowExportMenu] = useState(false);
 
-            const renderContacts = () => (
+            // Edit contact state
+            const [editingContact, setEditingContact] = useState(null);
+            const [editForm, setEditForm] = useState({});
+
+            // Folder/grouping state
+            const [selectedFolder, setSelectedFolder] = useState('All');
+            const folders = ['All', ...new Set(contacts.map(c => c.company || 'No Company').filter(Boolean))];
+
+            const renderContacts = () => {
+                // Sort contacts by ID descending (newest first)
+                const sortedContacts = [...contacts].sort((a, b) => (b.id || 0) - (a.id || 0));
+
+                // Filter by folder
+                const filteredContacts = selectedFolder === 'All'
+                    ? sortedContacts
+                    : sortedContacts.filter(c => (c.company || 'No Company') === selectedFolder);
+
+                return (
                 <div className="flex flex-col min-h-screen page-enter">
                     <header className="header-bar p-5 flex items-center justify-between sticky top-0 z-10">
                         <button
@@ -2755,8 +2772,27 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                         <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)}></div>
                     )}
 
+                    {/* Folder Filter */}
+                    {contacts.length > 0 && (
+                        <div className="px-5 pt-4 pb-2 overflow-x-auto flex gap-2">
+                            {folders.map(folder => (
+                                <button
+                                    key={folder}
+                                    onClick={() => setSelectedFolder(folder)}
+                                    className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+                                        selectedFolder === folder
+                                            ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                                            : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700'
+                                    }`}
+                                >
+                                    {folder}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="p-5 space-y-3 flex-1 overflow-y-auto">
-                        {contacts.length === 0 ? (
+                        {filteredContacts.length === 0 ? (
                             <div className="text-center py-16">
                                 <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-slate-800/50 flex items-center justify-center">
                                     <SafeIcon name="users" className="w-10 h-10 text-slate-600" />
@@ -2771,7 +2807,7 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                 </button>
                             </div>
                         ) : (
-                            contacts.map((c, i) => (
+                            filteredContacts.map((c, i) => (
                                 <div key={c.id || i} className="card-elevated card-stagger rounded-2xl overflow-hidden" style={{animationDelay: `${i * 0.05}s`}}>
                                     <div className="p-4 flex gap-4">
                                         <div className="h-14 w-14 bg-gradient-to-br from-sky-500 to-emerald-500 rounded-xl flex items-center justify-center font-bold text-xl flex-shrink-0 shadow-lg shadow-sky-500/20">
@@ -2801,6 +2837,16 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                                 <span>Email</span>
                                             </a>
                                         )}
+                                        <button
+                                            onClick={() => {
+                                                setEditingContact(c);
+                                                setEditForm({ ...c });
+                                            }}
+                                            className="flex-1 py-2.5 text-center text-xs bg-purple-500/20 text-purple-400 rounded-xl hover:bg-purple-500/30 transition-colors flex items-center justify-center gap-1.5 font-medium"
+                                        >
+                                            <SafeIcon name="pencil" className="w-3.5 h-3.5" />
+                                            <span>Edit</span>
+                                        </button>
                                         <button
                                             onClick={() => exportSingleVCard(c)}
                                             className="flex-1 py-2.5 text-center text-xs bg-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/30 transition-colors flex items-center justify-center gap-1.5 font-medium"
@@ -2839,8 +2885,103 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                             </button>
                         </div>
                     )}
+
+                    {/* Edit Contact Modal */}
+                    {editingContact && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-enter" onClick={() => setEditingContact(null)}>
+                            <div className="card-elevated rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-lg font-bold text-white">Edit Contact</h3>
+                                    <button onClick={() => setEditingContact(null)} className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
+                                        <SafeIcon name="x" className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-2">Name</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.name || ''}
+                                            onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                                            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-2">Position</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.position || ''}
+                                            onChange={(e) => setEditForm({...editForm, position: e.target.value})}
+                                            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-2">Company</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.company || ''}
+                                            onChange={(e) => setEditForm({...editForm, company: e.target.value})}
+                                            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-2">Phone</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.phone || ''}
+                                            onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                                            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-2">Email</label>
+                                        <input
+                                            type="email"
+                                            value={editForm.email || ''}
+                                            onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                                            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-2">Address</label>
+                                        <textarea
+                                            value={editForm.address || ''}
+                                            onChange={(e) => setEditForm({...editForm, address: e.target.value})}
+                                            rows="3"
+                                            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 mt-6">
+                                    <button
+                                        onClick={() => setEditingContact(null)}
+                                        className="flex-1 py-3 bg-slate-800/50 rounded-xl hover:bg-slate-700 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setContacts(prev => prev.map(c => c.id === editingContact.id ? {...c, ...editForm} : c));
+                                            setEditingContact(null);
+                                        }}
+                                        className="flex-1 py-3 bg-sky-500 text-white rounded-xl hover:bg-sky-400 transition-colors font-medium"
+                                    >
+                                        Save Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
+            };
 
             const renderManual = () => (
                 <div className="flex flex-col min-h-screen page-enter">
