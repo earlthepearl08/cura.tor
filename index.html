@@ -2590,35 +2590,45 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
 
             // CSV Export function
             const exportToCSV = () => {
-                if (contacts.length === 0) return;
+                console.log('exportToCSV called, contacts:', contacts.length);
+                if (contacts.length === 0) {
+                    alert('No contacts to export');
+                    return;
+                }
 
-                const headers = ['Name', 'Position', 'Company', 'Phone', 'Email', 'Address', 'Notes', 'Created At'];
-                const csvRows = [headers.join(',')];
+                try {
+                    const headers = ['Name', 'Position', 'Company', 'Phone', 'Email', 'Address', 'Notes', 'Created At'];
+                    const csvRows = [headers.join(',')];
 
-                contacts.forEach(c => {
-                    const row = [
-                        `"${(c.name || '').replace(/"/g, '""')}"`,
-                        `"${(c.position || '').replace(/"/g, '""')}"`,
-                        `"${(c.company || '').replace(/"/g, '""')}"`,
-                        `"${(c.phone || '').replace(/"/g, '""')}"`,
-                        `"${(c.email || '').replace(/"/g, '""')}"`,
-                        `"${(c.address || '').replace(/"/g, '""')}"`,
-                        `"${(c.notes || '').replace(/"/g, '""')}"`,
-                        `"${(c.createdAt || '').replace(/"/g, '""')}"`
-                    ];
-                    csvRows.push(row.join(','));
-                });
+                    contacts.forEach(c => {
+                        const row = [
+                            `"${(c.name || '').replace(/"/g, '""')}"`,
+                            `"${(c.position || '').replace(/"/g, '""')}"`,
+                            `"${(c.company || '').replace(/"/g, '""')}"`,
+                            `"${(c.phone || '').replace(/"/g, '""')}"`,
+                            `"${(c.email || '').replace(/"/g, '""')}"`,
+                            `"${(c.address || '').replace(/"/g, '""')}"`,
+                            `"${(c.notes || '').replace(/"/g, '""')}"`,
+                            `"${(c.createdAt || '').replace(/"/g, '""')}"`
+                        ];
+                        csvRows.push(row.join(','));
+                    });
 
-                const csvContent = csvRows.join('\n');
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `contacts_${new Date().toISOString().split('T')[0]}.csv`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
+                    const csvContent = csvRows.join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `contacts_${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    console.log('CSV export completed successfully');
+                } catch (error) {
+                    console.error('CSV export failed:', error);
+                    alert('Failed to export CSV: ' + error.message);
+                }
             };
 
             // Generate vCard format for a single contact
@@ -2683,19 +2693,29 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
 
             // Export all contacts as vCard
             const exportAllVCards = () => {
-                if (contacts.length === 0) return;
+                console.log('exportAllVCards called, contacts:', contacts.length);
+                if (contacts.length === 0) {
+                    alert('No contacts to export');
+                    return;
+                }
 
-                // Multiple vCards can be in one file
-                const vcards = contacts.map(c => generateVCard(c)).join('\n');
-                const blob = new Blob([vcards], { type: 'text/vcard;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `curator_contacts_${new Date().toISOString().split('T')[0]}.vcf`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
+                try {
+                    // Multiple vCards can be in one file
+                    const vcards = contacts.map(c => generateVCard(c)).join('\n');
+                    const blob = new Blob([vcards], { type: 'text/vcard;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `curator_contacts_${new Date().toISOString().split('T')[0]}.vcf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    console.log('vCard export completed successfully');
+                } catch (error) {
+                    console.error('vCard export failed:', error);
+                    alert('Failed to export vCard: ' + error.message);
+                }
             };
 
             // Export menu state
@@ -2742,7 +2762,11 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                 {showExportMenu && (
                                     <div className="absolute right-0 top-12 card-elevated modal-enter rounded-2xl p-2 min-w-[180px] z-50 shadow-2xl border border-slate-700">
                                         <button
-                                            onClick={() => { exportAllVCards(); setShowExportMenu(false); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                exportAllVCards();
+                                                setShowExportMenu(false);
+                                            }}
                                             className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors"
                                         >
                                             <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center">
@@ -2751,7 +2775,11 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                             <span>Save to Phone</span>
                                         </button>
                                         <button
-                                            onClick={() => { exportToCSV(); setShowExportMenu(false); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                exportToCSV();
+                                                setShowExportMenu(false);
+                                            }}
                                             className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors"
                                         >
                                             <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
