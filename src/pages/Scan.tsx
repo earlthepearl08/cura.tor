@@ -15,7 +15,11 @@ const Scanner: React.FC = () => {
     const navigate = useNavigate();
 
     const capture = useCallback(() => {
-        const imageSrc = webcamRef.current?.getScreenshot({ width: 1920, height: 1080 });
+        // Capture at high resolution (quality is set on Webcam component via screenshotQuality)
+        const imageSrc = webcamRef.current?.getScreenshot({
+            width: 1920,
+            height: 1080
+        });
         if (imageSrc) {
             setImgSrc(imageSrc);
         }
@@ -107,6 +111,7 @@ const Scanner: React.FC = () => {
                             audio={false}
                             ref={webcamRef}
                             screenshotFormat="image/jpeg"
+                            screenshotQuality={1.0}
                             videoConstraints={videoConstraints}
                             onUserMedia={() => {
                                 setIsCameraReady(true);
