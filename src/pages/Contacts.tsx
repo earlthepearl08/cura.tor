@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
@@ -10,6 +10,8 @@ const Contacts: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [showExportOptions, setShowExportOptions] = useState(false);
+    const [selectedFolder, setSelectedFolder] = useState<string>('all'); // 'all' or folder name
+    const [showFolderDropdown, setShowFolderDropdown] = useState(false);
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
     const [editFormData, setEditFormData] = useState({
         name: '',
@@ -19,6 +21,7 @@ const Contacts: React.FC = () => {
         email: '',
         address: '',
         notes: '',
+        folder: '',
     });
     const navigate = useNavigate();
 
@@ -61,6 +64,7 @@ const Contacts: React.FC = () => {
             email: contact.email.join(', '),
             address: contact.address,
             notes: contact.notes || '',
+            folder: contact.folder || 'Uncategorized',
         });
     };
 
@@ -80,6 +84,7 @@ const Contacts: React.FC = () => {
             email: editFormData.email.split(',').map((e: string) => e.trim()).filter((e: string) => e),
             address: editFormData.address,
             notes: editFormData.notes,
+            folder: editFormData.folder || 'Uncategorized',
             updatedAt: Date.now(),
         };
 
@@ -88,10 +93,24 @@ const Contacts: React.FC = () => {
         loadContacts();
     };
 
-    const filteredContacts = contacts.filter(c =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.company.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Get unique folders from contacts
+    const folders = Array.from(new Set(contacts.map(c => c.folder || 'Uncategorized'))).sort();
+
+    // Filter contacts by search and folder
+    const filteredContacts = contacts.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                             c.company.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesFolder = selectedFolder === 'all' || (c.folder || 'Uncategorized') === selectedFolder;
+        return matchesSearch && matchesFolder;
+    });
+
+    // Group contacts by folder
+    const groupedContacts = filteredContacts.reduce((acc, contact) => {
+        const folder = contact.folder || 'Uncategorized';
+        if (!acc[folder]) acc[folder] = [];
+        acc[folder].push(contact);
+        return acc;
+    }, {} as Record<string, Contact[]>);
 
     return (
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
@@ -138,9 +157,49 @@ const Contacts: React.FC = () => {
                         className="w-full bg-brand-900/50 border border-brand-800 rounded-xl py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all text-sm"
                     />
                 </div>
+
+                {/* Folder Filter */}
+                <div className="relative">
+                    <button
+                        onClick={() => setShowFolderDropdown(!showFolderDropdown)}
+                        className="w-full flex items-center justify-between bg-brand-900/50 border border-brand-800 rounded-xl py-2.5 px-4 hover:bg-brand-900/70 transition-all text-sm"
+                    >
+                        <div className="flex items-center gap-2">
+                            <Folder size={18} className="text-brand-500" />
+                            <span>{selectedFolder === 'all' ? 'All Folders' : selectedFolder}</span>
+                        </div>
+                        <span className="text-brand-500 text-xs">{filteredContacts.length}</span>
+                    </button>
+
+                    {showFolderDropdown && (
+                        <div className="absolute top-full left-0 right-0 mt-2 glass rounded-xl border border-brand-800 shadow-2xl z-50 max-h-64 overflow-y-auto">
+                            <button
+                                onClick={() => {
+                                    setSelectedFolder('all');
+                                    setShowFolderDropdown(false);
+                                }}
+                                className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors ${selectedFolder === 'all' ? 'bg-brand-500/20 text-brand-400' : ''}`}
+                            >
+                                All Folders ({contacts.length})
+                            </button>
+                            {folders.map(folder => (
+                                <button
+                                    key={folder}
+                                    onClick={() => {
+                                        setSelectedFolder(folder);
+                                        setShowFolderDropdown(false);
+                                    }}
+                                    className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors border-t border-brand-800 ${selectedFolder === folder ? 'bg-brand-500/20 text-brand-400' : ''}`}
+                                >
+                                    {folder} ({contacts.filter(c => (c.folder || 'Uncategorized') === folder).length})
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <div className="flex-1 p-4 space-y-4">
+            <div className="flex-1 p-4 space-y-6">
                 {isLoading ? (
                     <div className="flex items-center justify-center h-64">
                         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-400"></div>
@@ -150,7 +209,73 @@ const Contacts: React.FC = () => {
                         <Building2 size={48} className="mb-4 opacity-20" />
                         <p>{searchQuery ? "No contacts match your search" : "No contacts scanned yet"}</p>
                     </div>
+                ) : selectedFolder === 'all' ? (
+                    // Show grouped by folders
+                    Object.entries(groupedContacts).sort(([a], [b]) => a.localeCompare(b)).map(([folder, folderContacts]) => (
+                        <div key={folder} className="space-y-3">
+                            <div className="flex items-center gap-2 px-2">
+                                <Folder size={16} className="text-brand-500" />
+                                <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider">{folder}</h3>
+                                <span className="text-xs text-brand-600">({folderContacts.length})</span>
+                            </div>
+                            <div className="space-y-4">
+                                {folderContacts.map((contact) => (
+                                    <div key={contact.id} className="glass rounded-2xl overflow-hidden border border-brand-800/10 hover:border-brand-500/20 transition-all group">
+                                        <div className="p-4 flex gap-4">
+                                            {/* Image Preview */}
+                                            <div className="h-16 w-16 rounded-xl overflow-hidden bg-brand-900 flex-shrink-0 border border-brand-800">
+                                                <img src={contact.imageData} alt={contact.name} className="h-full w-full object-cover" />
+                                            </div>
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <h3 className="font-bold text-slate-100 truncate">{contact.name}</h3>
+                                                        <p className="text-xs text-brand-400 font-medium uppercase tracking-wider">{contact.position}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                        <button onClick={() => openEditModal(contact)} className="text-brand-700 hover:text-brand-400 p-1">
+                                                            <Edit3 size={16} />
+                                                        </button>
+                                                        <button onClick={() => deleteContact(contact.id)} className="text-brand-700 hover:text-red-400 p-1">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-2 text-xs text-slate-400 space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <Building2 size={12} className="text-brand-500" />
+                                                        <span className="truncate">{contact.company}</span>
+                                                    </div>
+                                                    {contact.email[0] && (
+                                                        <div className="flex items-center gap-2">
+                                                            <Mail size={12} className="text-brand-500" />
+                                                            <span className="truncate">{contact.email[0]}</span>
+                                                        </div>
+                                                    )}
+                                                    {contact.phone[0] && (
+                                                        <div className="flex items-center gap-2">
+                                                            <Phone size={12} className="text-brand-500" />
+                                                            <span className="truncate">{contact.phone[0]}</span>
+                                                        </div>
+                                                    )}
+                                                    {contact.notes && (
+                                                        <div className="flex items-center gap-2 text-amber-400/70">
+                                                            <StickyNote size={12} className="text-amber-500/50" />
+                                                            <span className="truncate">{contact.notes}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))
                 ) : (
+                    // Show flat list when folder is selected
                     filteredContacts.map((contact) => (
                         <div key={contact.id} className="glass rounded-2xl overflow-hidden border border-brand-800/10 hover:border-brand-500/20 transition-all group">
                             <div className="p-4 flex gap-4">
@@ -310,6 +435,53 @@ const Contacts: React.FC = () => {
                                     className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none"
                                 />
                             </div>
+
+                            {/* Folder Selector */}
+                            <div className="relative">
+                                <Folder className="absolute left-3 top-3 text-brand-500" size={18} />
+                                <select
+                                    value={editFormData.folder}
+                                    onChange={(e) => setEditFormData({ ...editFormData, folder: e.target.value })}
+                                    className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 bg-brand-900"
+                                >
+                                    <option value="Uncategorized">Uncategorized</option>
+                                    {folders.filter(f => f !== 'Uncategorized').map(folder => (
+                                        <option key={folder} value={folder}>{folder}</option>
+                                    ))}
+                                    <option value="__new__">+ Create New Folder</option>
+                                </select>
+                            </div>
+
+                            {/* New Folder Input (shown when "Create New Folder" is selected) */}
+                            {editFormData.folder === '__new__' && (
+                                <div className="relative">
+                                    <FolderPlus className="absolute left-3 top-3 text-brand-500" size={18} />
+                                    <input
+                                        type="text"
+                                        placeholder="Enter new folder name..."
+                                        onBlur={(e) => {
+                                            const newFolder = e.target.value.trim();
+                                            if (newFolder) {
+                                                setEditFormData({ ...editFormData, folder: newFolder });
+                                            } else {
+                                                setEditFormData({ ...editFormData, folder: 'Uncategorized' });
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                const newFolder = e.currentTarget.value.trim();
+                                                if (newFolder) {
+                                                    setEditFormData({ ...editFormData, folder: newFolder });
+                                                } else {
+                                                    setEditFormData({ ...editFormData, folder: 'Uncategorized' });
+                                                }
+                                            }
+                                        }}
+                                        autoFocus
+                                        className="w-full glass border border-brand-500 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Save Button */}

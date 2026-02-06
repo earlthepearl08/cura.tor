@@ -7,6 +7,7 @@ export interface Contact {
     email: string[];      // Multiple emails
     address: string;
     notes: string;        // User notes (e.g., what they're inquiring about)
+    folder?: string;      // Folder/group name (default: "Uncategorized")
     rawText: string;      // Original OCR output
     imageData: string;    // Base64 image
     confidence: number;   // 0-100

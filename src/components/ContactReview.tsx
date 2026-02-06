@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle } from 'lucide-react';
+import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3 } from 'lucide-react';
 import { OCRResult } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import { storage } from '@/services/storage';
@@ -25,6 +25,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
 
     const [duplicateWarning, setDuplicateWarning] = useState<DuplicateResult | null>(null);
     const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(true); // Start in edit mode for better UX
 
     // Check for duplicates when form data changes
     useEffect(() => {
@@ -82,8 +83,17 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         <div className="fixed inset-0 z-50 flex flex-col bg-brand-950 animate-in fade-in duration-300">
             <div className="p-4 glass flex items-center justify-between sticky top-0">
                 <button onClick={onCancel} className="p-2 text-brand-600 hover:text-white"><X size={24} /></button>
-                <h2 className="text-lg font-bold gradient-text">Verify Contact</h2>
-                <button onClick={() => handleSave(false)} className="p-2 text-emerald-500 hover:text-emerald-400"><Save size={24} /></button>
+                <h2 className="text-lg font-bold gradient-text">{isEditMode ? 'Edit Contact' : 'Verify Contact'}</h2>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setIsEditMode(!isEditMode)}
+                        className={`p-2 transition-colors ${isEditMode ? 'text-brand-400' : 'text-brand-600 hover:text-brand-400'}`}
+                        title={isEditMode ? 'View mode' : 'Edit mode'}
+                    >
+                        <Edit3 size={20} />
+                    </button>
+                    <button onClick={() => handleSave(false)} className="p-2 text-emerald-500 hover:text-emerald-400"><Save size={24} /></button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -114,7 +124,8 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             placeholder="Full Name"
-                            className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                            readOnly={!isEditMode}
+                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
                         />
                     </div>
 
@@ -125,7 +136,8 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             value={formData.position}
                             onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                             placeholder="Job Title"
-                            className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                            readOnly={!isEditMode}
+                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
                         />
                     </div>
 
@@ -136,7 +148,8 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             value={formData.company}
                             onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                             placeholder="Company Name"
-                            className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                            readOnly={!isEditMode}
+                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
                         />
                     </div>
 
@@ -147,7 +160,8 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             value={formData.phone}
                             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                             placeholder="Phone Numbers (comma separated)"
-                            className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                            readOnly={!isEditMode}
+                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
                         />
                     </div>
 
@@ -158,7 +172,8 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             placeholder="Email Addresses (comma separated)"
-                            className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                            readOnly={!isEditMode}
+                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
                         />
                     </div>
 
@@ -169,7 +184,8 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                             placeholder="Office Address"
                             rows={2}
-                            className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none"
+                            readOnly={!isEditMode}
+                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
                         />
                     </div>
 
@@ -181,7 +197,8 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                             placeholder="Notes (e.g., what they're inquiring about, where you met them)"
                             rows={3}
-                            className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none"
+                            readOnly={!isEditMode}
+                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
                         />
                     </div>
                 </div>
