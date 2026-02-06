@@ -24,7 +24,7 @@ const Home = () => {
             <header className="text-center mb-12">
                 <div className="relative inline-block">
                     <h1 className="text-4xl font-bold gradient-text mb-2">CardScanner</h1>
-                    <div className="absolute -top-2 -right-8 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg animate-pulse">
+                    <div className="absolute -top-1 -right-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg animate-pulse">
                         NEW
                     </div>
                 </div>
