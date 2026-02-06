@@ -922,6 +922,9 @@
 
         // Validate/correct parsing with Gemini AI (with vision)
         const validateWithGemini = async (imageData, rawText, parsed) => {
+            console.log('[Gemini Vision] Starting validation with image...');
+            console.log('[Gemini Vision] Image data length:', imageData?.length || 0);
+            console.log('[Gemini Vision] Parsed data:', parsed);
             try {
                 const prompt = `You are an expert multilingual business card data curator with VISION capability. Extract contact information directly from this image to 99% accuracy for ANY language and country.
 
@@ -1016,16 +1019,19 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                 });
 
                 const data = await response.json();
+                console.log('[Gemini Vision] API response received:', data);
 
                 if (!response.ok || data.error) {
-                    console.error('[Gemini] API error:', data.error || response.statusText);
+                    console.error('[Gemini Vision] API error:', data.error || response.statusText);
                     return { ...parsed, _aiValidated: false, _aiError: data.error?.message || `API error: ${response.status}` };
                 }
 
                 // Safe navigation with null checks (endpoint returns Gemini's response format)
                 const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                console.log('[Gemini Vision] Extracted text from response:', text);
+
                 if (!text) {
-                    console.warn('[Gemini] Empty or malformed response, using original parsing');
+                    console.warn('[Gemini Vision] Empty or malformed response, using original parsing');
                     return { ...parsed, _aiValidated: false, _aiError: 'Empty response from AI' };
                 }
 
@@ -1035,7 +1041,9 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                     jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
                 }
 
+                console.log('[Gemini Vision] Cleaned JSON text:', jsonText);
                 const corrected = JSON.parse(jsonText);
+                console.log('[Gemini Vision] Parsed JSON:', corrected);
 
                 // VALIDATION: Only reject clearly garbage AI responses (simplified - trust AI more!)
                 const isGarbage = (str) => {
@@ -1079,7 +1087,7 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                 const bestPosition = corrected.position || parsed.position;
                 const bestAddress = isAIAddressBetter(corrected.address, parsed.address) ? corrected.address : parsed.address;
 
-                return {
+                const finalResult = {
                     ...parsed,
                     name: bestName,
                     position: bestPosition,
@@ -1090,8 +1098,11 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                     _aiValidated: true
                 };
 
+                console.log('[Gemini Vision] ✓ Final validated result:', finalResult);
+                return finalResult;
+
             } catch (error) {
-                console.error('[Gemini] Validation error:', error);
+                console.error('[Gemini Vision] ✗ Validation error:', error);
                 return { ...parsed, _aiValidated: false, _aiError: error.message };
             }
         };
