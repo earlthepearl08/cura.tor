@@ -10,6 +10,7 @@ const Scanner: React.FC = () => {
     const [imgSrc, setImgSrc] = useState<string | null>(null);
     const [isCameraReady, setIsCameraReady] = useState(false);
     const [showReview, setShowReview] = useState(false);
+    const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
     const { isProcessing, processImage, result, error, reset } = useOCR();
     const navigate = useNavigate();
 
@@ -24,10 +25,47 @@ const Scanner: React.FC = () => {
         setImgSrc(null);
     };
 
+    const handleTapToFocus = useCallback(async (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+        if (!webcamRef.current || imgSrc) return;
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+        const x = ((clientX - rect.left) / rect.width) * 100;
+        const y = ((clientY - rect.top) / rect.height) * 100;
+
+        // Show focus animation
+        setFocusPoint({ x, y });
+        setTimeout(() => setFocusPoint(null), 1000);
+
+        // Apply focus constraints
+        try {
+            const stream = webcamRef.current.stream;
+            if (!stream) return;
+
+            const videoTrack = stream.getVideoTracks()[0];
+            const capabilities = videoTrack.getCapabilities?.();
+
+            if (capabilities && 'focusMode' in capabilities) {
+                await videoTrack.applyConstraints({
+                    advanced: [{ focusMode: 'single-shot' }] as any,
+                });
+            }
+        } catch (err) {
+            console.log('Tap-to-focus not supported:', err);
+        }
+    }, [imgSrc]);
+
     const videoConstraints = {
-        width: 1280,
-        height: 720,
-        facingMode: "environment" // Use back camera
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        facingMode: "environment", // Use back camera
+        focusMode: "continuous", // Continuous autofocus
+        advanced: [
+            { focusMode: "continuous" },
+            { focusDistance: { ideal: 0.25 } } // Focus at ~25cm for business cards
+        ]
     };
 
     return (
@@ -43,7 +81,11 @@ const Scanner: React.FC = () => {
 
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
                 {!imgSrc ? (
-                    <div className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-brand-500/30">
+                    <div
+                        className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-brand-500/30 cursor-pointer"
+                        onClick={handleTapToFocus}
+                        onTouchStart={handleTapToFocus}
+                    >
                         <Webcam
                             audio={false}
                             ref={webcamRef}
@@ -56,6 +98,17 @@ const Scanner: React.FC = () => {
                         <div className="absolute inset-0 pointer-events-none border-[20px] border-black/40">
                             <div className="w-full h-full border-2 border-dashed border-brand-400 opacity-50 rounded-lg"></div>
                         </div>
+                        {/* Focus Point Animation */}
+                        {focusPoint && (
+                            <div
+                                className="absolute w-16 h-16 border-2 border-emerald-400 rounded-full pointer-events-none animate-ping"
+                                style={{
+                                    left: `${focusPoint.x}%`,
+                                    top: `${focusPoint.y}%`,
+                                    transform: 'translate(-50%, -50%)',
+                                }}
+                            />
+                        )}
                         {!isCameraReady && (
                             <div className="absolute inset-0 flex items-center justify-center bg-brand-950">
                                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-brand-400"></div>
@@ -113,7 +166,7 @@ const Scanner: React.FC = () => {
                         : isProcessing
                             ? "Extracting information using OCR..."
                             : !imgSrc
-                                ? "Align the calling card within the frame for better text extraction."
+                                ? "Align the card within the frame. Tap anywhere to focus."
                                 : "Preview confirmed. Tap the checkmark to start OCR processing."}
                 </p>
 
