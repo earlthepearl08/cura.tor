@@ -1254,7 +1254,7 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
 
             // Manual entry state
             const [manualEntry, setManualEntry] = useState({
-                name: '', position: '', company: '', phone: '', email: '', address: '', notes: ''
+                name: '', position: '', company: '', phone: '', email: '', address: '', notes: '', folder: 'Uncategorized'
             });
 
             // Error and status state
@@ -1597,7 +1597,12 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
 
             // Save contact
             const saveContact = (contact) => {
-                const newContacts = [{ ...contact, id: Date.now(), createdAt: new Date().toISOString() }, ...contacts];
+                const newContacts = [{
+                    ...contact,
+                    id: Date.now(),
+                    createdAt: new Date().toISOString(),
+                    folder: contact.folder || 'Uncategorized'
+                }, ...contacts];
                 setContacts(newContacts);
                 localStorage.setItem('demo_contacts', JSON.stringify(newContacts));
                 setOcrResult(null);
@@ -2300,6 +2305,21 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                     placeholder="Notes"
                                 />
                             </div>
+
+                            <div className="relative">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-slate-800/50 flex items-center justify-center">
+                                    <SafeIcon name="folder" className="w-4 h-4 text-slate-500" />
+                                </div>
+                                <select
+                                    className="w-full pl-14 pr-4 py-4 card-elevated rounded-xl text-sm focus:ring-1 focus:ring-sky-500/50 outline-none transition-all"
+                                    value={ocrResult?.folder || 'Uncategorized'}
+                                    onChange={(e) => setOcrResult(prev => ({ ...prev, folder: e.target.value }))}
+                                >
+                                    {customFolders.map(folder => (
+                                        <option key={folder} value={folder}>{folder}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -2726,8 +2746,20 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
             const [editForm, setEditForm] = useState({});
 
             // Folder/grouping state
+            const [customFolders, setCustomFolders] = useState(() => {
+                const saved = localStorage.getItem('custom_folders');
+                return saved ? JSON.parse(saved) : ['Personal', 'Work', 'Uncategorized'];
+            });
             const [selectedFolder, setSelectedFolder] = useState('All');
-            const folders = ['All', ...new Set(contacts.map(c => c.company || 'No Company').filter(Boolean))];
+            const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+            const [newFolderName, setNewFolderName] = useState('');
+
+            // Save custom folders to localStorage whenever they change
+            useEffect(() => {
+                localStorage.setItem('custom_folders', JSON.stringify(customFolders));
+            }, [customFolders]);
+
+            const folders = ['All', ...customFolders];
 
             const renderContacts = () => {
                 // Sort contacts by ID descending (newest first)
@@ -2736,7 +2768,7 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                 // Filter by folder
                 const filteredContacts = selectedFolder === 'All'
                     ? sortedContacts
-                    : sortedContacts.filter(c => (c.company || 'No Company') === selectedFolder);
+                    : sortedContacts.filter(c => (c.folder || 'Uncategorized') === selectedFolder);
 
                 return (
                 <div className="flex flex-col min-h-screen page-enter">
@@ -2816,6 +2848,13 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                     {folder}
                                 </button>
                             ))}
+                            <button
+                                onClick={() => setShowNewFolderModal(true)}
+                                className="px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all border border-emerald-500/30 flex items-center gap-1.5"
+                            >
+                                <SafeIcon name="plus" className="w-3.5 h-3.5" />
+                                <span>New Folder</span>
+                            </button>
                         </div>
                     )}
 
@@ -2957,6 +2996,19 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                     </div>
 
                                     <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-2">Folder</label>
+                                        <select
+                                            value={editForm.folder || 'Uncategorized'}
+                                            onChange={(e) => setEditForm({...editForm, folder: e.target.value})}
+                                            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                                        >
+                                            {customFolders.map(folder => (
+                                                <option key={folder} value={folder}>{folder}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
                                         <label className="block text-xs font-medium text-slate-400 mb-2">Phone</label>
                                         <input
                                             type="text"
@@ -2996,12 +3048,69 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                     </button>
                                     <button
                                         onClick={() => {
-                                            setContacts(prev => prev.map(c => c.id === editingContact.id ? {...c, ...editForm} : c));
+                                            const updatedContacts = contacts.map(c => c.id === editingContact.id ? {...c, ...editForm} : c);
+                                            setContacts(updatedContacts);
+                                            localStorage.setItem('demo_contacts', JSON.stringify(updatedContacts));
                                             setEditingContact(null);
                                         }}
                                         className="flex-1 py-3 bg-sky-500 text-white rounded-xl hover:bg-sky-400 transition-colors font-medium"
                                     >
                                         Save Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* New Folder Modal */}
+                    {showNewFolderModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm modal-enter" onClick={() => setShowNewFolderModal(false)}>
+                            <div className="card-elevated rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-lg font-semibold mb-4">Create New Folder</h3>
+                                <input
+                                    type="text"
+                                    value={newFolderName}
+                                    onChange={(e) => setNewFolderName(e.target.value)}
+                                    placeholder="Folder name (e.g., Clients, Vendors)"
+                                    className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 mb-4"
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter' && newFolderName.trim()) {
+                                            if (!customFolders.includes(newFolderName.trim())) {
+                                                setCustomFolders([...customFolders, newFolderName.trim()]);
+                                                setNewFolderName('');
+                                                setShowNewFolderModal(false);
+                                            } else {
+                                                alert('Folder already exists');
+                                            }
+                                        }
+                                    }}
+                                />
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => {
+                                            setNewFolderName('');
+                                            setShowNewFolderModal(false);
+                                        }}
+                                        className="flex-1 py-3 bg-slate-800/50 rounded-xl hover:bg-slate-700 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (newFolderName.trim()) {
+                                                if (!customFolders.includes(newFolderName.trim())) {
+                                                    setCustomFolders([...customFolders, newFolderName.trim()]);
+                                                    setNewFolderName('');
+                                                    setShowNewFolderModal(false);
+                                                } else {
+                                                    alert('Folder already exists');
+                                                }
+                                            }
+                                        }}
+                                        disabled={!newFolderName.trim()}
+                                        className="flex-1 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Create Folder
                                     </button>
                                 </div>
                             </div>
@@ -3015,7 +3124,7 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                 <div className="flex flex-col min-h-screen page-enter">
                     <header className="header-bar p-5 flex items-center justify-between sticky top-0 z-10">
                         <button
-                            onClick={() => { setView('home'); setManualEntry({ name: '', position: '', company: '', phone: '', email: '', address: '', notes: '' }); }}
+                            onClick={() => { setView('home'); setManualEntry({ name: '', position: '', company: '', phone: '', email: '', address: '', notes: '', folder: 'Uncategorized' }); }}
                             className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
                         >
                             <SafeIcon name="arrow-left" className="w-5 h-5" />
@@ -3061,6 +3170,21 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                 placeholder="Notes"
                             />
                         </div>
+
+                        <div className="relative">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-slate-800/50 flex items-center justify-center">
+                                <SafeIcon name="folder" className="w-4 h-4 text-slate-500" />
+                            </div>
+                            <select
+                                className="w-full pl-14 pr-4 py-4 card-elevated rounded-xl text-sm focus:ring-1 focus:ring-violet-500/50 outline-none transition-all"
+                                value={manualEntry.folder}
+                                onChange={(e) => setManualEntry(prev => ({ ...prev, folder: e.target.value }))}
+                            >
+                                {customFolders.map(folder => (
+                                    <option key={folder} value={folder}>{folder}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div className="p-5 border-t border-slate-800/50 bg-slate-950/80 backdrop-blur-xl">
@@ -3078,7 +3202,7 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                                 const newContacts = [newContact, ...contacts];
                                 setContacts(newContacts);
                                 localStorage.setItem('demo_contacts', JSON.stringify(newContacts));
-                                setManualEntry({ name: '', position: '', company: '', phone: '', email: '', address: '', notes: '' });
+                                setManualEntry({ name: '', position: '', company: '', phone: '', email: '', address: '', notes: '', folder: 'Uncategorized' });
                                 setView('contacts');
                             }}
                             className="w-full py-4 bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold rounded-2xl shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
