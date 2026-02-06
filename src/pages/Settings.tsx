@@ -1,20 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Cpu, Sparkles, Key, Check, AlertCircle } from 'lucide-react';
-import { getOCREngine, setOCREngine, getGeminiApiKey, setGeminiApiKey, OCREngine } from '@/services/ocr';
+import { ArrowLeft, Cpu, Sparkles, Check } from 'lucide-react';
+import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 
 const Settings = () => {
     const navigate = useNavigate();
     const [ocrEngine, setOcrEngineState] = useState<OCREngine>(getOCREngine());
-    const [geminiApiKey, setGeminiApiKeyState] = useState(getGeminiApiKey() || '');
-    const [showApiKey, setShowApiKey] = useState(false);
     const [saved, setSaved] = useState(false);
 
     const handleSave = () => {
         setOCREngine(ocrEngine);
-        if (geminiApiKey.trim()) {
-            setGeminiApiKey(geminiApiKey.trim());
-        }
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
     };
@@ -88,12 +83,13 @@ const Settings = () => {
                                 </span>
                             </div>
                             <p className="text-xs text-brand-500 mb-2">
-                                AI multimodal vision. Handles ANY card design, ALL languages, stylized fonts. No OCR step needed.
+                                AI multimodal vision. Handles ANY card design, ALL languages, stylized fonts. No API key needed - powered by the app.
                             </p>
                             <ul className="text-[10px] text-brand-600 space-y-0.5">
                                 <li>✓ Best for international cards (Japanese, Thai, Chinese, Korean)</li>
                                 <li>✓ Understands visual context (logos, layouts)</li>
                                 <li>✓ Works with stylized/difficult fonts</li>
+                                <li>✓ Powered by server - no configuration required</li>
                             </ul>
                         </div>
                         {ocrEngine === 'gemini-vision' && (
@@ -101,52 +97,6 @@ const Settings = () => {
                         )}
                     </button>
                 </div>
-
-                {/* Gemini API Key Input */}
-                {ocrEngine === 'gemini-vision' && (
-                    <div className="space-y-3 animate-in fade-in duration-300">
-                        <div className="flex items-center gap-2">
-                            <Key size={16} className="text-purple-400" />
-                            <h2 className="text-sm font-bold text-purple-400 uppercase tracking-wider">Gemini API Key</h2>
-                        </div>
-
-                        <div className="p-4 glass rounded-2xl border border-purple-500/30">
-                            <div className="relative">
-                                <input
-                                    type={showApiKey ? 'text' : 'password'}
-                                    value={geminiApiKey}
-                                    onChange={(e) => setGeminiApiKeyState(e.target.value)}
-                                    placeholder="Enter your Gemini API key..."
-                                    className="w-full bg-brand-900/50 border border-brand-800 rounded-xl py-3 px-4 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-mono"
-                                />
-                                <button
-                                    onClick={() => setShowApiKey(!showApiKey)}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs text-brand-500 hover:text-white transition-colors"
-                                >
-                                    {showApiKey ? 'Hide' : 'Show'}
-                                </button>
-                            </div>
-
-                            <div className="mt-3 p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
-                                <p className="text-xs text-purple-400 flex items-start gap-2">
-                                    <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-                                    <span>
-                                        Get your free API key from{' '}
-                                        <a
-                                            href="https://makersuite.google.com/app/apikey"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="underline hover:text-purple-300"
-                                        >
-                                            Google AI Studio
-                                        </a>
-                                        . Free tier: 1,500 requests/day.
-                                    </span>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* Save Success Message */}
                 {saved && (

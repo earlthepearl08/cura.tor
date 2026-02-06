@@ -101,15 +101,7 @@ export class OCRService {
     async processImageWithGeminiVision(imageSrc: string): Promise<OCRResult> {
         console.log('[Gemini Vision] Starting direct image analysis...');
 
-        const apiKey = getGeminiApiKey();
-        if (!apiKey) {
-            throw new Error('Gemini API key not configured. Please add your API key in Settings.');
-        }
-
         try {
-            // Convert image to base64 (remove data URL prefix if present)
-            const base64Image = imageSrc.replace(/^data:image\/\w+;base64,/, '');
-
             const prompt = `You are an expert at extracting contact information from business cards. Analyze this business card image and extract ALL contact details with perfect accuracy.
 
 **CRITICAL REQUIREMENTS:**
@@ -137,34 +129,19 @@ export class OCRService {
 
 Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
 
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                {
-                                    inline_data: {
-                                        mime_type: 'image/jpeg',
-                                        data: base64Image
-                                    }
-                                }
-                            ]
-                        }],
-                        generationConfig: {
-                            temperature: 0.1,
-                            maxOutputTokens: 1000
-                        }
-                    })
-                }
-            );
+            // Call our secure backend API instead of Gemini directly
+            const response = await fetch('/api/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    imageData: imageSrc,
+                    prompt: prompt
+                })
+            });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error?.message || `Gemini API error: ${response.status}`);
+                throw new Error(errorData.error || `API error: ${response.status}`);
             }
 
             const data = await response.json();
