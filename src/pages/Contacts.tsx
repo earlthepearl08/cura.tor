@@ -109,7 +109,7 @@ const Contacts: React.FC = () => {
         <div key={contact.id} className="glass rounded-2xl overflow-hidden border border-brand-800/10 hover:border-brand-500/20 transition-all group">
             <div className="p-4 flex gap-4">
                 {/* Image Preview */}
-                <div className="h-16 w-16 rounded-xl overflow-hidden bg-brand-900 flex-shrink-0 border border-brand-800">
+                <div className="w-24 aspect-[1.586/1] rounded-xl overflow-hidden bg-brand-900 flex-shrink-0 border border-brand-800">
                     <img src={contact.imageData} alt={contact.name} className="h-full w-full object-cover" />
                 </div>
 

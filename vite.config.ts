@@ -10,11 +10,11 @@ export default defineConfig({
             registerType: 'autoUpdate',
             includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icons/*.png'],
             manifest: {
-                name: 'CURA.TOR',
-                short_name: 'CURA.TOR',
-                description: 'Smart Contact Curation - Scan business cards with OCR',
+                name: 'Cura.tor - Smart Contact Curation',
+                short_name: 'Cura.tor',
+                description: 'Scan and curate business cards with smart OCR technology',
                 theme_color: '#020617',
-                background_color: '#0a0f1a',
+                background_color: '#020617',
                 display: 'standalone',
                 orientation: 'portrait-primary',
                 start_url: '/',
@@ -74,38 +74,7 @@ export default defineConfig({
                 // Cache static assets
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
 
-                // Runtime caching for Tesseract.js assets
                 runtimeCaching: [
-                    {
-                        // Cache Tesseract worker files
-                        urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/tesseract\.js.*/i,
-                        handler: 'CacheFirst',
-                        options: {
-                            cacheName: 'tesseract-worker-cache',
-                            expiration: {
-                                maxEntries: 10,
-                                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-                            },
-                            cacheableResponse: {
-                                statuses: [0, 200]
-                            }
-                        }
-                    },
-                    {
-                        // Cache Tesseract language data
-                        urlPattern: /^https:\/\/tessdata\.projectnaptha\.com\/.*/i,
-                        handler: 'CacheFirst',
-                        options: {
-                            cacheName: 'tesseract-lang-cache',
-                            expiration: {
-                                maxEntries: 5,
-                                maxAgeSeconds: 60 * 60 * 24 * 90 // 90 days
-                            },
-                            cacheableResponse: {
-                                statuses: [0, 200]
-                            }
-                        }
-                    },
                     {
                         // Cache Google Fonts
                         urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

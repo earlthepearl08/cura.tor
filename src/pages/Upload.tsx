@@ -128,7 +128,7 @@ const Uploader: React.FC = () => {
                         <div className="space-y-3">
                             {queue.map((item) => (
                                 <div key={item.id} className="flex items-center p-3 glass rounded-2xl group">
-                                    <div className="h-12 w-12 rounded-lg overflow-hidden border border-brand-700 mr-4">
+                                    <div className="w-20 aspect-[1.586/1] rounded-lg overflow-hidden border border-brand-700 mr-4 flex-shrink-0">
                                         <img src={item.preview} alt="preview" className="h-full w-full object-cover" />
                                     </div>
                                     <div className="flex-1 min-w-0">
