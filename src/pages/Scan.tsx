@@ -141,8 +141,8 @@ const Scanner: React.FC = () => {
                         )}
                     </div>
                 ) : (
-                    <div className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-emerald-500/50">
-                        <img src={imgSrc} alt="captured" className="w-full h-full object-cover" />
+                    <div className="w-full max-w-md rounded-2xl overflow-hidden glass relative border-2 border-emerald-500/50">
+                        <img src={imgSrc} alt="captured" className="w-full h-auto" />
                     </div>
                 )}
 
