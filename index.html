@@ -438,6 +438,43 @@
         const PHONE_REGEX = /^\+?\d[\d\s().-]{6,}$/;
         const HAS_LETTERS_REGEX = /[A-Za-z]/;
 
+        // Country names - to filter out from name detection
+        const COUNTRY_NAMES = [
+            'afghanistan', 'albania', 'algeria', 'argentina', 'armenia', 'australia', 'austria', 'azerbaijan',
+            'bahrain', 'bangladesh', 'belarus', 'belgium', 'bolivia', 'brazil', 'brunei', 'bulgaria',
+            'cambodia', 'cameroon', 'canada', 'chile', 'china', 'colombia', 'croatia', 'cyprus', 'czech',
+            'denmark', 'dominican',
+            'ecuador', 'egypt', 'emirates', 'estonia', 'ethiopia',
+            'fiji', 'finland', 'france',
+            'georgia', 'germany', 'ghana', 'greece', 'guatemala',
+            'honduras', 'hong kong', 'hungary',
+            'iceland', 'india', 'indonesia', 'iran', 'iraq', 'ireland', 'israel', 'italy',
+            'jamaica', 'japan', 'jordan',
+            'kazakhstan', 'kenya', 'korea', 'kuwait', 'kyrgyzstan',
+            'laos', 'latvia', 'lebanon', 'libya', 'lithuania', 'luxembourg',
+            'macau', 'malaysia', 'maldives', 'malta', 'mauritius', 'mexico', 'mongolia', 'morocco', 'myanmar',
+            'nepal', 'netherlands', 'new zealand', 'nigeria', 'norway',
+            'oman',
+            'pakistan', 'panama', 'papua new guinea', 'paraguay', 'peru', 'philippines', 'poland', 'portugal',
+            'qatar',
+            'romania', 'russia', 'rwanda',
+            'saudi arabia', 'serbia', 'singapore', 'slovakia', 'slovenia', 'south africa', 'south korea', 'spain', 'sri lanka', 'sudan', 'sweden', 'switzerland', 'syria',
+            'taiwan', 'tajikistan', 'tanzania', 'thailand', 'tunisia', 'turkey', 'turkmenistan',
+            'uae', 'uganda', 'ukraine', 'united arab emirates', 'united kingdom', 'united states', 'uruguay', 'usa', 'uk', 'uzbekistan',
+            'venezuela', 'vietnam',
+            'yemen',
+            'zambia', 'zimbabwe',
+            // Common abbreviations
+            'hq', 'headquarters'
+        ];
+        const isCountryName = (word) => COUNTRY_NAMES.includes(word.toLowerCase().replace(/[()]/g, ''));
+        const lineIsCountries = (line) => {
+            const words = line.split(/\s{2,}|\t+|,\s*/).map(w => w.trim()).filter(w => w);
+            if (words.length === 0) return false;
+            const countryCount = words.filter(w => isCountryName(w)).length;
+            return countryCount >= Math.ceil(words.length * 0.5) && countryCount >= 2;
+        };
+
         // Professional suffixes pattern
         const PROFESSIONAL_SUFFIXES = ['ree', 'pee', 'rme', 'pme', 'cpa', 'cma', 'cfa', 'md', 'm\\.d\\.', 'do', 'd\\.o\\.', 'rn', 'r\\.n\\.', 'bsn', 'jd', 'j\\.d\\.', 'esq', 'esq\\.', 'atty', 'atty\\.', 'phd', 'ph\\.d\\.', 'edd', 'ed\\.d\\.', 'mba', 'm\\.b\\.a\\.', 'ms', 'm\\.s\\.', 'ma', 'm\\.a\\.', 'pe', 'p\\.e\\.', 'se', 's\\.e\\.', 'prc', 'lic\\.', 'certified'];
         const PROFESSIONAL_SUFFIX_REGEX = new RegExp(`[,\\s](${PROFESSIONAL_SUFFIXES.join('|')})$|[,\\s](${PROFESSIONAL_SUFFIXES.join('|')})[,\\s]`, 'i');
@@ -576,8 +613,8 @@
             const intlRegex = /(\+\d{1,3}[\s.-]*\d[\d\s.-]{6,14}\d)/gm;
             while ((match = intlRegex.exec(normalizedText)) !== null) phonePatterns.push(match[1]);
 
-            // Labeled: "Mobile:", "Tel:", etc.
-            const labeledRegex = /(?:mobile|tel|phone|fax|cell)[\s.:]*(?:no)?[\s.:]*([+\d\s()/-]{7,})/gi;
+            // Labeled: "Mobile:", "Tel:", "Contact:", etc.
+            const labeledRegex = /(?:mobile|tel|phone|fax|cell|contact|hp|handphone)[\s.:]*(?:no)?[\s.:]*([+\d\s()/-]{7,})/gi;
             while ((match = labeledRegex.exec(normalizedText)) !== null) phonePatterns.push(match[1]);
 
             // Philippine landline: +63 2 or 02
@@ -628,6 +665,8 @@
                 if (/^(email|e-mail|tel|telephone|mobile|phone|fax|address|website|web)[\s.:]*$/i.test(line)) usedLines.add(idx);
                 // Empty/punctuation lines
                 if (/^[:.\s]*$/.test(line) || line.length <= 2) usedLines.add(idx);
+                // Lines that are just country names (e.g. "Indonesia Malaysia India Thailand Vietnam")
+                if (lineIsCountries(line)) usedLines.add(idx);
             });
 
             // ============================================
@@ -682,6 +721,7 @@
                 if (websites.some(w => lower.includes(w.toLowerCase().replace(/^www\./, '')))) newUsedLines.add(idx);
                 if (/^(email|e-mail|tel|telephone|mobile|phone|fax|address|website|web)[\s.:]*$/i.test(line)) newUsedLines.add(idx);
                 if (/^[:.\s]*$/.test(line) || line.length <= 2) newUsedLines.add(idx);
+                if (lineIsCountries(line)) newUsedLines.add(idx);
             });
 
             // ============================================
@@ -722,6 +762,11 @@
 
             const looksLikePersonName = (line) => {
                 const words = line.split(/\s+/).filter(w => w.length > 0);
+
+                // Reject if line is mostly country names
+                if (lineIsCountries(line)) return false;
+                // Reject if ALL words are country names
+                if (words.length >= 2 && words.every(w => isCountryName(w))) return false;
 
                 // Check for professional title prefix (Engr., Dr., Mr., etc.)
                 const firstWord = words[0] || '';
@@ -995,70 +1040,40 @@ IMPORTANT: Be flexible! Names with titles are valid. Long addresses are valid. N
                 // Remove data URL prefix if present
                 const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '');
 
-                // Call Gemini directly with vision (with retry on rate limit)
-                const models = ['gemini-2.0-flash-lite', 'gemini-2.0-flash'];
-                let data = null;
-                let lastError = null;
-
-                for (const model of models) {
-                    for (let attempt = 0; attempt < 2; attempt++) {
-                        console.log(`[Gemini Vision] Trying ${model} (attempt ${attempt + 1})...`);
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                contents: [{
-                                    parts: [
-                                        { text: prompt },
-                                        {
-                                            inline_data: {
-                                                mime_type: 'image/jpeg',
-                                                data: base64Image
-                                            }
-                                        }
-                                    ]
-                                }],
-                                generationConfig: {
-                                    temperature: 0.1,
-                                    maxOutputTokens: 500
+                // Call Gemini directly with vision (single request, no aggressive retries)
+                console.log('[Gemini Vision] Calling gemini-2.0-flash-lite...');
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                {
+                                    inline_data: {
+                                        mime_type: 'image/jpeg',
+                                        data: base64Image
+                                    }
                                 }
-                            })
-                        });
-
-                        data = await response.json();
-
-                        if (response.ok && !data.error) {
-                            console.log(`[Gemini Vision] ✓ Success with ${model}`);
-                            break;
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 500
                         }
+                    })
+                });
 
-                        // Rate limited - wait and retry
-                        if (response.status === 429) {
-                            console.warn(`[Gemini Vision] Rate limited on ${model}, waiting 5s...`);
-                            await new Promise(r => setTimeout(r, 5000));
-                            lastError = data.error;
-                            data = null;
-                            continue;
-                        }
-
-                        // Other error - try next model
-                        lastError = data.error;
-                        data = null;
-                        break;
-                    }
-                    if (data && !data.error) break;
-                }
-
-                if (!data || data.error) {
-                    console.error('[Gemini Vision] All models failed:', lastError);
-                    return { ...parsed, _aiValidated: false, _aiError: lastError?.message || 'All models failed' };
-                }
-
+                const data = await response.json();
                 console.log('[Gemini Vision] API response received:', data);
 
                 if (!response.ok || data.error) {
-                    console.error('[Gemini Vision] API error:', data.error || response.statusText);
-                    return { ...parsed, _aiValidated: false, _aiError: data.error?.message || `API error: ${response.status}` };
+                    const errMsg = data.error?.message || `API error: ${response.status}`;
+                    console.error('[Gemini Vision] API error:', errMsg);
+                    if (response.status === 429) {
+                        console.warn('[Gemini Vision] Rate limited - using basic parser results (no retry to preserve quota)');
+                    }
+                    return { ...parsed, _aiValidated: false, _aiError: errMsg };
                 }
 
                 // Safe navigation with null checks (endpoint returns Gemini's response format)
