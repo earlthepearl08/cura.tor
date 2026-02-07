@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles } from 'lucide-react';
+import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus } from 'lucide-react';
 import { OCRResult, ocrService } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import { storage } from '@/services/storage';
@@ -21,6 +21,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         email: ocrResult.email.join(', '),
         address: ocrResult.address,
         notes: '',
+        folder: 'Uncategorized',
     });
 
     const [duplicateWarning, setDuplicateWarning] = useState<DuplicateResult | null>(null);
@@ -29,6 +30,19 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
     const [showRawText, setShowRawText] = useState(false);
     const [rawText, setRawText] = useState(ocrResult.rawText);
     const [isReparsing, setIsReparsing] = useState(false);
+    const [folders, setFolders] = useState<string[]>([]);
+    const [showCreateFolderInline, setShowCreateFolderInline] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
+
+    // Load existing folders on mount
+    useEffect(() => {
+        const loadFolders = async () => {
+            const existingContacts = await storage.getAllContacts();
+            const uniqueFolders = Array.from(new Set(existingContacts.map(c => c.folder || 'Uncategorized'))).sort();
+            setFolders(uniqueFolders);
+        };
+        loadFolders();
+    }, []);
 
     // Check for duplicates when form data changes
     useEffect(() => {
@@ -97,6 +111,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
             email: formData.email.split(',').map(e => e.trim()).filter(e => e),
             address: formData.address,
             notes: formData.notes,
+            folder: formData.folder || 'Uncategorized',
             rawText: rawText,
             imageData: imageData,
             confidence: ocrResult.confidence,
@@ -287,6 +302,62 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             readOnly={!isEditMode}
                             className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
                         />
+                    </div>
+
+                    {/* Folder Selector */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Save To Folder</label>
+                        <div className="relative">
+                            <Folder className="absolute left-3 top-3 text-brand-500" size={18} />
+                            <select
+                                value={showCreateFolderInline ? '__new__' : formData.folder}
+                                onChange={(e) => {
+                                    if (e.target.value === '__new__') {
+                                        setShowCreateFolderInline(true);
+                                    } else {
+                                        setShowCreateFolderInline(false);
+                                        setFormData({ ...formData, folder: e.target.value });
+                                    }
+                                }}
+                                disabled={!isEditMode}
+                                className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 bg-brand-900 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            >
+                                <option value="Uncategorized">Uncategorized</option>
+                                {folders.filter(f => f !== 'Uncategorized').map(folder => (
+                                    <option key={folder} value={folder}>{folder}</option>
+                                ))}
+                                <option value="__new__">+ Create New Folder</option>
+                            </select>
+                        </div>
+                        {showCreateFolderInline && (
+                            <div className="relative">
+                                <FolderPlus className="absolute left-3 top-3 text-brand-500" size={18} />
+                                <input
+                                    type="text"
+                                    value={newFolderName}
+                                    onChange={(e) => setNewFolderName(e.target.value)}
+                                    onBlur={() => {
+                                        if (newFolderName.trim()) {
+                                            setFormData({ ...formData, folder: newFolderName.trim() });
+                                            setFolders([...folders, newFolderName.trim()].sort());
+                                        }
+                                        setShowCreateFolderInline(false);
+                                        setNewFolderName('');
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && newFolderName.trim()) {
+                                            setFormData({ ...formData, folder: newFolderName.trim() });
+                                            setFolders([...folders, newFolderName.trim()].sort());
+                                            setShowCreateFolderInline(false);
+                                            setNewFolderName('');
+                                        }
+                                    }}
+                                    placeholder="Enter new folder name..."
+                                    autoFocus
+                                    className="w-full glass border border-brand-500 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

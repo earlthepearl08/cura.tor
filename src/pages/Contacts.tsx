@@ -12,6 +12,8 @@ const Contacts: React.FC = () => {
     const [showExportOptions, setShowExportOptions] = useState(false);
     const [selectedFolder, setSelectedFolder] = useState<string>('all'); // 'all' or folder name
     const [showFolderDropdown, setShowFolderDropdown] = useState(false);
+    const [showCreateFolder, setShowCreateFolder] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
     const [editFormData, setEditFormData] = useState({
         name: '',
@@ -114,51 +116,58 @@ const Contacts: React.FC = () => {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="font-bold text-slate-100 truncate">{contact.name}</h3>
-                            <p className="text-xs text-brand-400 font-medium uppercase tracking-wider">{contact.position}</p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <button
-                                onClick={() => exportService.toVCard(contact)}
-                                className="text-brand-600 hover:text-sky-400 p-2 hover:bg-white/5 rounded-lg transition-colors active:scale-95"
-                                title="Save as vCard"
-                            >
-                                <FileDown size={20} />
-                            </button>
-                            <button onClick={() => openEditModal(contact)} className="text-brand-600 hover:text-brand-300 p-2 hover:bg-white/5 rounded-lg transition-colors active:scale-95">
-                                <Edit3 size={20} />
-                            </button>
-                            <button onClick={() => deleteContact(contact.id)} className="text-brand-600 hover:text-red-400 p-2 hover:bg-white/5 rounded-lg transition-colors active:scale-95">
-                                <Trash2 size={20} />
-                            </button>
-                        </div>
+                    <div className="mb-2">
+                        <h3 className="font-bold text-slate-100 truncate">{contact.name}</h3>
+                        <p className="text-xs text-brand-400 font-medium uppercase tracking-wider">{contact.position}</p>
                     </div>
 
-                    <div className="mt-2 text-xs text-slate-400 space-y-1">
+                    <div className="text-xs text-slate-400 space-y-1 mb-3">
                         <div className="flex items-center gap-2">
                             <Building2 size={12} className="text-brand-500" />
                             <span className="truncate">{contact.company}</span>
                         </div>
-                        {contact.email[0] && (
-                            <a href={`mailto:${contact.email[0]}`} className="flex items-center gap-2 hover:text-sky-400 transition-colors py-1 -mx-1 px-1 rounded hover:bg-white/5">
-                                <Mail size={16} className="text-brand-500 flex-shrink-0" />
-                                <span className="truncate">{contact.email[0]}</span>
-                            </a>
-                        )}
-                        {contact.phone[0] && (
-                            <a href={`tel:${contact.phone[0]}`} className="flex items-center gap-2 hover:text-emerald-400 transition-colors py-1 -mx-1 px-1 rounded hover:bg-white/5">
-                                <Phone size={16} className="text-brand-500 flex-shrink-0" />
-                                <span className="truncate">{contact.phone[0]}</span>
-                            </a>
-                        )}
                         {contact.notes && (
                             <div className="flex items-center gap-2 text-amber-400/70">
                                 <StickyNote size={12} className="text-amber-500/50" />
                                 <span className="truncate">{contact.notes}</span>
                             </div>
                         )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-2 gap-2">
+                        {contact.phone[0] && (
+                            <a
+                                href={`tel:${contact.phone[0]}`}
+                                className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg transition-colors active:scale-95"
+                            >
+                                <Phone size={16} className="text-emerald-400" />
+                                <span className="text-xs font-medium text-emerald-400">Call</span>
+                            </a>
+                        )}
+                        {contact.email[0] && (
+                            <a
+                                href={`mailto:${contact.email[0]}`}
+                                className="flex items-center justify-center gap-2 px-3 py-2 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-lg transition-colors active:scale-95"
+                            >
+                                <Mail size={16} className="text-sky-400" />
+                                <span className="text-xs font-medium text-sky-400">Email</span>
+                            </a>
+                        )}
+                        <button
+                            onClick={() => openEditModal(contact)}
+                            className="flex items-center justify-center gap-2 px-3 py-2 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-lg transition-colors active:scale-95"
+                        >
+                            <Edit3 size={16} className="text-brand-400" />
+                            <span className="text-xs font-medium text-brand-400">Edit</span>
+                        </button>
+                        <button
+                            onClick={() => deleteContact(contact.id)}
+                            className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg transition-colors active:scale-95"
+                        >
+                            <Trash2 size={16} className="text-red-400" />
+                            <span className="text-xs font-medium text-red-400">Delete</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -261,6 +270,16 @@ const Contacts: React.FC = () => {
                                     {folder} ({contacts.filter(c => (c.folder || 'Uncategorized') === folder).length})
                                 </button>
                             ))}
+                            <button
+                                onClick={() => {
+                                    setShowFolderDropdown(false);
+                                    setShowCreateFolder(true);
+                                }}
+                                className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors border-t border-brand-800 text-emerald-400 flex items-center gap-2"
+                            >
+                                <FolderPlus size={16} />
+                                Create New Folder
+                            </button>
                         </div>
                     )}
                 </div>
@@ -299,6 +318,61 @@ const Contacts: React.FC = () => {
             <footer className="p-6 text-center text-[10px] text-brand-700 uppercase tracking-widest bg-brand-950">
                 Showing {filteredContacts.length} of {contacts.length} Contacts
             </footer>
+
+            {/* Create Folder Modal */}
+            {showCreateFolder && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                    <div className="bg-brand-900 rounded-2xl w-full max-w-sm border border-brand-800 shadow-2xl">
+                        <div className="p-4 border-b border-brand-800">
+                            <h3 className="text-lg font-bold gradient-text">Create New Folder</h3>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <div className="relative">
+                                <FolderPlus className="absolute left-3 top-3 text-brand-500" size={18} />
+                                <input
+                                    type="text"
+                                    value={newFolderName}
+                                    onChange={(e) => setNewFolderName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && newFolderName.trim()) {
+                                            setSelectedFolder(newFolderName.trim());
+                                            setNewFolderName('');
+                                            setShowCreateFolder(false);
+                                        }
+                                    }}
+                                    placeholder="Folder name (e.g., Clients, Suppliers)"
+                                    autoFocus
+                                    className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                                />
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-brand-800 flex gap-2">
+                            <button
+                                onClick={() => {
+                                    setShowCreateFolder(false);
+                                    setNewFolderName('');
+                                }}
+                                className="flex-1 py-2.5 bg-brand-800 hover:bg-brand-700 rounded-xl font-medium transition-colors text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (newFolderName.trim()) {
+                                        setSelectedFolder(newFolderName.trim());
+                                        setNewFolderName('');
+                                        setShowCreateFolder(false);
+                                    }
+                                }}
+                                disabled={!newFolderName.trim()}
+                                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            >
+                                Create
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Edit Contact Modal */}
             {editingContact && (
