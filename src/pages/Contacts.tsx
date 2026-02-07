@@ -122,16 +122,16 @@ const Contacts: React.FC = () => {
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={() => exportService.toVCard(contact)}
-                                className="text-brand-700 hover:text-sky-400 p-1"
+                                className="text-brand-600 hover:text-sky-400 p-2 hover:bg-white/5 rounded-lg transition-colors active:scale-95"
                                 title="Save as vCard"
                             >
-                                <FileDown size={16} />
+                                <FileDown size={20} />
                             </button>
-                            <button onClick={() => openEditModal(contact)} className="text-brand-700 hover:text-brand-400 p-1">
-                                <Edit3 size={16} />
+                            <button onClick={() => openEditModal(contact)} className="text-brand-600 hover:text-brand-300 p-2 hover:bg-white/5 rounded-lg transition-colors active:scale-95">
+                                <Edit3 size={20} />
                             </button>
-                            <button onClick={() => deleteContact(contact.id)} className="text-brand-700 hover:text-red-400 p-1">
-                                <Trash2 size={16} />
+                            <button onClick={() => deleteContact(contact.id)} className="text-brand-600 hover:text-red-400 p-2 hover:bg-white/5 rounded-lg transition-colors active:scale-95">
+                                <Trash2 size={20} />
                             </button>
                         </div>
                     </div>
@@ -142,14 +142,14 @@ const Contacts: React.FC = () => {
                             <span className="truncate">{contact.company}</span>
                         </div>
                         {contact.email[0] && (
-                            <a href={`mailto:${contact.email[0]}`} className="flex items-center gap-2 hover:text-sky-400 transition-colors">
-                                <Mail size={12} className="text-brand-500" />
+                            <a href={`mailto:${contact.email[0]}`} className="flex items-center gap-2 hover:text-sky-400 transition-colors py-1 -mx-1 px-1 rounded hover:bg-white/5">
+                                <Mail size={16} className="text-brand-500 flex-shrink-0" />
                                 <span className="truncate">{contact.email[0]}</span>
                             </a>
                         )}
                         {contact.phone[0] && (
-                            <a href={`tel:${contact.phone[0]}`} className="flex items-center gap-2 hover:text-emerald-400 transition-colors">
-                                <Phone size={12} className="text-brand-500" />
+                            <a href={`tel:${contact.phone[0]}`} className="flex items-center gap-2 hover:text-emerald-400 transition-colors py-1 -mx-1 px-1 rounded hover:bg-white/5">
+                                <Phone size={16} className="text-brand-500 flex-shrink-0" />
                                 <span className="truncate">{contact.phone[0]}</span>
                             </a>
                         )}
