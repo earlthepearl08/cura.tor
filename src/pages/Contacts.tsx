@@ -199,7 +199,7 @@ const Contacts: React.FC = () => {
                             <Download size={20} />
                         </button>
                         {showExportOptions && (
-                            <div className="absolute right-0 mt-2 w-40 glass rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden">
+                            <div className="absolute right-0 mt-2 w-40 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden">
                                 <button
                                     onClick={() => handleExport('csv')}
                                     className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors"
@@ -248,7 +248,7 @@ const Contacts: React.FC = () => {
                     </button>
 
                     {showFolderDropdown && (
-                        <div className="absolute top-full left-0 right-0 mt-2 glass rounded-xl border border-brand-800 shadow-2xl z-50 max-h-64 overflow-y-auto">
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 max-h-64 overflow-y-auto">
                             <button
                                 onClick={() => {
                                     setSelectedFolder('all');
