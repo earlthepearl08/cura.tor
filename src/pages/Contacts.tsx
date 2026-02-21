@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
@@ -15,6 +15,8 @@ const Contacts: React.FC = () => {
     const [showCreateFolder, setShowCreateFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [selectMode, setSelectMode] = useState(false);
     const [editFormData, setEditFormData] = useState({
         name: '',
         position: '',
@@ -44,10 +46,39 @@ const Contacts: React.FC = () => {
     };
 
     const handleExport = (type: 'csv' | 'excel' | 'vcard') => {
-        if (type === 'csv') exportService.toCSV(contacts);
-        else if (type === 'excel') exportService.toExcel(contacts);
-        else if (type === 'vcard') exportService.toVCardAll(contacts);
+        const toExport = selectedIds.size > 0
+            ? contacts.filter(c => selectedIds.has(c.id))
+            : contacts;
+        if (type === 'csv') exportService.toCSV(toExport);
+        else if (type === 'excel') exportService.toExcel(toExport);
+        else if (type === 'vcard') exportService.toVCardAll(toExport);
         setShowExportOptions(false);
+        if (selectedIds.size > 0) {
+            setSelectedIds(new Set());
+            setSelectMode(false);
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === filteredContacts.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredContacts.map(c => c.id)));
+        }
+    };
+
+    const exitSelectMode = () => {
+        setSelectMode(false);
+        setSelectedIds(new Set());
     };
 
     const deleteContact = async (id: string) => {
@@ -107,9 +138,26 @@ const Contacts: React.FC = () => {
         return matchesSearch && matchesFolder;
     });
 
-    const renderContactCard = (contact: Contact) => (
-        <div key={contact.id} className="glass rounded-2xl overflow-hidden border border-brand-800/10 hover:border-brand-500/20 transition-all group">
+    const renderContactCard = (contact: Contact) => {
+        const isSelected = selectedIds.has(contact.id);
+        return (
+        <div
+            key={contact.id}
+            className={`glass rounded-2xl overflow-hidden border transition-all group ${isSelected ? 'border-brand-400/50 bg-brand-500/5' : 'border-brand-800/10 hover:border-brand-500/20'}`}
+            onClick={selectMode ? () => toggleSelect(contact.id) : undefined}
+        >
             <div className="p-4 flex gap-4">
+                {/* Checkbox (select mode) */}
+                {selectMode && (
+                    <div className="flex items-center flex-shrink-0">
+                        {isSelected ? (
+                            <CheckSquare size={22} className="text-brand-400" />
+                        ) : (
+                            <Square size={22} className="text-brand-600" />
+                        )}
+                    </div>
+                )}
+
                 {/* Image Preview */}
                 <div className="w-24 aspect-[1.586/1] rounded-xl overflow-hidden bg-brand-900 flex-shrink-0 border border-brand-800">
                     <img src={contact.imageData} alt={contact.name} className="h-full w-full object-cover" />
@@ -135,44 +183,54 @@ const Contacts: React.FC = () => {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="grid grid-cols-2 gap-2">
+                    {!selectMode && (
+                    <div className="grid grid-cols-3 gap-2">
                         {contact.phone[0] && (
                             <a
                                 href={`tel:${contact.phone[0]}`}
-                                className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg transition-colors active:scale-95"
+                                className="flex items-center justify-center gap-1.5 px-2 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg transition-colors active:scale-95"
                             >
-                                <Phone size={16} className="text-emerald-400" />
+                                <Phone size={14} className="text-emerald-400" />
                                 <span className="text-xs font-medium text-emerald-400">Call</span>
                             </a>
                         )}
                         {contact.email[0] && (
                             <a
                                 href={`mailto:${contact.email[0]}`}
-                                className="flex items-center justify-center gap-2 px-3 py-2 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-lg transition-colors active:scale-95"
+                                className="flex items-center justify-center gap-1.5 px-2 py-2 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-lg transition-colors active:scale-95"
                             >
-                                <Mail size={16} className="text-sky-400" />
+                                <Mail size={14} className="text-sky-400" />
                                 <span className="text-xs font-medium text-sky-400">Email</span>
                             </a>
                         )}
                         <button
-                            onClick={() => openEditModal(contact)}
-                            className="flex items-center justify-center gap-2 px-3 py-2 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-lg transition-colors active:scale-95"
+                            onClick={() => exportService.toVCard(contact)}
+                            className="flex items-center justify-center gap-1.5 px-2 py-2 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 rounded-lg transition-colors active:scale-95"
                         >
-                            <Edit3 size={16} className="text-brand-400" />
+                            <FileDown size={14} className="text-violet-400" />
+                            <span className="text-xs font-medium text-violet-400">Save</span>
+                        </button>
+                        <button
+                            onClick={() => openEditModal(contact)}
+                            className="flex items-center justify-center gap-1.5 px-2 py-2 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-lg transition-colors active:scale-95"
+                        >
+                            <Edit3 size={14} className="text-brand-400" />
                             <span className="text-xs font-medium text-brand-400">Edit</span>
                         </button>
                         <button
                             onClick={() => deleteContact(contact.id)}
-                            className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg transition-colors active:scale-95"
+                            className="flex items-center justify-center gap-1.5 px-2 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg transition-colors active:scale-95"
                         >
-                            <Trash2 size={16} className="text-red-400" />
+                            <Trash2 size={14} className="text-red-400" />
                             <span className="text-xs font-medium text-red-400">Delete</span>
                         </button>
                     </div>
+                    )}
                 </div>
             </div>
         </div>
-    );
+        );
+    };
 
     // Group contacts by folder
     const groupedContacts = filteredContacts.reduce((acc, contact) => {
@@ -191,35 +249,50 @@ const Contacts: React.FC = () => {
                         <ArrowLeft size={24} />
                     </button>
                     <h1 className="text-lg font-semibold gradient-text">My Contacts</h1>
-                    <div className="relative">
+                    <div className="flex items-center gap-1">
+                        {/* Select Mode Toggle */}
                         <button
-                            onClick={() => setShowExportOptions(!showExportOptions)}
-                            className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400 hover:text-white"
+                            onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
+                            className={`p-2 rounded-full transition-colors ${selectMode ? 'bg-brand-500/20 text-brand-400' : 'hover:bg-white/10 text-brand-400 hover:text-white'}`}
                         >
-                            <Download size={20} />
+                            <CheckSquare size={20} />
                         </button>
-                        {showExportOptions && (
-                            <div className="absolute right-0 mt-2 w-40 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden">
-                                <button
-                                    onClick={() => handleExport('csv')}
-                                    className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors"
-                                >
-                                    Export as CSV
-                                </button>
-                                <button
-                                    onClick={() => handleExport('excel')}
-                                    className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors"
-                                >
-                                    Export as Excel
-                                </button>
-                                <button
-                                    onClick={() => handleExport('vcard')}
-                                    className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors"
-                                >
-                                    Export as vCard (.vcf)
-                                </button>
-                            </div>
-                        )}
+                        {/* Export */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowExportOptions(!showExportOptions)}
+                                className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400 hover:text-white"
+                            >
+                                <Download size={20} />
+                            </button>
+                            {showExportOptions && (
+                                <div className="absolute right-0 mt-2 w-48 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden">
+                                    {selectedIds.size > 0 && (
+                                        <div className="px-4 py-2 text-xs text-brand-400 border-b border-brand-800 bg-brand-500/10">
+                                            {selectedIds.size} contact{selectedIds.size > 1 ? 's' : ''} selected
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => handleExport('csv')}
+                                        className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors"
+                                    >
+                                        Export as CSV
+                                    </button>
+                                    <button
+                                        onClick={() => handleExport('excel')}
+                                        className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors"
+                                    >
+                                        Export as Excel
+                                    </button>
+                                    <button
+                                        onClick={() => handleExport('vcard')}
+                                        className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors"
+                                    >
+                                        Export as vCard (.vcf)
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -315,9 +388,28 @@ const Contacts: React.FC = () => {
                 )}
             </div>
 
-            <footer className="p-6 text-center text-[10px] text-brand-700 uppercase tracking-widest bg-brand-950">
-                Showing {filteredContacts.length} of {contacts.length} Contacts
-            </footer>
+            {selectMode ? (
+                <div className="sticky bottom-0 glass border-t border-brand-800 p-4 flex items-center justify-between gap-3 z-10">
+                    <button
+                        onClick={toggleSelectAll}
+                        className="flex items-center gap-2 px-3 py-2 bg-brand-800/50 hover:bg-brand-800 rounded-xl text-sm transition-colors"
+                    >
+                        {selectedIds.size === filteredContacts.length ? <CheckSquare size={16} className="text-brand-400" /> : <Square size={16} className="text-brand-600" />}
+                        <span>{selectedIds.size === filteredContacts.length ? 'Deselect All' : 'Select All'}</span>
+                    </button>
+                    <span className="text-xs text-brand-500">{selectedIds.size} selected</span>
+                    <button
+                        onClick={exitSelectMode}
+                        className="p-2 hover:bg-white/10 rounded-full text-brand-500 transition-colors"
+                    >
+                        <XCircle size={20} />
+                    </button>
+                </div>
+            ) : (
+                <footer className="p-6 text-center text-[10px] text-brand-700 uppercase tracking-widest bg-brand-950">
+                    Showing {filteredContacts.length} of {contacts.length} Contacts
+                </footer>
+            )}
 
             {/* Create Folder Modal */}
             {showCreateFolder && (

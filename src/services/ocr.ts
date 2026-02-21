@@ -15,7 +15,7 @@ export interface OCRResult {
 export type OCREngine = 'tesseract' | 'cloud-vision';
 
 export const getOCREngine = (): OCREngine => {
-    return (localStorage.getItem('ocr_engine') as OCREngine) || 'tesseract';
+    return 'cloud-vision';
 };
 
 export const setOCREngine = (engine: OCREngine): void => {
@@ -91,7 +91,7 @@ export class OCRService {
     private isInitializing: boolean = false;
     private currentEngine: OCREngine = getOCREngine();
 
-    private apiKey = 'AIzaSyDp5v_RuQZsNlrqJOKJ1TgAZq2n3GZ8nBg';
+    private apiKey = import.meta.env.VITE_GOOGLE_API_KEY || '';
 
     /**
      * Process image using Google Cloud Vision API for OCR,
@@ -112,8 +112,11 @@ export class OCRService {
                         requests: [{
                             image: { content: base64Image },
                             features: [
-                                { type: 'TEXT_DETECTION', maxResults: 1 }
-                            ]
+                                { type: 'DOCUMENT_TEXT_DETECTION' }
+                            ],
+                            imageContext: {
+                                languageHints: ['en', 'tl', 'zh', 'ja', 'ko']
+                            }
                         }]
                     })
                 }
@@ -127,23 +130,55 @@ export class OCRService {
             const data = await response.json();
             console.log('[Cloud Vision] Response received:', data);
 
-            const annotations = data?.responses?.[0]?.textAnnotations;
-            if (!annotations || annotations.length === 0) {
+            const visionResponse = data?.responses?.[0];
+
+            // Use fullTextAnnotation for better structured text (from DOCUMENT_TEXT_DETECTION)
+            const fullTextAnnotation = visionResponse?.fullTextAnnotation;
+            const annotations = visionResponse?.textAnnotations;
+
+            if (!fullTextAnnotation && (!annotations || annotations.length === 0)) {
                 throw new Error('No text detected in image');
             }
 
-            // First annotation contains the full text
-            const fullText = annotations[0].description || '';
+            const fullText = fullTextAnnotation?.text || annotations?.[0]?.description || '';
             console.log('[Cloud Vision] Full text extracted:', fullText);
 
             if (!fullText.trim()) {
                 throw new Error('Empty text from Cloud Vision');
             }
 
+            // Extract real confidence from Cloud Vision word-level data
+            let realConfidence = 90;
+            try {
+                const pages = fullTextAnnotation?.pages;
+                if (pages && pages.length > 0) {
+                    const wordConfidences: number[] = [];
+                    for (const page of pages) {
+                        for (const block of page.blocks || []) {
+                            for (const paragraph of block.paragraphs || []) {
+                                for (const word of paragraph.words || []) {
+                                    if (word.confidence !== undefined) {
+                                        wordConfidences.push(word.confidence);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (wordConfidences.length > 0) {
+                        realConfidence = Math.round(
+                            (wordConfidences.reduce((a: number, b: number) => a + b, 0) / wordConfidences.length) * 100
+                        );
+                    }
+                }
+            } catch (e) {
+                console.log('[Cloud Vision] Could not extract confidence scores, using default');
+            }
+            console.log('[Cloud Vision] Confidence:', realConfidence + '%');
+
             // Try AI parsing first (Gemini), fallback to rule-based parser
             let parsedData;
             try {
-                parsedData = await this.parseWithGemini(fullText);
+                parsedData = await this.parseWithGemini(fullText, base64Image);
                 console.log('[Cloud Vision] Gemini AI parsing succeeded:', parsedData);
             } catch (geminiError) {
                 console.log('[Cloud Vision] Gemini parsing failed, using rule-based parser:', geminiError);
@@ -153,7 +188,7 @@ export class OCRService {
             return {
                 ...parsedData,
                 rawText: fullText,
-                confidence: 90
+                confidence: realConfidence
             };
 
         } catch (error) {
@@ -164,41 +199,131 @@ export class OCRService {
 
     /**
      * Use Gemini AI to intelligently parse raw OCR text into structured contact data.
+     * Sends both the OCR text AND the original image for multimodal analysis.
      * Much more accurate than rule-based parsing for complex cards.
      */
-    async parseWithGemini(rawText: string): Promise<Omit<OCRResult, 'rawText' | 'confidence'>> {
+    async parseWithGemini(rawText: string, base64Image?: string): Promise<Omit<OCRResult, 'rawText' | 'confidence'>> {
         console.log('[Gemini] Parsing text with AI...');
 
-        const prompt = `You are a business card parser. Parse this business card text and extract contact information.
+        const prompt = `You are an expert business card data extractor. Your task is to parse raw OCR text from a business card and extract structured contact information.
 
-IMPORTANT RULES:
-- "name" must be the PERSON's full name, NOT a company name, brand name, or tagline
-- Brand names (like CLEARPACK, SAMSUNG, etc.) are NOT person names
-- Taglines/slogans (like "THE CLEAR CHOICE FOR PACKAGING") are NOT company names
-- Look for the actual registered company name (usually includes Ltd, Inc, Corp, PTE, etc.)
-- Phone numbers should include country codes if present
-- Return ALL phone numbers and email addresses found
+## Rules
 
-Business card text:
+1. "name" MUST be the PERSON's full name (first name + last name), including any professional credentials/designations that appear with it (e.g., "Dr. John Smith, MD, PhD", "Jane Cruz, REE, PEE", "Engr. Maria Santos, MSEE"). Include prefixes (Dr., Engr., Atty., Arch.) and suffixes (MD, PhD, CPA, REE, PEE, PE, MBA, MSEE, RN, DDS, Esq., Jr., Sr., III) as part of the name. It is NEVER a company name, brand, tagline, website, or abbreviation.
+2. "company" is the registered business entity name. It often includes suffixes like Inc., Ltd., Corp., LLC, Pte Ltd, Co., etc. It is NOT a tagline or slogan.
+3. "position" is the person's job title or role (e.g., "Senior Sales Manager", "VP of Engineering"). Department names alone (e.g., "Marketing Department") are NOT positions unless combined with a title.
+4. Phone numbers must include country codes when visible. Prefix with "+" if a country code is present. Include ALL phone numbers (mobile, office, direct, fax). Label fax numbers with "(Fax)" suffix.
+5. Include ALL email addresses found.
+6. "address" is the full physical/mailing address. Combine multiple address lines into one string, separated by commas.
+7. If a field cannot be determined, use an empty string "" for strings or [] for arrays.
+8. Do NOT invent or guess information that is not present in the text.
+9. If professional credentials appear on a SEPARATE line from the name (e.g., name on one line, "PhD, REE, PEE" on the next), combine them into the name field.
+
+## Examples
+
+Input:
+CLEARPACK
+THE CLEAR CHOICE FOR PACKAGING
+John Michael Santos
+Regional Sales Director
+Clearpack Technology (Phils.) Inc.
+Unit 5B Pacific Star Bldg., Makati Ave.
+Makati City 1226, Philippines
+M: +63 917 123 4567
+T: +63 2 8888 1234
+F: +63 2 8888 1235
+john.santos@ph.clearpack.com
+www.clearpack.com
+
+Output:
+{"name": "John Michael Santos", "position": "Regional Sales Director", "company": "Clearpack Technology (Phils.) Inc.", "phone": ["+63 917 123 4567", "+63 2 8888 1234", "+63 2 8888 1235 (Fax)"], "email": ["john.santos@ph.clearpack.com"], "address": "Unit 5B Pacific Star Bldg., Makati Ave., Makati City 1226, Philippines"}
+
+Input:
+SAMSUNG
+Maria Theresa O'Brien-Cruz, CPA
+Finance Manager
+Samsung Electronics Philippines Corp.
+tel (02) 7756-2000
+mob 0917-555-8888
+maria.cruz@samsung.com
+BGC, Taguig City
+
+Output:
+{"name": "Maria Theresa O'Brien-Cruz, CPA", "position": "Finance Manager", "company": "Samsung Electronics Philippines Corp.", "phone": ["(02) 7756-2000", "0917-555-8888"], "email": ["maria.cruz@samsung.com"], "address": "BGC, Taguig City"}
+
+Input:
+Dr. Wei Lin Chen
+Associate Professor
+Department of Computer Science
+National University of Singapore
+13 Computing Drive, Singapore 117417
++65 6516 1234
+weichen@comp.nus.edu.sg
+
+Output:
+{"name": "Dr. Wei Lin Chen", "position": "Associate Professor, Department of Computer Science", "company": "National University of Singapore", "phone": ["+65 6516 1234"], "email": ["weichen@comp.nus.edu.sg"], "address": "13 Computing Drive, Singapore 117417"}
+
+Input:
+Engr. Roberto M. Dela Cruz
+REE, PEE, MSEE
+Vice President - Technical Operations
+PhilEnergy Power Solutions Corp.
+Unit 12F Rockwell Business Center
+Makati City 1210, Philippines
++63 917 888 9999
++63 2 8812 3456
++63 2 8812 3457 (Fax)
+roberto.delacruz@philenergy.com.ph
+
+Output:
+{"name": "Engr. Roberto M. Dela Cruz, REE, PEE, MSEE", "position": "Vice President - Technical Operations", "company": "PhilEnergy Power Solutions Corp.", "phone": ["+63 917 888 9999", "+63 2 8812 3456", "+63 2 8812 3457 (Fax)"], "email": ["roberto.delacruz@philenergy.com.ph"], "address": "Unit 12F Rockwell Business Center, Makati City 1210, Philippines"}
+
+## Business Card Text to Parse
+
+<card_text>
 ${rawText}
+</card_text>
 
-Return ONLY a valid JSON object with these exact fields (no markdown, no explanation):
-{"name": "", "position": "", "company": "", "phone": [], "email": [], "address": ""}`;
+Return ONLY the JSON object. No explanation, no markdown.`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
+        const timeout = setTimeout(() => controller.abort(), 30000);
 
         try {
+            // Build multimodal content parts: text prompt + optional image
+            const parts: any[] = [{ text: prompt }];
+            if (base64Image) {
+                parts.push({
+                    inline_data: {
+                        mime_type: 'image/jpeg',
+                        data: base64Image
+                    }
+                });
+            }
+
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.apiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
+                        contents: [{ parts }],
                         generationConfig: {
-                            temperature: 0.1,
-                            maxOutputTokens: 1024
+                            temperature: 0.0,
+                            maxOutputTokens: 1024,
+                            responseMimeType: 'application/json',
+                            responseSchema: {
+                                type: 'OBJECT',
+                                properties: {
+                                    name: { type: 'STRING' },
+                                    position: { type: 'STRING' },
+                                    company: { type: 'STRING' },
+                                    phone: { type: 'ARRAY', items: { type: 'STRING' } },
+                                    email: { type: 'ARRAY', items: { type: 'STRING' } },
+                                    address: { type: 'STRING' }
+                                },
+                                required: ['name', 'position', 'company', 'phone', 'email', 'address']
+                            }
                         }
                     }),
                     signal: controller.signal
@@ -218,12 +343,17 @@ Return ONLY a valid JSON object with these exact fields (no markdown, no explana
 
             console.log('[Gemini] Raw response:', text);
 
-            // Extract JSON from response (handle markdown code blocks)
-            const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-            const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) throw new Error('No JSON in Gemini response');
-
-            const parsed = JSON.parse(jsonMatch[0]);
+            // With responseMimeType: 'application/json', response is guaranteed valid JSON
+            // But keep fallback parsing just in case
+            let parsed;
+            try {
+                parsed = JSON.parse(text);
+            } catch {
+                const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) throw new Error('No JSON in Gemini response');
+                parsed = JSON.parse(jsonMatch[0]);
+            }
 
             return {
                 name: parsed.name || '',

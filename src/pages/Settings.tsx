@@ -79,76 +79,23 @@ const Settings = () => {
                     </div>
                 </div>
 
-                {/* OCR Engine Selection */}
-                <div className="space-y-4">
-                    <h2 className="text-sm font-bold text-brand-400 uppercase tracking-wider">OCR Engine</h2>
-
-                    {/* Tesseract Option */}
-                    <button
-                        onClick={() => setOcrEngineState('tesseract')}
-                        className={`w-full p-4 rounded-2xl transition-all flex items-start gap-4 ${
-                            ocrEngine === 'tesseract'
-                                ? 'glass border-2 border-brand-500/50'
-                                : 'glass border border-brand-800/50 hover:border-brand-700/50'
-                        }`}
-                    >
-                        <div className={`p-3 rounded-xl ${
-                            ocrEngine === 'tesseract' ? 'bg-brand-500/20' : 'bg-brand-800/50'
-                        }`}>
-                            <Cpu size={20} className={ocrEngine === 'tesseract' ? 'text-brand-400' : 'text-brand-600'} />
-                        </div>
-                        <div className="flex-1 text-left">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold">Tesseract.js</span>
-                                <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
-                                    FREE
-                                </span>
+                {/* OCR Engine */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">OCR Engine</p>
+                    <div className="card-elevated rounded-2xl p-4">
+                        <div className="flex items-center gap-4">
+                            <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-sky-500/20">
+                                <Sparkles className="w-5 h-5 text-sky-400" />
                             </div>
-                            <p className="text-xs text-brand-500">Runs locally in your browser. Good for clean, standard cards.</p>
-                        </div>
-                        {ocrEngine === 'tesseract' && (
-                            <Check size={20} className="text-brand-400 flex-shrink-0" />
-                        )}
-                    </button>
-
-                    {/* Cloud Vision Option */}
-                    <button
-                        onClick={() => setOcrEngineState('cloud-vision')}
-                        className={`w-full p-4 rounded-2xl transition-all flex items-start gap-4 ${
-                            ocrEngine === 'cloud-vision'
-                                ? 'glass border-2 border-sky-500/50'
-                                : 'glass border border-brand-800/50 hover:border-brand-700/50'
-                        }`}
-                    >
-                        <div className={`p-3 rounded-xl ${
-                            ocrEngine === 'cloud-vision' ? 'bg-sky-500/20' : 'bg-brand-800/50'
-                        }`}>
-                            <Sparkles size={20} className={ocrEngine === 'cloud-vision' ? 'text-sky-400' : 'text-brand-600'} />
-                        </div>
-                        <div className="flex-1 text-left">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold">Cloud Vision</span>
-                                <span className="text-[10px] px-2 py-0.5 bg-sky-500/20 text-sky-400 rounded-full">
-                                    CLOUD OCR
-                                </span>
-                                <span className="text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">
-                                    BEST
-                                </span>
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <p className="font-semibold text-sm">Cloud Vision + Gemini AI</p>
+                                    <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">ACTIVE</span>
+                                </div>
+                                <p className="text-xs text-slate-500">Google Cloud Vision for text extraction, Gemini AI for intelligent parsing</p>
                             </div>
-                            <p className="text-xs text-brand-500 mb-2">
-                                Google Cloud Vision API. Superior text detection for all card designs and languages.
-                            </p>
-                            <ul className="text-[10px] text-brand-600 space-y-0.5">
-                                <li>✓ Best for international cards (Japanese, Thai, Chinese, Korean)</li>
-                                <li>✓ High accuracy text detection</li>
-                                <li>✓ Works with stylized/difficult fonts</li>
-                                <li>✓ Powered by Google Cloud - no configuration required</li>
-                            </ul>
                         </div>
-                        {ocrEngine === 'cloud-vision' && (
-                            <Check size={20} className="text-sky-400 flex-shrink-0" />
-                        )}
-                    </button>
+                    </div>
                 </div>
 
                 {/* Google Drive Sync */}
