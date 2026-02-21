@@ -14,6 +14,16 @@ interface QueuedFile {
     error?: string;
 }
 
+/** Convert a File to a base64 data URL */
+const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+    });
+};
+
 const Uploader: React.FC = () => {
     const [queue, setQueue] = useState<QueuedFile[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -64,7 +74,9 @@ const Uploader: React.FC = () => {
             setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'processing', error: undefined } : q));
 
             try {
-                const result = await ocrService.processImage(item.preview);
+                // Convert File to base64 data URL (Cloud Vision needs base64, not blob URLs)
+                const dataURL = await fileToDataURL(item.file);
+                const result = await ocrService.processImage(dataURL);
                 const contact: Contact = {
                     id: item.id,
                     name: result.name,
@@ -74,7 +86,7 @@ const Uploader: React.FC = () => {
                     email: result.email,
                     address: result.address,
                     rawText: result.rawText,
-                    imageData: item.preview,
+                    imageData: dataURL,
                     confidence: result.confidence,
                     isVerified: false,
                     notes: '',
