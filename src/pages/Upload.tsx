@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, X, FileImage, Trash2, ArrowLeft, Play } from 'lucide-react';
+import { Upload, Trash2, ArrowLeft, Play, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { storage } from '@/services/storage';
 import { ocrService } from '@/services/ocr';
@@ -11,11 +11,15 @@ interface QueuedFile {
     file: File;
     preview: string;
     status: 'queued' | 'processing' | 'completed' | 'error';
+    error?: string;
 }
 
 const Uploader: React.FC = () => {
     const [queue, setQueue] = useState<QueuedFile[]>([]);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [processedCount, setProcessedCount] = useState(0);
     const navigate = useNavigate();
+    const successCountRef = useRef(0);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         const newFiles = acceptedFiles.map(file => ({
@@ -31,13 +35,14 @@ const Uploader: React.FC = () => {
         onDrop,
         accept: {
             'image/*': ['.jpeg', '.jpg', '.png']
-        }
+        },
+        disabled: isProcessing
     });
 
     const removeFile = (id: string) => {
+        if (isProcessing) return;
         setQueue(prev => {
             const filtered = prev.filter(item => item.id !== id);
-            // Clean up object URLs to prevent memory leaks
             const removed = prev.find(item => item.id === id);
             if (removed) URL.revokeObjectURL(removed.preview);
             return filtered;
@@ -45,10 +50,18 @@ const Uploader: React.FC = () => {
     };
 
     const startProcessing = async () => {
-        for (const item of queue) {
-            if (item.status === 'completed') continue;
+        if (isProcessing) return;
+        setIsProcessing(true);
+        setProcessedCount(0);
+        successCountRef.current = 0;
 
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'processing' } : q));
+        const items = [...queue].filter(item => item.status !== 'completed');
+        const total = items.length;
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            setProcessedCount(i + 1);
+            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'processing', error: undefined } : q));
 
             try {
                 const result = await ocrService.processImage(item.preview);
@@ -63,21 +76,55 @@ const Uploader: React.FC = () => {
                     rawText: result.rawText,
                     imageData: item.preview,
                     confidence: result.confidence,
-                    isVerified: false, // Bulk uploads are unverified until edited
+                    isVerified: false,
                     notes: '',
                     createdAt: Date.now()
                 };
 
                 await storage.saveContact(contact);
                 setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed' } : q));
-            } catch (error) {
+                successCountRef.current++;
+            } catch (error: any) {
+                const errorMsg = error?.message || 'Processing failed';
                 console.error(`Failed to process ${item.file.name}:`, error);
-                setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error' } : q));
+                setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: errorMsg } : q));
             }
         }
-        // Auto-navigate after completion if at least one was successful
-        if (queue.some(item => item.status === 'completed' || item.status === 'processing')) {
-            setTimeout(() => navigate('/contacts'), 1000);
+
+        setIsProcessing(false);
+
+        if (successCountRef.current > 0) {
+            setTimeout(() => navigate('/contacts'), 1500);
+        }
+    };
+
+    const totalItems = queue.length;
+    const completedItems = queue.filter(q => q.status === 'completed').length;
+    const errorItems = queue.filter(q => q.status === 'error').length;
+
+    const getStatusDisplay = (item: QueuedFile) => {
+        switch (item.status) {
+            case 'processing':
+                return <span className="text-sky-400">Processing...</span>;
+            case 'completed':
+                return <span className="text-emerald-400">Done</span>;
+            case 'error':
+                return <span className="text-red-400">{item.error || 'Failed'}</span>;
+            default:
+                return <span className="text-brand-500">Queued</span>;
+        }
+    };
+
+    const getStatusIcon = (item: QueuedFile) => {
+        switch (item.status) {
+            case 'processing':
+                return <Loader2 size={20} className="text-sky-400 animate-spin" />;
+            case 'completed':
+                return <CheckCircle size={20} className="text-emerald-400" />;
+            case 'error':
+                return <AlertCircle size={20} className="text-red-400" />;
+            default:
+                return null;
         }
     };
 
@@ -97,7 +144,8 @@ const Uploader: React.FC = () => {
                 <div
                     {...getRootProps()}
                     className={`relative border-2 border-dashed rounded-3xl p-12 transition-all cursor-pointer flex flex-col items-center justify-center
-            ${isDragActive
+            ${isProcessing ? 'opacity-50 pointer-events-none border-brand-800' :
+                        isDragActive
                             ? 'border-brand-400 bg-brand-400/10 scale-[1.02]'
                             : 'border-brand-700 hover:border-brand-500 glass'}`}
                 >
@@ -111,45 +159,101 @@ const Uploader: React.FC = () => {
 
                 {/* Queue Management */}
                 {queue.length > 0 && (
-                    <div className="mt-12">
-                        <div className="flex items-center justify-between mb-6">
+                    <div className="mt-8">
+                        <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-semibold uppercase tracking-wider text-brand-500">
-                                Process Queue ({queue.length})
+                                {isProcessing
+                                    ? `Processing ${processedCount} of ${totalItems}...`
+                                    : completedItems > 0
+                                        ? `${completedItems}/${totalItems} completed${errorItems > 0 ? ` (${errorItems} failed)` : ''}`
+                                        : `Process Queue (${totalItems})`
+                                }
                             </h3>
                             <button
                                 onClick={startProcessing}
-                                className="flex items-center gap-2 px-4 py-2 bg-brand-100 text-brand-950 rounded-xl font-semibold hover:bg-white transition-all shadow-lg text-sm"
+                                disabled={isProcessing}
+                                className="flex items-center gap-2 px-4 py-2 bg-brand-100 text-brand-950 rounded-xl font-semibold hover:bg-white transition-all shadow-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <Play size={16} fill="currentColor" />
-                                Process All
+                                {isProcessing ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Play size={16} fill="currentColor" />
+                                        Process All
+                                    </>
+                                )}
                             </button>
                         </div>
 
+                        {/* Progress Bar */}
+                        {isProcessing && (
+                            <div className="w-full h-1.5 bg-brand-800 rounded-full mb-4 overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-sky-500 to-brand-400 rounded-full transition-all duration-500"
+                                    style={{ width: `${(processedCount / totalItems) * 100}%` }}
+                                />
+                            </div>
+                        )}
+
                         <div className="space-y-3">
                             {queue.map((item) => (
-                                <div key={item.id} className="flex items-center p-3 glass rounded-2xl group">
+                                <div
+                                    key={item.id}
+                                    className={`flex items-center p-3 glass rounded-2xl group transition-all ${
+                                        item.status === 'processing' ? 'border border-sky-500/30' :
+                                        item.status === 'completed' ? 'border border-emerald-500/20 opacity-70' :
+                                        item.status === 'error' ? 'border border-red-500/30' :
+                                        'border border-transparent'
+                                    }`}
+                                >
                                     <div className="w-20 aspect-[1.586/1] rounded-lg overflow-hidden border border-brand-700 mr-4 flex-shrink-0">
                                         <img src={item.preview} alt="preview" className="h-full w-full object-cover" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium truncate">{item.file.name}</p>
-                                        <p className="text-[10px] text-brand-500 uppercase">{(item.file.size / 1024).toFixed(1)} KB • Queued</p>
+                                        <p className="text-[10px] uppercase">
+                                            {(item.file.size / 1024).toFixed(1)} KB &bull; {getStatusDisplay(item)}
+                                        </p>
                                     </div>
-                                    <button
-                                        onClick={() => removeFile(item.id)}
-                                        className="p-2 text-brand-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
+                                    {getStatusIcon(item) || (
+                                        <button
+                                            onClick={() => removeFile(item.id)}
+                                            className={`p-2 text-brand-600 hover:text-red-400 transition-all ${isProcessing ? 'invisible' : 'opacity-0 group-hover:opacity-100'}`}
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                         </div>
+
+                        {/* Completion message */}
+                        {!isProcessing && completedItems > 0 && (
+                            <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3">
+                                <CheckCircle size={18} className="text-emerald-400 flex-shrink-0" />
+                                <p className="text-sm text-emerald-400">
+                                    {completedItems} contact{completedItems > 1 ? 's' : ''} saved! Redirecting to contacts...
+                                </p>
+                            </div>
+                        )}
+
+                        {!isProcessing && errorItems > 0 && completedItems === 0 && (
+                            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-3">
+                                <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
+                                <p className="text-sm text-red-400">
+                                    All images failed to process. Check your internet connection and try again.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
 
             <footer className="p-6 text-center text-xs text-brand-600">
-                Bulk upload processes images sequentially to maintain offline performance.
+                Images are processed sequentially using Cloud Vision + Gemini AI.
             </footer>
         </div>
     );
