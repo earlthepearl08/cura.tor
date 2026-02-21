@@ -1,7 +1,7 @@
 import { Contact } from '@/types/contact';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '989864367677-fcll4q385kai03cj1hkhaa852i5rdhis.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
 const FILE_NAME = 'cura-tor-contacts.json';
 
@@ -184,9 +184,10 @@ class GoogleDriveService {
           body: multipartRequestBody,
         });
       } else {
-        // Create new file
+        // Create new file in appDataFolder
+        const createMetadata = { ...metadata, parents: ['appDataFolder'] };
         const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('metadata', new Blob([JSON.stringify(createMetadata)], { type: 'application/json' }));
         form.append('file', new Blob([content], { type: 'application/json' }));
 
         const response = await fetch(

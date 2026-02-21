@@ -48,7 +48,7 @@ const Contacts: React.FC = () => {
     const handleExport = (type: 'csv' | 'excel' | 'vcard') => {
         const toExport = selectedIds.size > 0
             ? contacts.filter(c => selectedIds.has(c.id))
-            : contacts;
+            : filteredContacts;
         if (type === 'csv') exportService.toCSV(toExport);
         else if (type === 'excel') exportService.toExcel(toExport);
         else if (type === 'vcard') exportService.toVCardAll(toExport);
