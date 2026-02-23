@@ -22,6 +22,31 @@ class GoogleDriveService {
     fileId: null
   };
 
+  constructor() {
+    // Restore session from sessionStorage (survives refresh, not browser close)
+    const savedToken = sessionStorage.getItem('gdrive_token');
+    const savedUser = sessionStorage.getItem('gdrive_user');
+    if (savedToken) {
+      this.accessToken = savedToken;
+      this.state.isSignedIn = true;
+      this.state.user = savedUser ? JSON.parse(savedUser) : null;
+    }
+  }
+
+  private persistSession(): void {
+    if (this.accessToken) {
+      sessionStorage.setItem('gdrive_token', this.accessToken);
+      if (this.state.user) {
+        sessionStorage.setItem('gdrive_user', JSON.stringify(this.state.user));
+      }
+    }
+  }
+
+  private clearSession(): void {
+    sessionStorage.removeItem('gdrive_token');
+    sessionStorage.removeItem('gdrive_user');
+  }
+
   async init(): Promise<void> {
     return new Promise((resolve, reject) => {
       // Load Google API script
@@ -86,7 +111,7 @@ class GoogleDriveService {
         }
         this.accessToken = response.access_token;
         this.state.isSignedIn = true;
-        this.loadUserInfo();
+        this.loadUserInfo().then(() => this.persistSession());
       },
     });
   }
@@ -115,6 +140,7 @@ class GoogleDriveService {
         this.accessToken = response.access_token;
         this.state.isSignedIn = true;
         await this.loadUserInfo();
+        this.persistSession();
         resolve();
       };
       this.tokenClient.requestAccessToken({ prompt: '' });
@@ -129,6 +155,7 @@ class GoogleDriveService {
     this.state.isSignedIn = false;
     this.state.user = null;
     this.state.fileId = null;
+    this.clearSession();
   }
 
   getState(): GoogleDriveState {

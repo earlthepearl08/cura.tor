@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from '@/pages/Home';
 import Scan from '@/pages/Scan';
 import Upload from '@/pages/Upload';
@@ -23,6 +23,7 @@ function App() {
                     <Route path="/contacts" element={<Contacts />} />
                     <Route path="/manual" element={<ManualInput />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </div>
         </Router>

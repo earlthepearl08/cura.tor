@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCcw, Check, X, ArrowLeft } from 'lucide-react';
+import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useOCR } from '@/hooks/useOCR';
 import ContactReview from '@/components/ContactReview';
@@ -9,6 +9,7 @@ const Scanner: React.FC = () => {
     const webcamRef = useRef<Webcam>(null);
     const [imgSrc, setImgSrc] = useState<string | null>(null);
     const [isCameraReady, setIsCameraReady] = useState(false);
+    const [cameraError, setCameraError] = useState<string | null>(null);
     const [showReview, setShowReview] = useState(false);
     const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
     const { isProcessing, processImage, result, error, reset } = useOCR();
@@ -141,6 +142,25 @@ const Scanner: React.FC = () => {
 
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
                 {!imgSrc ? (
+                    cameraError ? (
+                        <div className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-red-500/30 flex flex-col items-center justify-center gap-4 p-6">
+                            <div className="p-4 rounded-full bg-red-500/10">
+                                <CameraOff size={40} className="text-red-400" />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-sm font-semibold text-red-400 mb-1">Camera Access Denied</p>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                    {cameraError}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => navigate('/upload')}
+                                className="mt-2 px-4 py-2 text-sm glass rounded-xl hover:bg-white/10 transition-colors"
+                            >
+                                Upload an image instead
+                            </button>
+                        </div>
+                    ) : (
                     <div
                         className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-brand-500/30 cursor-pointer"
                         onClick={handleTapToFocus}
@@ -155,6 +175,12 @@ const Scanner: React.FC = () => {
                             onUserMedia={() => {
                                 setIsCameraReady(true);
                                 applyCameraFocus();
+                            }}
+                            onUserMediaError={(err) => {
+                                const msg = err instanceof DOMException && err.name === 'NotAllowedError'
+                                    ? 'Please allow camera access in your browser settings and reload the page.'
+                                    : 'Could not access camera. Make sure no other app is using it, then reload.';
+                                setCameraError(msg);
                             }}
                             className="w-full h-full object-cover"
                         />
@@ -179,6 +205,7 @@ const Scanner: React.FC = () => {
                             </div>
                         )}
                     </div>
+                    )
                 ) : (
                     <div className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-emerald-500/50">
                         <img src={imgSrc} alt="captured" className="w-full h-full object-cover" />
@@ -241,11 +268,17 @@ const Scanner: React.FC = () => {
 
                 <p className="mt-8 text-sm text-brand-400 text-center max-w-xs leading-relaxed">
                     {error
-                        ? <span className="text-red-400">Error: {error}</span>
+                        ? <span className="text-red-400">
+                            {error.toLowerCase().includes('fetch') || error.toLowerCase().includes('network')
+                                ? 'No internet connection. Please check your network and try again.'
+                                : error.toLowerCase().includes('api key') || error.toLowerCase().includes('unregistered')
+                                    ? 'Service temporarily unavailable. Please try again later.'
+                                    : `Processing failed: ${error}`}
+                          </span>
                         : isProcessing
                             ? "Extracting information using OCR..."
                             : !imgSrc
-                                ? "Align the card within the frame. Tap anywhere to focus."
+                                ? cameraError ? "" : "Align the card within the frame. Tap anywhere to focus."
                                 : "Preview confirmed. Tap the checkmark to start OCR processing."}
                 </p>
 

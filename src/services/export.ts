@@ -53,13 +53,14 @@ export const exportService = {
 
     /** Generate vCard string for a single contact */
     contactToVCard(contact: Contact): string {
-        const nameParts = contact.name.split(' ');
+        const displayName = contact.name || contact.company || 'Unknown Contact';
+        const nameParts = displayName.split(' ');
         const lastName = nameParts.length > 1 ? nameParts.pop() : '';
         const firstName = nameParts.join(' ');
 
         let vcard = 'BEGIN:VCARD\r\nVERSION:3.0\r\n';
         vcard += `N:${lastName};${firstName};;;\r\n`;
-        vcard += `FN:${contact.name}\r\n`;
+        vcard += `FN:${displayName}\r\n`;
 
         if (contact.company) {
             vcard += `ORG:${contact.company}\r\n`;
@@ -87,7 +88,8 @@ export const exportService = {
     /** Download a single contact as .vcf */
     toVCard(contact: Contact) {
         const vcard = this.contactToVCard(contact);
-        const filename = `${contact.name.replace(/[^a-zA-Z0-9]/g, '_')}.vcf`;
+        const safeName = (contact.name || contact.company || 'contact').replace(/[^a-zA-Z0-9]/g, '_');
+        const filename = `${safeName}.vcf`;
         this.downloadFile(vcard, filename, 'text/vcard');
     },
 
