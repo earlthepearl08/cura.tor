@@ -91,7 +91,7 @@ export class OCRService {
     private isInitializing: boolean = false;
     private currentEngine: OCREngine = getOCREngine();
 
-    private apiKey = import.meta.env.VITE_GOOGLE_API_KEY || '';
+    // API calls are routed through backend serverless functions to keep keys secure
 
     /**
      * Process image using Google Cloud Vision API for OCR,
@@ -101,30 +101,15 @@ export class OCRService {
         console.log('[Cloud Vision] Starting image analysis...');
 
         try {
-            const base64Image = imageSrc.replace(/^data:image\/\w+;base64,/, '');
-
-            const response = await fetch(
-                `https://vision.googleapis.com/v1/images:annotate?key=${this.apiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        requests: [{
-                            image: { content: base64Image },
-                            features: [
-                                { type: 'DOCUMENT_TEXT_DETECTION' }
-                            ],
-                            imageContext: {
-                                languageHints: ['en', 'tl', 'zh', 'ja', 'ko']
-                            }
-                        }]
-                    })
-                }
-            );
+            const response = await fetch('/api/ocr', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageData: imageSrc })
+            });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error?.message || `Cloud Vision API error: ${response.status}`);
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.details?.error?.message || errorData.error || `Cloud Vision API error: ${response.status}`);
             }
 
             const data = await response.json();
@@ -178,7 +163,7 @@ export class OCRService {
             // Try AI parsing first (Gemini), fallback to rule-based parser
             let parsedData;
             try {
-                parsedData = await this.parseWithGemini(fullText, base64Image);
+                parsedData = await this.parseWithGemini(fullText, imageSrc);
                 console.log('[Cloud Vision] Gemini AI parsing succeeded:', parsedData);
             } catch (geminiError) {
                 console.log('[Cloud Vision] Gemini parsing failed, using rule-based parser:', geminiError);
@@ -293,48 +278,47 @@ Return ONLY the JSON object. No explanation, no markdown.`;
             // Build multimodal content parts: text prompt + optional image
             const parts: any[] = [{ text: prompt }];
             if (base64Image) {
+                const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
                 parts.push({
                     inline_data: {
                         mime_type: 'image/jpeg',
-                        data: base64Image
+                        data: cleanBase64
                     }
                 });
             }
 
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts }],
-                        generationConfig: {
-                            temperature: 0.0,
-                            maxOutputTokens: 1024,
-                            responseMimeType: 'application/json',
-                            responseSchema: {
-                                type: 'OBJECT',
-                                properties: {
-                                    name: { type: 'STRING' },
-                                    position: { type: 'STRING' },
-                                    company: { type: 'STRING' },
-                                    phone: { type: 'ARRAY', items: { type: 'STRING' } },
-                                    email: { type: 'ARRAY', items: { type: 'STRING' } },
-                                    address: { type: 'STRING' }
-                                },
-                                required: ['name', 'position', 'company', 'phone', 'email', 'address']
-                            }
+            const response = await fetch('/api/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts }],
+                    model: 'gemini-2.5-flash',
+                    generationConfig: {
+                        temperature: 0.0,
+                        maxOutputTokens: 1024,
+                        responseMimeType: 'application/json',
+                        responseSchema: {
+                            type: 'OBJECT',
+                            properties: {
+                                name: { type: 'STRING' },
+                                position: { type: 'STRING' },
+                                company: { type: 'STRING' },
+                                phone: { type: 'ARRAY', items: { type: 'STRING' } },
+                                email: { type: 'ARRAY', items: { type: 'STRING' } },
+                                address: { type: 'STRING' }
+                            },
+                            required: ['name', 'position', 'company', 'phone', 'email', 'address']
                         }
-                    }),
-                    signal: controller.signal
-                }
-            );
+                    }
+                }),
+                signal: controller.signal
+            });
 
             clearTimeout(timeout);
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error?.message || `Gemini API error: ${response.status}`);
+                throw new Error(errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`);
             }
 
             const data = await response.json();
