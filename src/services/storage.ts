@@ -33,6 +33,15 @@ export class StorageService {
         await db.delete(STORE_NAME, id);
     }
 
+    async batchSave(contacts: Contact[]): Promise<void> {
+        const db = await this.db;
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        for (const contact of contacts) {
+            tx.store.put(contact);
+        }
+        await tx.done;
+    }
+
     async clearAll(): Promise<void> {
         const db = await this.db;
         await db.clear(STORE_NAME);

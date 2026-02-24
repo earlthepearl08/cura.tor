@@ -1,6 +1,42 @@
 import { useState, useEffect, useCallback } from 'react';
 import { googleDrive } from '@/services/googleDrive';
 import { storage } from '@/services/storage';
+import { Contact } from '@/types/contact';
+
+/** Get the effective timestamp for a contact (updatedAt if set, otherwise createdAt) */
+const getTimestamp = (c: Contact): number => c.updatedAt || c.createdAt || 0;
+
+/**
+ * Two-way merge: combines local and Drive contacts.
+ * - Contacts with the same ID: keep the version with the newer timestamp
+ * - Contacts only in local: keep them
+ * - Contacts only in Drive: add them
+ * Returns the merged array.
+ */
+const mergeContacts = (local: Contact[], drive: Contact[]): Contact[] => {
+  const merged = new Map<string, Contact>();
+
+  // Add all local contacts first
+  for (const c of local) {
+    merged.set(c.id, c);
+  }
+
+  // Merge Drive contacts
+  for (const driveContact of drive) {
+    const localContact = merged.get(driveContact.id);
+    if (!localContact) {
+      // Only on Drive — add it
+      merged.set(driveContact.id, driveContact);
+    } else {
+      // Exists in both — keep the newer version
+      if (getTimestamp(driveContact) > getTimestamp(localContact)) {
+        merged.set(driveContact.id, driveContact);
+      }
+    }
+  }
+
+  return Array.from(merged.values());
+};
 
 export const useGoogleDrive = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -30,6 +66,42 @@ export const useGoogleDrive = () => {
     }
   }, []);
 
+  const syncContacts = useCallback(async () => {
+    try {
+      setIsSyncing(true);
+      setError(null);
+
+      // Load both sides
+      const localContacts = await storage.getAllContacts();
+      let driveContacts: Contact[] = [];
+      try {
+        driveContacts = await googleDrive.loadContacts();
+      } catch (err) {
+        // First sync or no file on Drive yet — that's fine
+        console.log('[Sync] No existing Drive data, will push local contacts');
+      }
+
+      // Merge
+      const merged = mergeContacts(localContacts, driveContacts);
+
+      // Save merged result to both local and Drive
+      await storage.batchSave(merged);
+      await googleDrive.saveContacts(merged);
+
+      // Update last sync time
+      const now = Date.now();
+      setLastSyncTime(now);
+      localStorage.setItem('lastDriveSync', now.toString());
+
+      return merged.length;
+    } catch (err: any) {
+      setError(err.message || 'Failed to sync contacts');
+      throw err;
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
   const connect = useCallback(async () => {
     try {
       setError(null);
@@ -38,13 +110,13 @@ export const useGoogleDrive = () => {
       setIsConnected(state.isSignedIn);
       setUser(state.user);
 
-      // Auto-sync after connecting
+      // Auto-sync after connecting (two-way merge)
       await syncContacts();
     } catch (err: any) {
       setError(err.message || 'Failed to connect to Google Drive');
       throw err;
     }
-  }, []);
+  }, [syncContacts]);
 
   const disconnect = useCallback(() => {
     googleDrive.signOut();
@@ -53,73 +125,6 @@ export const useGoogleDrive = () => {
     setLastSyncTime(null);
     localStorage.removeItem('lastDriveSync');
   }, []);
-
-  const syncContacts = useCallback(async () => {
-    if (!isConnected) {
-      throw new Error('Not connected to Google Drive');
-    }
-
-    try {
-      setIsSyncing(true);
-      setError(null);
-
-      // Get local contacts
-      const localContacts = await storage.getAllContacts();
-
-      // Save to Drive
-      await googleDrive.saveContacts(localContacts);
-
-      // Update last sync time
-      const now = Date.now();
-      setLastSyncTime(now);
-      localStorage.setItem('lastDriveSync', now.toString());
-    } catch (err: any) {
-      setError(err.message || 'Failed to sync contacts');
-      throw err;
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isConnected]);
-
-  const restoreFromDrive = useCallback(async () => {
-    if (!isConnected) {
-      throw new Error('Not connected to Google Drive');
-    }
-
-    try {
-      setIsSyncing(true);
-      setError(null);
-
-      // Load from Drive
-      const driveContacts = await googleDrive.loadContacts();
-
-      if (driveContacts.length === 0) {
-        throw new Error('No backup found on Google Drive');
-      }
-
-      // Clear local storage and restore
-      const allLocal = await storage.getAllContacts();
-      for (const contact of allLocal) {
-        await storage.deleteContact(contact.id);
-      }
-
-      for (const contact of driveContacts) {
-        await storage.saveContact(contact);
-      }
-
-      // Update last sync time
-      const now = Date.now();
-      setLastSyncTime(now);
-      localStorage.setItem('lastDriveSync', now.toString());
-
-      return driveContacts.length;
-    } catch (err: any) {
-      setError(err.message || 'Failed to restore from Drive');
-      throw err;
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isConnected]);
 
   return {
     isConnected,
@@ -130,6 +135,5 @@ export const useGoogleDrive = () => {
     connect,
     disconnect,
     syncContacts,
-    restoreFromDrive,
   };
 };
