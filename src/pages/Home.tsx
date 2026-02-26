@@ -4,15 +4,26 @@ import { Camera, Upload, Users, Settings, PenLine, ChevronRight } from 'lucide-r
 import { storage } from '@/services/storage';
 import { getOCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
+import { Contact } from '@/types/contact';
 
 const Home = () => {
     const [contactCount, setContactCount] = useState(0);
+    const [weekCount, setWeekCount] = useState(0);
+    const [folderCount, setFolderCount] = useState(0);
+    const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
     const [ocrEngine, setOcrEngineState] = useState(getOCREngine());
     const { isConnected, user, isSyncing } = useGoogleDrive();
     const navigate = useNavigate();
 
     useEffect(() => {
-        storage.getAllContacts().then(contacts => setContactCount(contacts.length));
+        storage.getAllContacts().then(contacts => {
+            setContactCount(contacts.length);
+            const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            setWeekCount(contacts.filter(c => c.createdAt > oneWeekAgo).length);
+            setFolderCount(new Set(contacts.map(c => c.folder || 'Uncategorized')).size);
+            const sorted = [...contacts].sort((a, b) => b.createdAt - a.createdAt);
+            setRecentContacts(sorted.slice(0, 3));
+        });
     }, []);
 
     return (
@@ -133,6 +144,54 @@ const Home = () => {
                     </Link>
                 </div>
             </div>
+
+            {/* Activity Stats */}
+            {contactCount > 0 && (
+                <div className="w-full max-w-md mb-6">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Activity</p>
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="card-elevated rounded-2xl p-3 text-center">
+                            <p className="text-xl font-bold gradient-text">{contactCount}</p>
+                            <p className="text-[10px] text-slate-500">Total</p>
+                        </div>
+                        <div className="card-elevated rounded-2xl p-3 text-center">
+                            <p className="text-xl font-bold gradient-text">{weekCount}</p>
+                            <p className="text-[10px] text-slate-500">This Week</p>
+                        </div>
+                        <div className="card-elevated rounded-2xl p-3 text-center">
+                            <p className="text-xl font-bold gradient-text">{folderCount}</p>
+                            <p className="text-[10px] text-slate-500">Folders</p>
+                        </div>
+                    </div>
+                    {recentContacts.length > 0 && (
+                        <div className="space-y-2">
+                            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Recently Added</p>
+                            {recentContacts.map(c => (
+                                <Link
+                                    key={c.id}
+                                    to="/contacts"
+                                    className="flex items-center gap-3 card-elevated rounded-xl p-3 hover:scale-[1.01] active:scale-[0.99] transition-all"
+                                >
+                                    {c.imageData ? (
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-brand-800 flex-shrink-0">
+                                            <img src={c.imageData} alt="" className="w-full h-full object-cover" />
+                                        </div>
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-lg bg-brand-800 flex items-center justify-center flex-shrink-0">
+                                            <Users className="w-4 h-4 text-slate-500" />
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-white truncate">{c.name || 'Unknown'}</p>
+                                        <p className="text-[10px] text-slate-500 truncate">{c.company}</p>
+                                    </div>
+                                    <ChevronRight className="w-3 h-3 text-slate-600 flex-shrink-0" />
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Status Bar */}
             <div className="w-full max-w-md card-elevated rounded-2xl p-4">

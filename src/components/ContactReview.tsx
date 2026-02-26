@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus } from 'lucide-react';
+import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus, MessageCircle, Download, Camera, Users } from 'lucide-react';
 import { OCRResult, ocrService } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import { storage } from '@/services/storage';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
+import { exportService } from '@/services/export';
 
 interface ContactReviewProps {
     ocrResult: OCRResult;
     imageData: string;
     onCancel: () => void;
     onSave: (contact: Contact) => void;
+    onScanAnother?: () => void;
 }
 
-const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave }) => {
+const NOTE_CONTEXTS = [
+    'Networking Event', 'Conference', 'Trade Show',
+    'Referral', 'Meeting', 'Exhibition'
+];
+
+const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother }) => {
     const [formData, setFormData] = useState({
         name: ocrResult.name,
         position: ocrResult.position,
@@ -33,6 +40,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
     const [folders, setFolders] = useState<string[]>([]);
     const [showCreateFolderInline, setShowCreateFolderInline] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
+    const [savedContact, setSavedContact] = useState<Contact | null>(null);
 
     // Load existing folders on mount
     useEffect(() => {
@@ -120,7 +128,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         };
 
         await storage.saveContact(contact);
-        onSave(contact);
+        setSavedContact(contact);
     };
 
     return (
@@ -292,16 +300,35 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                     </div>
 
                     {/* Notes Field */}
-                    <div className="relative">
-                        <StickyNote className="absolute left-3 top-3 text-brand-500" size={18} />
-                        <textarea
-                            value={formData.notes}
-                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            placeholder="Notes (e.g., what they're inquiring about, where you met them)"
-                            rows={3}
-                            readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
-                        />
+                    <div className="space-y-2">
+                        {isEditMode && (
+                            <div className="flex flex-wrap gap-2 px-1">
+                                {NOTE_CONTEXTS.map(ctx => (
+                                    <button
+                                        key={ctx}
+                                        type="button"
+                                        onClick={() => {
+                                            const prefix = formData.notes ? formData.notes + ' | ' : '';
+                                            setFormData({ ...formData, notes: prefix + ctx });
+                                        }}
+                                        className="px-3 py-1 text-xs font-medium glass border border-brand-700 rounded-full hover:bg-brand-500/10 hover:border-brand-500/30 transition-colors text-brand-400"
+                                    >
+                                        {ctx}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <div className="relative">
+                            <StickyNote className="absolute left-3 top-3 text-brand-500" size={18} />
+                            <textarea
+                                value={formData.notes}
+                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                placeholder="Where did you meet? What did you discuss?"
+                                rows={3}
+                                readOnly={!isEditMode}
+                                className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            />
+                        </div>
                     </div>
 
                     {/* Folder Selector */}
@@ -411,6 +438,80 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                                 Save Anyway
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Success Screen with Quick Actions */}
+            {savedContact && (
+                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-brand-950 animate-in fade-in duration-300 p-6">
+                    <div className="mb-6">
+                        <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                            <Check size={40} className="text-emerald-400" />
+                        </div>
+                    </div>
+                    <h2 className="text-xl font-bold text-white mb-1">{savedContact.name || 'Contact'}</h2>
+                    <p className="text-sm text-slate-500 mb-8">Saved successfully</p>
+
+                    <div className="w-full max-w-xs grid grid-cols-2 gap-3 mb-8">
+                        {savedContact.phone[0] && (
+                            <a
+                                href={`tel:${savedContact.phone[0]}`}
+                                className="flex items-center justify-center gap-2 py-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-sm font-medium active:scale-95 transition-all"
+                            >
+                                <Phone size={16} />
+                                Call
+                            </a>
+                        )}
+                        {savedContact.email[0] && (
+                            <a
+                                href={`mailto:${savedContact.email[0]}`}
+                                className="flex items-center justify-center gap-2 py-3 bg-sky-500/10 border border-sky-500/30 rounded-xl text-sky-400 text-sm font-medium active:scale-95 transition-all"
+                            >
+                                <Mail size={16} />
+                                Email
+                            </a>
+                        )}
+                        {savedContact.phone[0] && (
+                            <a
+                                href={`https://wa.me/${savedContact.phone[0].replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-2 py-3 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 text-sm font-medium active:scale-95 transition-all"
+                            >
+                                <MessageCircle size={16} />
+                                WhatsApp
+                            </a>
+                        )}
+                        <button
+                            onClick={() => exportService.toVCard(savedContact)}
+                            className="flex items-center justify-center gap-2 py-3 bg-violet-500/10 border border-violet-500/30 rounded-xl text-violet-400 text-sm font-medium active:scale-95 transition-all"
+                        >
+                            <Download size={16} />
+                            Save vCard
+                        </button>
+                    </div>
+
+                    <div className="w-full max-w-xs space-y-3">
+                        {onScanAnother && (
+                            <button
+                                onClick={() => {
+                                    setSavedContact(null);
+                                    onScanAnother();
+                                }}
+                                className="w-full py-3.5 glass border border-brand-700 rounded-xl text-sm font-semibold text-brand-300 flex items-center justify-center gap-2 hover:bg-white/5 transition-all"
+                            >
+                                <Camera size={16} />
+                                Scan Another
+                            </button>
+                        )}
+                        <button
+                            onClick={() => onSave(savedContact)}
+                            className="w-full py-3.5 bg-brand-100 text-brand-950 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 transition-all"
+                        >
+                            <Users size={16} />
+                            View Contacts
+                        </button>
                     </div>
                 </div>
             )}

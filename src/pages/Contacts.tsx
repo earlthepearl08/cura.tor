@@ -132,8 +132,15 @@ const Contacts: React.FC = () => {
 
     // Filter contacts by search and folder
     const filteredContacts = contacts.filter(c => {
-        const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                             c.company.toLowerCase().includes(searchQuery.toLowerCase());
+        const q = searchQuery.toLowerCase();
+        const matchesSearch = !q ||
+            c.name.toLowerCase().includes(q) ||
+            c.company.toLowerCase().includes(q) ||
+            c.position.toLowerCase().includes(q) ||
+            c.address.toLowerCase().includes(q) ||
+            (c.notes || '').toLowerCase().includes(q) ||
+            c.phone.some(p => p.includes(q)) ||
+            c.email.some(e => e.toLowerCase().includes(q));
         const matchesFolder = selectedFolder === 'all' || (c.folder || 'Uncategorized') === selectedFolder;
         return matchesSearch && matchesFolder;
     });
@@ -300,7 +307,7 @@ const Contacts: React.FC = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" size={18} />
                     <input
                         type="text"
-                        placeholder="Search by name or company..."
+                        placeholder="Search contacts..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full bg-brand-900/50 border border-brand-800 rounded-xl py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all text-sm"

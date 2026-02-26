@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff } from 'lucide-react';
+import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useOCR } from '@/hooks/useOCR';
 import ContactReview from '@/components/ContactReview';
@@ -12,6 +12,8 @@ const Scanner: React.FC = () => {
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [showReview, setShowReview] = useState(false);
     const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
+    const [batchMode, setBatchMode] = useState(false);
+    const [batchCount, setBatchCount] = useState(0);
     const { isProcessing, processImage, result, error, reset } = useOCR();
     const navigate = useNavigate();
 
@@ -136,8 +138,16 @@ const Scanner: React.FC = () => {
                 <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                     <ArrowLeft size={24} />
                 </button>
-                <h1 className="text-lg font-semibold gradient-text">Scan Card</h1>
-                <div className="w-10" /> {/* Spacer */}
+                <h1 className="text-lg font-semibold gradient-text">
+                    {batchMode ? `Batch Scan${batchCount > 0 ? ` (${batchCount})` : ''}` : 'Scan Card'}
+                </h1>
+                <button
+                    onClick={() => { setBatchMode(!batchMode); setBatchCount(0); }}
+                    className={`p-2 rounded-full transition-colors ${batchMode ? 'bg-sky-500/20 text-sky-400' : 'hover:bg-white/10 text-slate-500'}`}
+                    title={batchMode ? 'Exit batch mode' : 'Batch scan mode'}
+                >
+                    <Layers size={20} />
+                </button>
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
@@ -291,7 +301,23 @@ const Scanner: React.FC = () => {
                             reset();
                         }}
                         onSave={() => navigate('/contacts')}
+                        onScanAnother={batchMode ? () => {
+                            setBatchCount(prev => prev + 1);
+                            setShowReview(false);
+                            setImgSrc(null);
+                            reset();
+                        } : undefined}
                     />
+                )}
+
+                {batchMode && batchCount > 0 && !imgSrc && !showReview && !isProcessing && (
+                    <button
+                        onClick={() => navigate('/contacts')}
+                        className="mt-4 px-6 py-3 bg-brand-100 text-brand-950 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] active:scale-95 transition-all"
+                    >
+                        <Check size={18} />
+                        Done ({batchCount} scanned)
+                    </button>
                 )}
             </div>
         </div>
