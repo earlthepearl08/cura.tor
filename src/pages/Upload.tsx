@@ -113,6 +113,8 @@ const Uploader: React.FC = () => {
         const dupes = new Map<string, string>();
         const seenInBatch: Array<{ id: string; ocrResult: OCRResult }> = [];
 
+        console.log(`[DupeCheck] Checking ${completedResults.length} results against ${existingContacts.length} stored contacts`);
+
         for (const item of completedResults) {
             const r = item.ocrResult;
             const asPartialContact = {
@@ -122,14 +124,18 @@ const Uploader: React.FC = () => {
                 company: r.company,
             };
 
+            console.log(`[DupeCheck] Item: "${r.name}" | company: "${r.company}" | emails: [${r.email}] | phones: [${r.phone}]`);
+
             // Check against existing stored contacts
             const storedResult = checkDuplicate(asPartialContact, existingContacts);
+            console.log(`[DupeCheck] vs stored → score: ${storedResult.matchScore}, isDupe: ${storedResult.isDuplicate}, reasons: [${storedResult.matchReasons}]`);
             if (storedResult.isDuplicate) {
                 dupes.set(item.id, `Duplicate of "${storedResult.matchedContact?.name}"`);
                 continue;
             }
 
             // Check against earlier items in this batch
+            let batchDupeFound = false;
             for (const seen of seenInBatch) {
                 const batchResult = checkDuplicate(asPartialContact, [{
                     id: seen.id,
@@ -138,14 +144,20 @@ const Uploader: React.FC = () => {
                     phone: seen.ocrResult.phone,
                     company: seen.ocrResult.company,
                 } as any]);
+                console.log(`[DupeCheck] vs batch "${seen.ocrResult.name}" → score: ${batchResult.matchScore}, isDupe: ${batchResult.isDuplicate}`);
                 if (batchResult.isDuplicate) {
                     dupes.set(item.id, `Same as "${seen.ocrResult.name}" in this batch`);
+                    batchDupeFound = true;
                     break;
                 }
             }
 
-            seenInBatch.push(item);
+            if (!batchDupeFound) {
+                seenInBatch.push(item);
+            }
         }
+
+        console.log(`[DupeCheck] Result: ${dupes.size} duplicates found`, [...dupes.entries()]);
 
         setDuplicateIds(dupes);
 

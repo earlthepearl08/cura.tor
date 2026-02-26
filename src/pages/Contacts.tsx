@@ -88,6 +88,17 @@ const Contacts: React.FC = () => {
         }
     };
 
+    const deleteSelected = async () => {
+        if (selectedIds.size === 0) return;
+        if (!window.confirm(`Delete ${selectedIds.size} contact${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+        for (const id of selectedIds) {
+            await storage.deleteContact(id);
+        }
+        setSelectedIds(new Set());
+        setSelectMode(false);
+        loadContacts();
+    };
+
     const openEditModal = (contact: Contact) => {
         setEditingContact(contact);
         setEditFormData({
@@ -396,21 +407,41 @@ const Contacts: React.FC = () => {
             </div>
 
             {selectMode ? (
-                <div className="sticky bottom-0 glass border-t border-brand-800 p-4 flex items-center justify-between gap-3 z-10">
-                    <button
-                        onClick={toggleSelectAll}
-                        className="flex items-center gap-2 px-3 py-2 bg-brand-800/50 hover:bg-brand-800 rounded-xl text-sm transition-colors"
-                    >
-                        {selectedIds.size === filteredContacts.length ? <CheckSquare size={16} className="text-brand-400" /> : <Square size={16} className="text-brand-600" />}
-                        <span>{selectedIds.size === filteredContacts.length ? 'Deselect All' : 'Select All'}</span>
-                    </button>
-                    <span className="text-xs text-brand-500">{selectedIds.size} selected</span>
-                    <button
-                        onClick={exitSelectMode}
-                        className="p-2 hover:bg-white/10 rounded-full text-brand-500 transition-colors"
-                    >
-                        <XCircle size={20} />
-                    </button>
+                <div className="sticky bottom-0 glass border-t border-brand-800 p-4 z-10 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <button
+                            onClick={toggleSelectAll}
+                            className="flex items-center gap-2 px-3 py-2 bg-brand-800/50 hover:bg-brand-800 rounded-xl text-sm transition-colors"
+                        >
+                            {selectedIds.size === filteredContacts.length ? <CheckSquare size={16} className="text-brand-400" /> : <Square size={16} className="text-brand-600" />}
+                            <span>{selectedIds.size === filteredContacts.length ? 'Deselect All' : 'Select All'}</span>
+                        </button>
+                        <span className="text-xs text-brand-500">{selectedIds.size} selected</span>
+                        <button
+                            onClick={exitSelectMode}
+                            className="p-2 hover:bg-white/10 rounded-full text-brand-500 transition-colors"
+                        >
+                            <XCircle size={20} />
+                        </button>
+                    </div>
+                    {selectedIds.size > 0 && (
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setShowExportOptions(true)}
+                                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-800/50 hover:bg-brand-800 border border-brand-700 rounded-xl text-sm font-medium transition-colors"
+                            >
+                                <Download size={16} className="text-brand-400" />
+                                Export
+                            </button>
+                            <button
+                                onClick={deleteSelected}
+                                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-sm font-medium text-red-400 transition-colors"
+                            >
+                                <Trash2 size={16} />
+                                Delete
+                            </button>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <footer className="p-6 text-center text-[10px] text-brand-700 uppercase tracking-widest bg-brand-950">
