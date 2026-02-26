@@ -119,10 +119,10 @@ export function checkDuplicate(
         if (newContact.name && existing.name) {
             const nameSimilarity = stringSimilarity(newContact.name, existing.name);
             if (nameSimilarity >= 90) {
-                score += 30;
+                score += 45;
                 reasons.push('Same name');
             } else if (nameSimilarity >= 70) {
-                score += 15;
+                score += 20;
                 reasons.push('Similar name');
             }
         }
