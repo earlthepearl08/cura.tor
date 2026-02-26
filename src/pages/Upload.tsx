@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Trash2, ArrowLeft, Play, CheckCircle, AlertCircle, Loader2, Edit3, Save, Users, Square, CheckSquare } from 'lucide-react';
+import { Upload, Trash2, ArrowLeft, Play, CheckCircle, AlertCircle, Loader2, Edit3, Save, Users, Square, CheckSquare, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { storage } from '@/services/storage';
 import { ocrService, OCRResult } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import ContactReview from '@/components/ContactReview';
+import { checkDuplicate } from '@/services/duplicateDetection';
 
 interface QueuedFile {
     id: string;
@@ -33,6 +34,7 @@ const Uploader: React.FC = () => {
     const [processedCount, setProcessedCount] = useState(0);
     const [reviewingId, setReviewingId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [duplicateIds, setDuplicateIds] = useState<Map<string, string>>(new Map()); // id -> reason
     const navigate = useNavigate();
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -96,6 +98,66 @@ const Uploader: React.FC = () => {
         }
 
         setIsProcessing(false);
+
+        // Run duplicate detection after processing
+        checkForDuplicates();
+    };
+
+    const checkForDuplicates = async () => {
+        const existingContacts = await storage.getAllContacts();
+        const dupes = new Map<string, string>();
+        const seenInBatch: Array<{ id: string; ocrResult: OCRResult }> = [];
+
+        setQueue(currentQueue => {
+            const completed = currentQueue.filter(q => q.status === 'completed' && q.ocrResult);
+
+            for (const item of completed) {
+                const r = item.ocrResult!;
+                const asPartialContact = {
+                    name: r.name,
+                    email: r.email,
+                    phone: r.phone,
+                    company: r.company,
+                };
+
+                // Check against existing stored contacts
+                const storedResult = checkDuplicate(asPartialContact, existingContacts);
+                if (storedResult.isDuplicate) {
+                    dupes.set(item.id, `Duplicate of "${storedResult.matchedContact?.name}"`);
+                    continue;
+                }
+
+                // Check against earlier items in this batch
+                for (const seen of seenInBatch) {
+                    const batchResult = checkDuplicate(asPartialContact, [{
+                        id: seen.id,
+                        name: seen.ocrResult.name,
+                        email: seen.ocrResult.email,
+                        phone: seen.ocrResult.phone,
+                        company: seen.ocrResult.company,
+                    } as any]);
+                    if (batchResult.isDuplicate) {
+                        dupes.set(item.id, `Same as "${seen.ocrResult.name}" in this batch`);
+                        break;
+                    }
+                }
+
+                seenInBatch.push({ id: item.id, ocrResult: r });
+            }
+
+            return currentQueue; // no mutation
+        });
+
+        setDuplicateIds(dupes);
+
+        // Auto-deselect duplicates
+        if (dupes.size > 0) {
+            setSelectedIds(prev => {
+                const next = new Set(prev);
+                for (const id of dupes.keys()) next.delete(id);
+                return next;
+            });
+        }
     };
 
     const toggleSelect = (id: string) => {
@@ -255,6 +317,7 @@ const Uploader: React.FC = () => {
                                     key={item.id}
                                     className={`flex items-center p-3 glass rounded-2xl group transition-all ${
                                         item.status === 'processing' ? 'border border-sky-500/30' :
+                                        item.status === 'completed' && duplicateIds.has(item.id) ? 'border border-amber-500/30' :
                                         item.status === 'completed' ? 'border border-emerald-500/20' :
                                         item.status === 'error' ? 'border border-red-500/30' :
                                         'border border-transparent'
@@ -289,7 +352,9 @@ const Uploader: React.FC = () => {
                                         </p>
                                         <p className="text-[10px] uppercase">
                                             {item.status === 'completed' && item.ocrResult
-                                                ? <span className="text-slate-500 normal-case">{item.ocrResult.company || 'No company'}</span>
+                                                ? duplicateIds.has(item.id)
+                                                    ? <span className="text-amber-400 normal-case flex items-center gap-1"><AlertTriangle size={10} />{duplicateIds.get(item.id)}</span>
+                                                    : <span className="text-slate-500 normal-case">{item.ocrResult.company || 'No company'}</span>
                                                 : <>{(item.file.size / 1024).toFixed(1)} KB &bull; {getStatusDisplay(item)}</>
                                             }
                                         </p>
@@ -317,6 +382,14 @@ const Uploader: React.FC = () => {
                         {/* Review & Save section */}
                         {hasResults && (
                             <div className="mt-6 space-y-3">
+                                {duplicateIds.size > 0 && (
+                                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3">
+                                        <AlertTriangle size={18} className="text-amber-400 flex-shrink-0" />
+                                        <p className="text-sm text-amber-400">
+                                            {duplicateIds.size} duplicate{duplicateIds.size > 1 ? 's' : ''} detected and deselected. You can still select them manually to save.
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-xl flex items-center gap-3">
                                     <Edit3 size={18} className="text-sky-400 flex-shrink-0" />
                                     <p className="text-sm text-sky-400">
