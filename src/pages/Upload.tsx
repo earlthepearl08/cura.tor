@@ -70,18 +70,21 @@ const Uploader: React.FC = () => {
         });
     };
 
-    const processOneItem = async (item: QueuedFile) => {
+    const processOneItem = async (item: QueuedFile): Promise<{ id: string; ocrResult: OCRResult } | null> => {
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'processing', error: undefined } : q));
         try {
             const result = await ocrService.processImage(item.dataURL);
             setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed', ocrResult: result } : q));
             setSelectedIds(prev => new Set(prev).add(item.id));
+            setProcessedCount(prev => prev + 1);
+            return { id: item.id, ocrResult: result };
         } catch (error: any) {
             const errorMsg = error?.message || 'Processing failed';
             console.error(`Failed to process ${item.file.name}:`, error);
             setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: errorMsg } : q));
+            setProcessedCount(prev => prev + 1);
+            return null;
         }
-        setProcessedCount(prev => prev + 1);
     };
 
     const startProcessing = async () => {
@@ -91,62 +94,58 @@ const Uploader: React.FC = () => {
 
         const items = [...queue].filter(item => item.status !== 'completed');
         const BATCH_SIZE = 3;
+        const completedResults: Array<{ id: string; ocrResult: OCRResult }> = [];
 
         for (let i = 0; i < items.length; i += BATCH_SIZE) {
             const batch = items.slice(i, i + BATCH_SIZE);
-            await Promise.all(batch.map(item => processOneItem(item)));
+            const results = await Promise.all(batch.map(item => processOneItem(item)));
+            for (const r of results) {
+                if (r) completedResults.push(r);
+            }
         }
 
         setIsProcessing(false);
-
-        // Run duplicate detection after processing
-        checkForDuplicates();
+        runDuplicateCheck(completedResults);
     };
 
-    const checkForDuplicates = async () => {
+    const runDuplicateCheck = async (completedResults: Array<{ id: string; ocrResult: OCRResult }>) => {
         const existingContacts = await storage.getAllContacts();
         const dupes = new Map<string, string>();
         const seenInBatch: Array<{ id: string; ocrResult: OCRResult }> = [];
 
-        setQueue(currentQueue => {
-            const completed = currentQueue.filter(q => q.status === 'completed' && q.ocrResult);
+        for (const item of completedResults) {
+            const r = item.ocrResult;
+            const asPartialContact = {
+                name: r.name,
+                email: r.email,
+                phone: r.phone,
+                company: r.company,
+            };
 
-            for (const item of completed) {
-                const r = item.ocrResult!;
-                const asPartialContact = {
-                    name: r.name,
-                    email: r.email,
-                    phone: r.phone,
-                    company: r.company,
-                };
-
-                // Check against existing stored contacts
-                const storedResult = checkDuplicate(asPartialContact, existingContacts);
-                if (storedResult.isDuplicate) {
-                    dupes.set(item.id, `Duplicate of "${storedResult.matchedContact?.name}"`);
-                    continue;
-                }
-
-                // Check against earlier items in this batch
-                for (const seen of seenInBatch) {
-                    const batchResult = checkDuplicate(asPartialContact, [{
-                        id: seen.id,
-                        name: seen.ocrResult.name,
-                        email: seen.ocrResult.email,
-                        phone: seen.ocrResult.phone,
-                        company: seen.ocrResult.company,
-                    } as any]);
-                    if (batchResult.isDuplicate) {
-                        dupes.set(item.id, `Same as "${seen.ocrResult.name}" in this batch`);
-                        break;
-                    }
-                }
-
-                seenInBatch.push({ id: item.id, ocrResult: r });
+            // Check against existing stored contacts
+            const storedResult = checkDuplicate(asPartialContact, existingContacts);
+            if (storedResult.isDuplicate) {
+                dupes.set(item.id, `Duplicate of "${storedResult.matchedContact?.name}"`);
+                continue;
             }
 
-            return currentQueue; // no mutation
-        });
+            // Check against earlier items in this batch
+            for (const seen of seenInBatch) {
+                const batchResult = checkDuplicate(asPartialContact, [{
+                    id: seen.id,
+                    name: seen.ocrResult.name,
+                    email: seen.ocrResult.email,
+                    phone: seen.ocrResult.phone,
+                    company: seen.ocrResult.company,
+                } as any]);
+                if (batchResult.isDuplicate) {
+                    dupes.set(item.id, `Same as "${seen.ocrResult.name}" in this batch`);
+                    break;
+                }
+            }
+
+            seenInBatch.push(item);
+        }
 
         setDuplicateIds(dupes);
 
