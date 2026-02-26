@@ -6,8 +6,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Get API key from environment variable
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GOOGLE_API_KEY;
+  // Get API key from environment variable (server-side only)
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
   if (!apiKey) {
     console.error('GEMINI_API_KEY / GOOGLE_API_KEY not found in environment variables');
@@ -15,13 +15,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { contents, generationConfig, model, imageData, prompt } = req.body;
+    const { contents, generationConfig, imageData, prompt } = req.body;
 
     // Flexible mode: accept raw Gemini request body (contents + generationConfig)
     if (contents) {
-      const geminiModel = model || 'gemini-2.5-flash';
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

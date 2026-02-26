@@ -272,7 +272,7 @@ ${rawText}
 Return ONLY the JSON object. No explanation, no markdown.`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
+        const timeout = setTimeout(() => controller.abort(), 60000);
 
         try {
             // Build multimodal content parts: text prompt + optional image

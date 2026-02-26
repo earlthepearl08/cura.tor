@@ -12,6 +12,7 @@ interface ContactReviewProps {
     onCancel: () => void;
     onSave: (contact: Contact) => void;
     onScanAnother?: () => void;
+    reviewOnly?: boolean; // Skip saving to storage and success screen (for upload review)
 }
 
 const NOTE_CONTEXTS = [
@@ -19,7 +20,7 @@ const NOTE_CONTEXTS = [
     'Referral', 'Meeting', 'Exhibition'
 ];
 
-const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother }) => {
+const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, reviewOnly }) => {
     const [formData, setFormData] = useState({
         name: ocrResult.name,
         position: ocrResult.position,
@@ -111,7 +112,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         }
 
         const contact: Contact = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             name: formData.name,
             position: formData.position,
             company: formData.company,
@@ -126,6 +127,11 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
             isVerified: true,
             createdAt: Date.now()
         };
+
+        if (reviewOnly) {
+            onSave(contact);
+            return;
+        }
 
         await storage.saveContact(contact);
         setSavedContact(contact);

@@ -174,7 +174,6 @@ const Scanner: React.FC = () => {
                     <div
                         className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-brand-500/30 cursor-pointer"
                         onClick={handleTapToFocus}
-                        onTouchStart={handleTapToFocus}
                     >
                         <Webcam
                             audio={false}
