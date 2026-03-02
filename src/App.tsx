@@ -6,6 +6,7 @@ import Upload from '@/pages/Upload';
 import Contacts from '@/pages/Contacts';
 import ManualInput from '@/pages/ManualInput';
 import Settings from '@/pages/Settings';
+import QRScan from '@/pages/QRScan';
 import { getTheme } from '@/hooks/useTheme';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
                     <Route path="/contacts" element={<Contacts />} />
                     <Route path="/manual" element={<ManualInput />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/qr-scan" element={<QRScan />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </div>

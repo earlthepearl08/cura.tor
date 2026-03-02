@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Camera, Upload, Users, Settings, PenLine, ChevronRight } from 'lucide-react';
+import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { getOCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
@@ -71,7 +71,7 @@ const Home = () => {
             {/* Primary Actions */}
             <div className="w-full max-w-md mb-6">
                 <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Quick Actions</p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                     <Link
                         to="/scan"
                         className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
@@ -79,8 +79,19 @@ const Home = () => {
                         <div className="w-12 h-12 bg-gradient-to-br from-sky-500/20 to-blue-600/20 rounded-xl flex items-center justify-center">
                             <Camera className="w-5 h-5 text-sky-400" />
                         </div>
-                        <span className="font-semibold text-sm text-white">Scan</span>
-                        <span className="text-[10px] text-slate-500">Camera</span>
+                        <span className="font-semibold text-sm text-white">Scan Card</span>
+                        <span className="text-[10px] text-slate-500">OCR Camera</span>
+                    </Link>
+
+                    <Link
+                        to="/qr-scan"
+                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                        <div className="w-12 h-12 bg-gradient-to-br from-rose-500/20 to-pink-600/20 rounded-xl flex items-center justify-center">
+                            <QrCode className="w-5 h-5 text-rose-400" />
+                        </div>
+                        <span className="font-semibold text-sm text-white">QR Scan</span>
+                        <span className="text-[10px] text-slate-500">QR Codes</span>
                     </Link>
 
                     <Link
