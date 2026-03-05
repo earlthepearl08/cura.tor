@@ -1,10 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+
+function detectInAppBrowser(): string | null {
+    const ua = navigator.userAgent || '';
+    if (/FBAN|FBAV/i.test(ua)) return 'Facebook';
+    if (/Instagram/i.test(ua)) return 'Instagram';
+    if (/\bLine\//i.test(ua)) return 'LINE';
+    if (/Twitter|TwitterAndroid/i.test(ua)) return 'Twitter';
+    if (/LinkedIn/i.test(ua)) return 'LinkedIn';
+    if (/\[FB/i.test(ua) || /Messenger/i.test(ua)) return 'Messenger';
+    if (/Snapchat/i.test(ua)) return 'Snapchat';
+    if (/TikTok/i.test(ua)) return 'TikTok';
+    return null;
+}
 
 const Auth: React.FC = () => {
     const { user, isLoading, signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
+    const inAppBrowser = useMemo(() => detectInAppBrowser(), []);
     const [mode, setMode] = useState<'signin' | 'signup'>('signin');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -90,11 +104,27 @@ const Auth: React.FC = () => {
                     </div>
                 )}
 
+                {/* In-app browser warning */}
+                {inAppBrowser && (
+                    <div className="w-full max-w-sm mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                        <p className="text-sm text-amber-300 font-medium mb-1">
+                            Open in your browser
+                        </p>
+                        <p className="text-xs text-amber-300/70 mb-3">
+                            Google Sign-In doesn't work inside {inAppBrowser}. Tap the menu (•••) and choose "Open in Safari" or "Open in Chrome".
+                        </p>
+                        <p className="text-xs text-amber-300/50 flex items-center gap-1">
+                            <ExternalLink size={12} />
+                            You can still use email sign-in below
+                        </p>
+                    </div>
+                )}
+
                 {/* Google Sign In */}
                 <button
                     onClick={handleGoogleSignIn}
-                    disabled={isSubmitting}
-                    className="w-full max-w-sm py-3.5 glass border border-brand-800 rounded-xl font-medium flex items-center justify-center gap-3 hover:bg-white/5 active:scale-[0.98] transition-all disabled:opacity-50 mb-6"
+                    disabled={isSubmitting || !!inAppBrowser}
+                    className={`w-full max-w-sm py-3.5 glass border border-brand-800 rounded-xl font-medium flex items-center justify-center gap-3 hover:bg-white/5 active:scale-[0.98] transition-all disabled:opacity-50 mb-6 ${inAppBrowser ? 'opacity-40 cursor-not-allowed' : ''}`}
                 >
                     <svg className="w-5 h-5" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
