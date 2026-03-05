@@ -27,7 +27,11 @@ export async function tryDecodeQR(dataURL: string): Promise<OCRResult | null> {
             });
 
             if (qrResult && qrResult.data) {
-                resolve(parseQRData(qrResult.data));
+                const parsed = parseQRData(qrResult.data);
+                // Only use QR result if it has meaningful contact data (name, phone, or email).
+                // If the QR is just a URL or plain text, fall through to OCR for the card text.
+                const hasMeaningfulData = parsed.name || parsed.phone.length > 0 || parsed.email.length > 0;
+                resolve(hasMeaningfulData ? parsed : null);
             } else {
                 resolve(null);
             }

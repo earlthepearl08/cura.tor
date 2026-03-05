@@ -1,0 +1,42 @@
+<svg viewBox="0 0 420 140" xmlns="http://www.w3.org/2000/svg">
+  <!-- Cura.tor Logo - Dark theme version (CURA in white) -->
+  <defs>
+    <linearGradient id="curatorGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0EA5E9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0284C7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="curatorGrad2Dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0369A1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#075985;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: Abstract C + card -->
+  <g transform="translate(15, 20)">
+    <!-- Large C shape (for Curator) -->
+    <path d="M45 10 A35 35 0 1 0 45 80" stroke="url(#curatorGrad2)" stroke-width="8" fill="none" stroke-linecap="round"/>
+
+    <!-- Card inside the C -->
+    <rect x="25" y="28" width="40" height="26" rx="4" fill="url(#curatorGrad2Dark)"/>
+
+    <!-- Card details -->
+    <rect x="31" y="38" width="18" height="2.5" rx="1" fill="white" opacity="0.8"/>
+    <rect x="31" y="44" width="12" height="2.5" rx="1" fill="white" opacity="0.5"/>
+
+    <!-- Dot accent -->
+    <circle cx="70" cy="15" r="5" fill="url(#curatorGrad2)"/>
+  </g>
+
+  <!-- Text: CURA in WHITE for dark backgrounds -->
+  <text x="105" y="65" font-family="'Arial Black', Arial, sans-serif" font-size="38" font-weight="900" fill="#FFFFFF">CURA</text>
+
+  <!-- The signature dot - larger, bold -->
+  <circle cx="228" cy="52" r="7" fill="url(#curatorGrad2)"/>
+
+  <!-- TOR in gradient blue -->
+  <text x="244" y="65" font-family="'Arial Black', Arial, sans-serif" font-size="38" font-weight="900" fill="url(#curatorGrad2)">TOR</text>
+
+  <!-- Tagline with line accent -->
+  <rect x="105" y="78" width="40" height="3" rx="1.5" fill="url(#curatorGrad2)"/>
+  <text x="152" y="88" font-family="Arial, sans-serif" font-size="10" fill="#64748B" letter-spacing="1">SMART CONTACT CURATION</text>
+</svg>

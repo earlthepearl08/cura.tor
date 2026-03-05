@@ -78,18 +78,8 @@ const Auth: React.FC = () => {
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             <div className="flex-1 flex flex-col items-center justify-center p-6">
                 {/* Logo */}
-                <div className="mb-8 text-center">
-                    <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
-                        <svg viewBox="0 0 40 40" className="w-10 h-10 text-white" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="6" y="10" width="28" height="20" rx="3" />
-                            <circle cx="16" cy="20" r="4" />
-                            <line x1="24" y1="16" x2="30" y2="16" />
-                            <line x1="24" y1="20" x2="30" y2="20" />
-                            <line x1="24" y1="24" x2="28" y2="24" />
-                        </svg>
-                    </div>
-                    <h1 className="text-3xl font-bold gradient-text">Cura.tor</h1>
-                    <p className="text-sm text-slate-500 mt-1">Smart Business Card Scanner</p>
+                <div className="mb-8">
+                    <img src="/logo.svg" alt="Cura.tor" className="w-64 mx-auto" />
                 </div>
 
                 {/* Error message */}

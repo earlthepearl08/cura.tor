@@ -1,15 +1,29 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { Contact } from '@/types/contact';
 
-const DB_NAME = 'CardScannerDB';
+const DB_PREFIX = 'CardScannerDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'contacts';
 
 export class StorageService {
     private db: Promise<IDBPDatabase>;
+    private currentUid: string | null = null;
 
     constructor() {
-        this.db = openDB(DB_NAME, DB_VERSION, {
+        // Default DB for unauthenticated state (shouldn't be used in practice)
+        this.db = this.openUserDB(null);
+    }
+
+    /** Switch to a user-specific database. Each user gets their own IndexedDB. */
+    switchUser(uid: string | null) {
+        if (uid === this.currentUid) return;
+        this.currentUid = uid;
+        this.db = this.openUserDB(uid);
+    }
+
+    private openUserDB(uid: string | null): Promise<IDBPDatabase> {
+        const dbName = uid ? `${DB_PREFIX}_${uid}` : DB_PREFIX;
+        return openDB(dbName, DB_VERSION, {
             upgrade(db) {
                 if (!db.objectStoreNames.contains(STORE_NAME)) {
                     db.createObjectStore(STORE_NAME, { keyPath: 'id' });

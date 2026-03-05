@@ -504,6 +504,11 @@ const Uploader: React.FC = () => {
                     ocrResult={reviewItem.ocrResult}
                     imageData={reviewItem.dataURL}
                     onCancel={() => setReviewingId(null)}
+                    onDelete={() => {
+                        removeFile(reviewItem.id);
+                        setSelectedIds(prev => { const next = new Set(prev); next.delete(reviewItem.id); return next; });
+                        setReviewingId(null);
+                    }}
                     onSave={(contact) => {
                         // Update the queue item's OCR result with edited data
                         setQueue(prev => prev.map(q => q.id === reviewItem.id ? {

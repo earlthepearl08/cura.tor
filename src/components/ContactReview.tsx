@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus, MessageCircle, Download, Camera, Users, Lock } from 'lucide-react';
+import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus, MessageCircle, Download, Camera, Users, Lock, Trash2 } from 'lucide-react';
 import { OCRResult, ocrService } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import { storage } from '@/services/storage';
@@ -13,6 +13,7 @@ interface ContactReviewProps {
     onCancel: () => void;
     onSave: (contact: Contact) => void;
     onScanAnother?: () => void;
+    onDelete?: () => void; // Delete/discard this item (e.g., remove from upload queue)
     reviewOnly?: boolean; // Skip saving to storage and success screen (for upload review)
 }
 
@@ -21,7 +22,7 @@ const NOTE_CONTEXTS = [
     'Referral', 'Meeting', 'Exhibition'
 ];
 
-const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, reviewOnly }) => {
+const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, onDelete, reviewOnly }) => {
     const { canExportVCard } = useAuth();
     const [formData, setFormData] = useState({
         name: ocrResult.name,
@@ -397,10 +398,18 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                 </div>
             </div>
 
-            <div className="p-4 bg-brand-900 border-t border-brand-800">
+            <div className="p-4 bg-brand-900 border-t border-brand-800 flex gap-3">
+                {onDelete && (
+                    <button
+                        onClick={onDelete}
+                        className="py-4 px-5 glass border border-red-500/30 text-red-400 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-500/10 active:scale-95 transition-all"
+                    >
+                        <Trash2 size={20} />
+                    </button>
+                )}
                 <button
                     onClick={() => handleSave(false)}
-                    className="w-full py-4 bg-brand-100 text-brand-950 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] active:scale-95 transition-all"
+                    className="flex-1 py-4 bg-brand-100 text-brand-950 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] active:scale-95 transition-all"
                 >
                     <Check size={20} />
                     Save Contact

@@ -19,6 +19,7 @@ import {
     getScansRemaining as getScansRemainingService,
     redeemAccessCode as redeemAccessCodeService,
 } from '@/services/userService';
+import { storage } from '@/services/storage';
 
 interface AuthContextType {
     user: UserProfile | null;
@@ -76,6 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setFirebaseUser(fbUser);
             if (fbUser) {
                 try {
+                    storage.switchUser(fbUser.uid);
                     const profile = await getOrCreateUserDoc(fbUser);
                     setUser(profile);
                 } catch (err) {
@@ -83,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setUser(null);
                 }
             } else {
+                storage.switchUser(null);
                 setUser(null);
             }
             setIsLoading(false);
@@ -124,6 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signOut = useCallback(async () => {
         await firebaseSignOut(auth);
+        storage.switchUser(null);
         setUser(null);
         setFirebaseUser(null);
     }, []);
