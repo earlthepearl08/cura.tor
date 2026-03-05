@@ -60,6 +60,35 @@ export class StorageService {
         const db = await this.db;
         await db.clear(STORE_NAME);
     }
+
+    /** One-time migration: copy contacts from the old shared DB into the current user's DB, then clear the old one. */
+    async migrateFromLegacyDB(): Promise<number> {
+        if (!this.currentUid) return 0;
+
+        const legacyDb = await openDB(DB_PREFIX, DB_VERSION, {
+            upgrade(db) {
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                }
+            },
+        });
+
+        const legacyContacts: Contact[] = await legacyDb.getAll(STORE_NAME);
+        if (legacyContacts.length === 0) {
+            legacyDb.close();
+            return 0;
+        }
+
+        // Copy into current user's DB
+        await this.batchSave(legacyContacts);
+
+        // Clear the old DB so this doesn't run again
+        await legacyDb.clear(STORE_NAME);
+        legacyDb.close();
+
+        console.log(`Migrated ${legacyContacts.length} contacts from legacy DB`);
+        return legacyContacts.length;
+    }
 }
 
 export const storage = new StorageService();

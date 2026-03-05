@@ -78,6 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (fbUser) {
                 try {
                     storage.switchUser(fbUser.uid);
+                    await storage.migrateFromLegacyDB();
                     const profile = await getOrCreateUserDoc(fbUser);
                     setUser(profile);
                 } catch (err) {
