@@ -65,29 +65,47 @@ export class StorageService {
     async migrateFromLegacyDB(): Promise<number> {
         if (!this.currentUid) return 0;
 
-        const legacyDb = await openDB(DB_PREFIX, DB_VERSION, {
-            upgrade(db) {
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                }
-            },
-        });
+        let total = 0;
 
-        const legacyContacts: Contact[] = await legacyDb.getAll(STORE_NAME);
-        if (legacyContacts.length === 0) {
-            legacyDb.close();
-            return 0;
+        // Migrate from the old shared (no-UID) DB
+        total += await this.migrateFromDB(DB_PREFIX);
+
+        // One-time fix: contacts were accidentally migrated to wrong account.
+        // Copy them from that account's DB to the current user, then clean up.
+        const WRONG_UID = '5disr5WXONYXDCe6l2ONfduk2Ht2';
+        const TARGET_UID = 'sNu5XECxkQfddPQXxuuOw9YFn2n2';
+        if (this.currentUid === TARGET_UID) {
+            total += await this.migrateFromDB(`${DB_PREFIX}_${WRONG_UID}`);
         }
 
-        // Copy into current user's DB
-        await this.batchSave(legacyContacts);
+        return total;
+    }
 
-        // Clear the old DB so this doesn't run again
-        await legacyDb.clear(STORE_NAME);
-        legacyDb.close();
+    private async migrateFromDB(dbName: string): Promise<number> {
+        try {
+            const sourceDb = await openDB(dbName, DB_VERSION, {
+                upgrade(db) {
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                },
+            });
 
-        console.log(`Migrated ${legacyContacts.length} contacts from legacy DB`);
-        return legacyContacts.length;
+            const contacts: Contact[] = await sourceDb.getAll(STORE_NAME);
+            if (contacts.length === 0) {
+                sourceDb.close();
+                return 0;
+            }
+
+            await this.batchSave(contacts);
+            await sourceDb.clear(STORE_NAME);
+            sourceDb.close();
+
+            console.log(`Migrated ${contacts.length} contacts from ${dbName}`);
+            return contacts.length;
+        } catch {
+            return 0;
+        }
     }
 }
 
