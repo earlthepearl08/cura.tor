@@ -1,12 +1,15 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Trash2, ArrowLeft, Play, CheckCircle, AlertCircle, Loader2, Edit3, Save, Users, Square, CheckSquare, AlertTriangle } from 'lucide-react';
+import { Upload, Trash2, ArrowLeft, Play, CheckCircle, AlertCircle, Loader2, Edit3, Save, Users, Square, CheckSquare, AlertTriangle, QrCode } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { storage } from '@/services/storage';
 import { ocrService, OCRResult } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import ContactReview from '@/components/ContactReview';
 import { checkDuplicate } from '@/services/duplicateDetection';
+import { tryDecodeQR } from '@/services/qrDetect';
+import UpgradePrompt from '@/components/UpgradePrompt';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface QueuedFile {
     id: string;
@@ -35,7 +38,10 @@ const Uploader: React.FC = () => {
     const [reviewingId, setReviewingId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [duplicateIds, setDuplicateIds] = useState<Map<string, string>>(new Map()); // id -> reason
+    const [qrIds, setQrIds] = useState<Set<string>>(new Set()); // items decoded as QR codes
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const navigate = useNavigate();
+    const { canPerformScan, canSaveContact, incrementScanCount, user, scansRemaining } = useAuth();
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const newFiles: QueuedFile[] = [];
@@ -73,10 +79,23 @@ const Uploader: React.FC = () => {
     const processOneItem = async (item: QueuedFile): Promise<{ id: string; ocrResult: OCRResult } | null> => {
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'processing', error: undefined } : q));
         try {
+            // Try QR decode first (free, no API call)
+            const qrResult = await tryDecodeQR(item.dataURL);
+            if (qrResult) {
+                setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed', ocrResult: qrResult } : q));
+                setSelectedIds(prev => new Set(prev).add(item.id));
+                setQrIds(prev => new Set(prev).add(item.id));
+                setProcessedCount(prev => prev + 1);
+                // QR decode is free — no scan count increment
+                return { id: item.id, ocrResult: qrResult };
+            }
+
+            // No QR code found — use OCR pipeline (counts as scan)
             const result = await ocrService.processImage(item.dataURL);
             setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed', ocrResult: result } : q));
             setSelectedIds(prev => new Set(prev).add(item.id));
             setProcessedCount(prev => prev + 1);
+            await incrementScanCount();
             return { id: item.id, ocrResult: result };
         } catch (error: any) {
             const errorMsg = error?.message || 'Processing failed';
@@ -89,6 +108,13 @@ const Uploader: React.FC = () => {
 
     const startProcessing = async () => {
         if (isProcessing) return;
+
+        // Check if user has at least 1 scan remaining (some images may be QR codes and won't cost a scan)
+        if (!canPerformScan(1)) {
+            setShowUpgradePrompt(true);
+            return;
+        }
+
         setIsProcessing(true);
         setProcessedCount(0);
 
@@ -192,7 +218,13 @@ const Uploader: React.FC = () => {
 
     const saveAndContinue = async () => {
         const completed = queue.filter(q => q.status === 'completed' && q.ocrResult && selectedIds.has(q.id));
+        const existingContacts = await storage.getAllContacts();
+        let savedCount = existingContacts.length;
         for (const item of completed) {
+            if (!canSaveContact(savedCount)) {
+                setShowUpgradePrompt(true);
+                break;
+            }
             const result = item.ocrResult!;
             const contact: Contact = {
                 id: item.id,
@@ -211,6 +243,7 @@ const Uploader: React.FC = () => {
                 createdAt: Date.now()
             };
             await storage.saveContact(contact);
+            savedCount++;
         }
         navigate('/contacts');
     };
@@ -276,7 +309,7 @@ const Uploader: React.FC = () => {
                         <Upload size={48} />
                     </div>
                     <h2 className="text-xl font-medium mb-2">Drop your cards here</h2>
-                    <p className="text-brand-500 text-sm">Supports JPG, PNG (Bulk upload available)</p>
+                    <p className="text-brand-500 text-sm">Business cards & QR codes — JPG, PNG (Bulk upload)</p>
                 </div>
 
                 {/* Queue Management */}
@@ -365,7 +398,10 @@ const Uploader: React.FC = () => {
                                             {item.status === 'completed' && item.ocrResult
                                                 ? duplicateIds.has(item.id)
                                                     ? <span className="text-amber-400 normal-case flex items-center gap-1"><AlertTriangle size={10} />{duplicateIds.get(item.id)}</span>
-                                                    : <span className="text-slate-500 normal-case">{item.ocrResult.company || 'No company'}</span>
+                                                    : <span className="text-slate-500 normal-case flex items-center gap-1">
+                                                        {qrIds.has(item.id) && <QrCode size={10} className="text-rose-400" />}
+                                                        {qrIds.has(item.id) ? 'QR Code' : (item.ocrResult.company || 'No company')}
+                                                      </span>
                                                 : <>{(item.file.size / 1024).toFixed(1)} KB &bull; {getStatusDisplay(item)}</>
                                             }
                                         </p>
@@ -449,8 +485,17 @@ const Uploader: React.FC = () => {
             </div>
 
             <footer className="p-6 text-center text-xs text-brand-600">
-                Images are processed sequentially using Cloud Vision + Gemini AI.
+                QR codes are auto-detected (free). Business cards use Cloud Vision + Gemini AI.
             </footer>
+
+            {showUpgradePrompt && (
+                <UpgradePrompt
+                    feature="scan"
+                    onDismiss={() => setShowUpgradePrompt(false)}
+                    scansUsed={user?.tier === 'early_access' ? (user.scanUsage.lifetimeCount || 0) : (user?.scanUsage.count || 0)}
+                    scansLimit={user?.tier === 'early_access' ? (user.scanUsage.lifetimeLimit || 30) : 5}
+                />
+            )}
 
             {/* ContactReview modal for individual card editing */}
             {reviewItem && reviewItem.ocrResult && (

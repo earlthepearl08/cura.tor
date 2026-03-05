@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
+import UpgradePrompt from '@/components/UpgradePrompt';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Contacts: React.FC = () => {
     const [contacts, setContacts] = useState<Contact[]>([]);
@@ -28,6 +30,8 @@ const Contacts: React.FC = () => {
         folder: '',
     });
     const navigate = useNavigate();
+    const { canExportCSV, canExportExcel, canExportBulkVCard, canExportVCard } = useAuth();
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
     useEffect(() => {
         loadContacts();
@@ -46,6 +50,11 @@ const Contacts: React.FC = () => {
     };
 
     const handleExport = (type: 'csv' | 'excel' | 'vcard') => {
+        // Check tier permissions
+        if (type === 'csv' && !canExportCSV()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
+        if (type === 'excel' && !canExportExcel()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
+        if (type === 'vcard' && !canExportBulkVCard()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
+
         const toExport = selectedIds.size > 0
             ? contacts.filter(c => selectedIds.has(c.id))
             : filteredContacts;
@@ -222,11 +231,21 @@ const Contacts: React.FC = () => {
                             </a>
                         )}
                         <button
-                            onClick={() => exportService.toVCard(contact)}
-                            className="flex items-center justify-center gap-1.5 px-2 py-2 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 rounded-lg transition-colors active:scale-95"
+                            onClick={() => {
+                                if (!canExportVCard()) { setShowUpgradePrompt(true); return; }
+                                exportService.toVCard(contact);
+                            }}
+                            className={`flex items-center justify-center gap-1.5 px-2 py-2 border rounded-lg transition-colors active:scale-95 ${
+                                canExportVCard()
+                                    ? 'bg-violet-500/10 hover:bg-violet-500/20 border-violet-500/30'
+                                    : 'bg-slate-500/10 border-slate-500/30 opacity-60'
+                            }`}
                         >
-                            <FileDown size={14} className="text-violet-400" />
-                            <span className="text-xs font-medium text-violet-400">Save</span>
+                            {canExportVCard()
+                                ? <FileDown size={14} className="text-violet-400" />
+                                : <Lock size={14} className="text-slate-500" />
+                            }
+                            <span className={`text-xs font-medium ${canExportVCard() ? 'text-violet-400' : 'text-slate-500'}`}>Save</span>
                         </button>
                         <button
                             onClick={() => openEditModal(contact)}
@@ -292,21 +311,24 @@ const Contacts: React.FC = () => {
                                     )}
                                     <button
                                         onClick={() => handleExport('csv')}
-                                        className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors"
+                                        className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors flex items-center justify-between ${!canExportCSV() ? 'opacity-60' : ''}`}
                                     >
                                         Export as CSV
+                                        {!canExportCSV() && <Lock size={12} className="text-amber-400" />}
                                     </button>
                                     <button
                                         onClick={() => handleExport('excel')}
-                                        className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors"
+                                        className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportExcel() ? 'opacity-60' : ''}`}
                                     >
                                         Export as Excel
+                                        {!canExportExcel() && <Lock size={12} className="text-amber-400" />}
                                     </button>
                                     <button
                                         onClick={() => handleExport('vcard')}
-                                        className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors"
+                                        className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportBulkVCard() ? 'opacity-60' : ''}`}
                                     >
                                         Export as vCard (.vcf)
+                                        {!canExportBulkVCard() && <Lock size={12} className="text-amber-400" />}
                                     </button>
                                 </div>
                             )}
@@ -502,6 +524,11 @@ const Contacts: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Upgrade Prompt Modal */}
+            {showUpgradePrompt && (
+                <UpgradePrompt feature="export" onDismiss={() => setShowUpgradePrompt(false)} />
             )}
 
             {/* Edit Contact Modal */}

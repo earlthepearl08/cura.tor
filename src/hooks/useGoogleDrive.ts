@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { googleDrive } from '@/services/googleDrive';
 import { storage } from '@/services/storage';
+import { useAuth } from '@/contexts/AuthContext';
 import { Contact } from '@/types/contact';
 
 /** Get the effective timestamp for a contact (updatedAt if set, otherwise createdAt) */
@@ -39,6 +40,7 @@ const mergeContacts = (local: Contact[], drive: Contact[]): Contact[] => {
 };
 
 export const useGoogleDrive = () => {
+  const { canUseGoogleDrive } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [user, setUser] = useState<{ email: string; name: string } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -67,6 +69,10 @@ export const useGoogleDrive = () => {
   }, []);
 
   const syncContacts = useCallback(async () => {
+    if (!canUseGoogleDrive()) {
+      setError('Google Drive sync requires a Pro or Early Access plan');
+      return 0;
+    }
     try {
       setIsSyncing(true);
       setError(null);
@@ -100,9 +106,13 @@ export const useGoogleDrive = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, []);
+  }, [canUseGoogleDrive]);
 
   const connect = useCallback(async () => {
+    if (!canUseGoogleDrive()) {
+      setError('Google Drive sync requires a Pro or Early Access plan');
+      return;
+    }
     try {
       setError(null);
       await googleDrive.signIn();
@@ -116,7 +126,7 @@ export const useGoogleDrive = () => {
       setError(err.message || 'Failed to connect to Google Drive');
       throw err;
     }
-  }, [syncContacts]);
+  }, [syncContacts, canUseGoogleDrive]);
 
   const disconnect = useCallback(() => {
     googleDrive.signOut();

@@ -1,22 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Cpu, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/contexts/AuthContext';
+import { TIER_LIMITS } from '@/types/user';
+import AccessCodeInput from '@/components/AccessCodeInput';
+
+const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> = {
+    free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
+    early_access: { label: 'Early Access', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+    pro: { label: 'Pro', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+};
 
 const Settings = () => {
     const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
     const [ocrEngine, setOcrEngineState] = useState<OCREngine>(getOCREngine());
     const [saved, setSaved] = useState(false);
-    const { isConnected, user, isSyncing, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
+    const { isConnected, user: driveUser, isSyncing, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
+    const { user, signOut, canUseGoogleDrive, scansRemaining } = useAuth();
 
-    const handleSave = () => {
-        setOCREngine(ocrEngine);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-    };
+    const tierBadge = TIER_BADGES[user?.tier || 'free'];
+    const limits = TIER_LIMITS[user?.tier || 'free'];
 
     const handleConnect = async () => {
         try {
@@ -34,6 +41,13 @@ const Settings = () => {
         }
     };
 
+    const handleSignOut = async () => {
+        if (window.confirm('Sign out of Cura.tor?')) {
+            await signOut();
+            navigate('/auth');
+        }
+    };
+
     return (
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
@@ -46,6 +60,129 @@ const Settings = () => {
             </div>
 
             <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+                {/* Account */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Account</p>
+                    <div className="card-elevated rounded-2xl p-4">
+                        <div className="flex items-center gap-4 mb-4">
+                            {user?.photoURL ? (
+                                <img src={user.photoURL} alt="" className="w-12 h-12 rounded-xl object-cover" />
+                            ) : (
+                                <div className="w-12 h-12 rounded-xl bg-brand-700 flex items-center justify-center">
+                                    <User className="w-6 h-6 text-brand-400" />
+                                </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm truncate">{user?.displayName || 'User'}</p>
+                                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${tierBadge.bg} ${tierBadge.color}`}>
+                                {tierBadge.label}
+                            </span>
+                        </div>
+                        <button
+                            onClick={handleSignOut}
+                            className="w-full py-2.5 glass border border-brand-800 rounded-xl text-sm text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <LogOut size={16} />
+                            Sign Out
+                        </button>
+                    </div>
+                </div>
+
+                {/* Plan & Usage */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Plan & Usage</p>
+                    <div className="card-elevated rounded-2xl p-4 space-y-4">
+                        {/* Scan Usage */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium flex items-center gap-2">
+                                    <Zap size={16} className="text-sky-400" />
+                                    Scans
+                                </span>
+                                <span className="text-xs text-slate-500">
+                                    {user?.tier === 'pro'
+                                        ? 'Unlimited'
+                                        : user?.tier === 'early_access'
+                                            ? `${user.scanUsage.lifetimeCount} / ${user.scanUsage.lifetimeLimit || 30} lifetime`
+                                            : `${user?.scanUsage.count || 0} / ${TIER_LIMITS.free.scansPerMonth} this month`
+                                    }
+                                </span>
+                            </div>
+                            {user?.tier !== 'pro' && (
+                                <div className="w-full bg-brand-700 rounded-full h-2">
+                                    <div
+                                        className={`h-2 rounded-full transition-all ${
+                                            scansRemaining === 0 ? 'bg-red-500' : (scansRemaining !== null && scansRemaining <= 2) ? 'bg-amber-500' : 'bg-sky-500'
+                                        }`}
+                                        style={{
+                                            width: `${Math.min(100, user?.tier === 'early_access'
+                                                ? ((user.scanUsage.lifetimeCount / (user.scanUsage.lifetimeLimit || 30)) * 100)
+                                                : (((user?.scanUsage.count || 0) / (TIER_LIMITS.free.scansPerMonth || 5)) * 100)
+                                            )}%`
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Contact Storage */}
+                        {user?.contactLimit !== null && user?.contactLimit !== undefined && (
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs text-slate-400">Contact storage</span>
+                                    <span className="text-xs text-slate-500">{user.contactLimit} contacts max</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Feature list */}
+                        <div className="space-y-1.5 pt-2 border-t border-brand-800">
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400">vCard download</span>
+                                {limits.individualVCard
+                                    ? <Check size={14} className="text-emerald-400" />
+                                    : <Lock size={14} className="text-slate-600" />
+                                }
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400">CSV/Excel export</span>
+                                {limits.csvExport
+                                    ? <Check size={14} className="text-emerald-400" />
+                                    : <Lock size={14} className="text-slate-600" />
+                                }
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400">Google Drive sync</span>
+                                {limits.googleDriveSync
+                                    ? <Check size={14} className="text-emerald-400" />
+                                    : <Lock size={14} className="text-slate-600" />
+                                }
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400">QR scan</span>
+                                <Check size={14} className="text-emerald-400" />
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400">Manual entry</span>
+                                <Check size={14} className="text-emerald-400" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Access Code (only for free users) */}
+                {user?.tier === 'free' && (
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Access Code</p>
+                        <div className="card-elevated rounded-2xl p-4">
+                            <p className="text-xs text-slate-500 mb-3">Have an access code? Enter it below to unlock more features.</p>
+                            <AccessCodeInput />
+                        </div>
+                    </div>
+                )}
+
                 {/* Appearance */}
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Appearance</p>
@@ -102,7 +239,15 @@ const Settings = () => {
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Cloud Backup</p>
                     <div className="card-elevated rounded-2xl p-4">
-                        {isConnected ? (
+                        {!canUseGoogleDrive() ? (
+                            <div className="text-center py-4">
+                                <div className="w-12 h-12 mx-auto mb-3 bg-slate-700/50 rounded-xl flex items-center justify-center">
+                                    <Lock className="w-5 h-5 text-slate-500" />
+                                </div>
+                                <p className="font-semibold text-sm mb-1">Pro Feature</p>
+                                <p className="text-xs text-slate-500">Google Drive sync is available on the Pro plan</p>
+                            </div>
+                        ) : isConnected ? (
                             <>
                                 <div className="flex items-center gap-4 mb-4">
                                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -110,7 +255,7 @@ const Settings = () => {
                                     </div>
                                     <div className="flex-1">
                                         <p className="font-semibold text-sm text-emerald-400">Connected</p>
-                                        {user && <p className="text-xs text-slate-500">{user.email}</p>}
+                                        {driveUser && <p className="text-xs text-slate-500">{driveUser.email}</p>}
                                     </div>
                                     {isSyncing && (
                                         <div className="animate-spin h-5 w-5 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
@@ -162,10 +307,6 @@ const Settings = () => {
                                         <Smartphone className="w-3 h-3 text-sky-400" />
                                         <span>Syncs across all your devices</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                                        <Lock className="w-3 h-3 text-purple-400" />
-                                        <span>Your data stays private</span>
-                                    </div>
                                 </div>
                                 <button
                                     onClick={handleConnect}
@@ -179,24 +320,13 @@ const Settings = () => {
                     </div>
                 </div>
 
-                {/* Save Success Message */}
-                {saved && (
-                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3 animate-in fade-in duration-200">
-                        <Check size={20} className="text-emerald-400" />
-                        <span className="text-sm text-emerald-400">Settings saved successfully!</span>
+                {/* About */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">About</p>
+                    <div className="card-elevated rounded-2xl p-4 text-center">
+                        <p className="text-xs text-slate-500">Cura.tor v1.0 Beta</p>
                     </div>
-                )}
-            </div>
-
-            {/* Save Button */}
-            <div className="p-4 border-t border-brand-800/50 bg-brand-950/80 backdrop-blur">
-                <button
-                    onClick={handleSave}
-                    className="w-full py-4 bg-gradient-to-r from-brand-500 to-brand-600 text-white font-semibold rounded-2xl hover:scale-[1.01] active:scale-[0.99] transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
-                >
-                    <Check size={20} />
-                    Save Settings
-                </button>
+                </div>
             </div>
         </div>
     );

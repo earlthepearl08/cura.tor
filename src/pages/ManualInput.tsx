@@ -4,6 +4,8 @@ import { ArrowLeft, User, Building2, Briefcase, Phone, Mail, MapPin, StickyNote,
 import { storage } from '@/services/storage';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { Contact } from '@/types/contact';
+import UpgradePrompt from '@/components/UpgradePrompt';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ManualInput: React.FC = () => {
     const navigate = useNavigate();
@@ -20,6 +22,8 @@ const ManualInput: React.FC = () => {
     const [duplicateWarning, setDuplicateWarning] = useState<DuplicateResult | null>(null);
     const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const { canSaveContact, user } = useAuth();
 
     // Check for duplicates when form data changes
     useEffect(() => {
@@ -56,6 +60,13 @@ const ManualInput: React.FC = () => {
         // Show warning if duplicate detected and not forcing save
         if (duplicateWarning && !forceSave) {
             setShowDuplicateWarning(true);
+            return;
+        }
+
+        // Check contact storage limit
+        const existingContacts = await storage.getAllContacts();
+        if (!canSaveContact(existingContacts.length)) {
+            setShowUpgradePrompt(true);
             return;
         }
 
@@ -212,6 +223,15 @@ const ManualInput: React.FC = () => {
                     {isSaving ? 'Saving...' : 'Save Contact'}
                 </button>
             </div>
+
+            {/* Storage Limit Modal */}
+            {showUpgradePrompt && (
+                <UpgradePrompt
+                    feature="storage"
+                    onDismiss={() => setShowUpgradePrompt(false)}
+                    contactLimit={user?.contactLimit || 25}
+                />
+            )}
 
             {/* Duplicate Warning Modal */}
             {showDuplicateWarning && duplicateWarning && (

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus, MessageCircle, Download, Camera, Users } from 'lucide-react';
+import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus, MessageCircle, Download, Camera, Users, Lock } from 'lucide-react';
 import { OCRResult, ocrService } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import { storage } from '@/services/storage';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { exportService } from '@/services/export';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ContactReviewProps {
     ocrResult: OCRResult;
@@ -21,6 +22,7 @@ const NOTE_CONTEXTS = [
 ];
 
 const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, reviewOnly }) => {
+    const { canExportVCard } = useAuth();
     const [formData, setFormData] = useState({
         name: ocrResult.name,
         position: ocrResult.position,
@@ -490,11 +492,18 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             </a>
                         )}
                         <button
-                            onClick={() => exportService.toVCard(savedContact)}
-                            className="flex items-center justify-center gap-2 py-3 bg-violet-500/10 border border-violet-500/30 rounded-xl text-violet-400 text-sm font-medium active:scale-95 transition-all"
+                            onClick={() => {
+                                if (!canExportVCard()) return;
+                                exportService.toVCard(savedContact);
+                            }}
+                            className={`flex items-center justify-center gap-2 py-3 border rounded-xl text-sm font-medium active:scale-95 transition-all ${
+                                canExportVCard()
+                                    ? 'bg-violet-500/10 border-violet-500/30 text-violet-400'
+                                    : 'bg-slate-500/10 border-slate-500/30 text-slate-500 opacity-60'
+                            }`}
                         >
-                            <Download size={16} />
-                            Save vCard
+                            {canExportVCard() ? <Download size={16} /> : <Lock size={16} />}
+                            {canExportVCard() ? 'Save vCard' : 'vCard (Pro)'}
                         </button>
                     </div>
 

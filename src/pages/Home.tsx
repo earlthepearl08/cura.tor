@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode } from 'lucide-react';
+import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap } from 'lucide-react';
 import { storage } from '@/services/storage';
-import { getOCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
+import { useAuth } from '@/contexts/AuthContext';
+import { TIER_LIMITS } from '@/types/user';
 import { Contact } from '@/types/contact';
 
 const Home = () => {
@@ -11,9 +12,16 @@ const Home = () => {
     const [weekCount, setWeekCount] = useState(0);
     const [folderCount, setFolderCount] = useState(0);
     const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
-    const [ocrEngine, setOcrEngineState] = useState(getOCREngine());
-    const { isConnected, user, isSyncing } = useGoogleDrive();
+    const { isConnected, user: driveUser, isSyncing } = useGoogleDrive();
+    const { user, scansRemaining } = useAuth();
     const navigate = useNavigate();
+
+    const tierBadge: Record<string, { label: string; color: string; bg: string }> = {
+        free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
+        early_access: { label: 'Early Access', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+        pro: { label: 'Pro', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+    };
+    const badge = tierBadge[user?.tier || 'free'];
 
     useEffect(() => {
         storage.getAllContacts().then(contacts => {
@@ -66,6 +74,38 @@ const Home = () => {
                     </div>
                 </div>
                 <p className="text-slate-500 text-xs tracking-widest uppercase">Smart Contact Curation</p>
+            </div>
+
+            {/* User Greeting */}
+            <div className="w-full max-w-md mb-6">
+                <div className="card-elevated rounded-2xl p-4 flex items-center gap-3">
+                    {user?.photoURL ? (
+                        <img src={user.photoURL} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                    ) : (
+                        <div className="w-10 h-10 rounded-xl bg-brand-700 flex items-center justify-center">
+                            <Users className="w-5 h-5 text-brand-400" />
+                        </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-white truncate">
+                            Hi, {user?.displayName?.split(' ')[0] || 'there'}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${badge.bg} ${badge.color}`}>
+                                {badge.label}
+                            </span>
+                            {user?.tier !== 'pro' && (
+                                <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                    <Zap size={10} className="text-sky-400" />
+                                    {user?.tier === 'early_access'
+                                        ? `${scansRemaining ?? 0} scans left`
+                                        : `${scansRemaining ?? 0} / ${TIER_LIMITS.free.scansPerMonth} scans`
+                                    }
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Primary Actions */}
@@ -218,11 +258,9 @@ const Home = () => {
                             )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <span className="px-2 py-1 bg-slate-800/50 rounded-md">
-                            {ocrEngine === 'cloud-vision' ? 'Cloud Vision' : 'Tesseract'}
-                        </span>
-                    </div>
+                    <span className="text-[10px] text-slate-500 px-2 py-1 bg-slate-800/50 rounded-md">
+                        Cloud Vision + Gemini
+                    </span>
                 </div>
             </div>
         </div>

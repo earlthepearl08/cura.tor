@@ -7,6 +7,9 @@ import Contacts from '@/pages/Contacts';
 import ManualInput from '@/pages/ManualInput';
 import Settings from '@/pages/Settings';
 import QRScan from '@/pages/QRScan';
+import Auth from '@/pages/Auth';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { getTheme } from '@/hooks/useTheme';
 
 function App() {
@@ -16,18 +19,21 @@ function App() {
 
     return (
         <Router>
-            <div className="min-height-screen bg-brand-950">
-                <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/scan" element={<Scan />} />
-                    <Route path="/upload" element={<Upload />} />
-                    <Route path="/contacts" element={<Contacts />} />
-                    <Route path="/manual" element={<ManualInput />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/qr-scan" element={<QRScan />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-            </div>
+            <AuthProvider>
+                <div className="min-height-screen bg-brand-950">
+                    <Routes>
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                        <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
+                        <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+                        <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
+                        <Route path="/manual" element={<ProtectedRoute><ManualInput /></ProtectedRoute>} />
+                        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                        <Route path="/qr-scan" element={<ProtectedRoute><QRScan /></ProtectedRoute>} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                </div>
+            </AuthProvider>
         </Router>
     );
 }

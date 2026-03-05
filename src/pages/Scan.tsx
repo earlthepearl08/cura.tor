@@ -4,6 +4,8 @@ import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff, Layers } from 'luci
 import { useNavigate } from 'react-router-dom';
 import { useOCR } from '@/hooks/useOCR';
 import ContactReview from '@/components/ContactReview';
+import UpgradePrompt from '@/components/UpgradePrompt';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Scanner: React.FC = () => {
     const webcamRef = useRef<Webcam>(null);
@@ -16,6 +18,8 @@ const Scanner: React.FC = () => {
     const [batchCount, setBatchCount] = useState(0);
     const { isProcessing, processImage, result, error, reset } = useOCR();
     const navigate = useNavigate();
+    const { canPerformScan, incrementScanCount, user, scansRemaining } = useAuth();
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
     const cropToViewfinder = useCallback((imageSrc: string): Promise<string> => {
         return new Promise((resolve) => {
@@ -256,8 +260,13 @@ const Scanner: React.FC = () => {
                             <button
                                 onClick={async () => {
                                     if (imgSrc) {
+                                        if (!canPerformScan()) {
+                                            setShowUpgradePrompt(true);
+                                            return;
+                                        }
                                         const ocrResult = await processImage(imgSrc);
                                         if (ocrResult) {
+                                            await incrementScanCount();
                                             setShowReview(true);
                                         }
                                     }
@@ -317,6 +326,15 @@ const Scanner: React.FC = () => {
                         <Check size={18} />
                         Done ({batchCount} scanned)
                     </button>
+                )}
+
+                {showUpgradePrompt && (
+                    <UpgradePrompt
+                        feature="scan"
+                        onDismiss={() => setShowUpgradePrompt(false)}
+                        scansUsed={user?.tier === 'early_access' ? (user.scanUsage.lifetimeCount || 0) : (user?.scanUsage.count || 0)}
+                        scansLimit={user?.tier === 'early_access' ? (user.scanUsage.lifetimeLimit || 30) : 5}
+                    />
                 )}
             </div>
         </div>
