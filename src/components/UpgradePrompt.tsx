@@ -12,24 +12,43 @@ interface UpgradePromptProps {
     contactLimit?: number;
 }
 
-const FEATURE_MESSAGES: Record<string, { title: string; message: string }> = {
-    scan: {
-        title: 'Scan Limit Reached',
-        message: 'You\'ve used all your available scans. Upgrade to Pro for unlimited scanning.',
-    },
-    export: {
-        title: 'Pro Feature',
-        message: 'All export features (vCard, CSV, Excel) are available on paid plans.',
-    },
-    drive: {
-        title: 'Pro Feature',
-        message: 'Google Drive sync is available on the Pro plan.',
-    },
-    storage: {
+function getFeatureMessage(feature: string, tier: string): { title: string; message: string } {
+    if (feature === 'scan') {
+        if (tier === 'early_access') {
+            return {
+                title: 'All Scans Used',
+                message: 'You\'ve used all of your Early Access scans. Stay tuned — premium upgrades are coming soon!',
+            };
+        }
+        return {
+            title: 'Scan Limit Reached',
+            message: 'You\'ve used all 5 free scans this month. Enter an access code to unlock more, or your scans will reset next month.',
+        };
+    }
+    if (feature === 'export') {
+        return {
+            title: 'Export Locked',
+            message: 'Export features (vCard, CSV, Excel) are unlocked with an access code.',
+        };
+    }
+    if (feature === 'drive') {
+        return {
+            title: 'Google Drive Locked',
+            message: 'Google Drive sync is unlocked with an access code.',
+        };
+    }
+    // storage
+    if (tier === 'early_access') {
+        return {
+            title: 'Storage Limit Reached',
+            message: 'You\'ve reached your Early Access limit of 50 contacts. Premium upgrades with more storage are coming soon!',
+        };
+    }
+    return {
         title: 'Storage Limit Reached',
-        message: 'You\'ve reached your contact storage limit. Upgrade to Pro for unlimited contacts.',
-    },
-};
+        message: 'You\'ve reached the free limit of 25 contacts. Enter an access code to unlock more storage.',
+    };
+}
 
 const UpgradePrompt: React.FC<UpgradePromptProps> = ({
     feature,
@@ -46,7 +65,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
     const [codeError, setCodeError] = useState('');
     const [isRedeeming, setIsRedeeming] = useState(false);
 
-    const { title, message } = FEATURE_MESSAGES[feature];
+    const { title, message } = getFeatureMessage(feature, user?.tier || 'free');
 
     const handleRedeem = async () => {
         if (!code.trim()) return;
@@ -107,7 +126,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
                 )}
 
                 {/* Access code section */}
-                {user?.tier === 'free' && !showCodeInput && (
+                {user?.tier !== 'early_access' && user?.tier !== 'pro' && !showCodeInput && (
                     <button
                         onClick={() => setShowCodeInput(true)}
                         className="w-full mb-4 py-2.5 glass border border-brand-700 rounded-xl text-xs font-medium text-brand-400 hover:bg-white/5 transition-colors flex items-center justify-center gap-2"

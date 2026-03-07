@@ -103,7 +103,8 @@ export class StorageService {
 
             console.log(`Migrated ${contacts.length} contacts from ${dbName}`);
             return contacts.length;
-        } catch {
+        } catch (err) {
+            console.error(`Migration from ${dbName} failed:`, err);
             return 0;
         }
     }
