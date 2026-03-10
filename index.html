@@ -30,6 +30,19 @@
 
 <body>
     <div id="root"></div>
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            document.getElementById('root').innerHTML =
+                '<div style="padding:20px;font-family:monospace;font-size:14px;color:#ef4444;background:#1e1e1e;min-height:100vh;white-space:pre-wrap;word-break:break-all;">' +
+                'APP ERROR:\n\n' + msg + '\n\nFile: ' + url + '\nLine: ' + line + ':' + col +
+                '\n\nStack:\n' + (error && error.stack ? error.stack : 'N/A') + '</div>';
+        };
+        window.addEventListener('unhandledrejection', function(e) {
+            document.getElementById('root').innerHTML =
+                '<div style="padding:20px;font-family:monospace;font-size:14px;color:#ef4444;background:#1e1e1e;min-height:100vh;white-space:pre-wrap;word-break:break-all;">' +
+                'PROMISE ERROR:\n\n' + (e.reason ? (e.reason.stack || e.reason.message || e.reason) : 'Unknown') + '</div>';
+        });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
 </body>
 
