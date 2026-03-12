@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
+import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
 
 const Contacts: React.FC = () => {
     const [contacts, setContacts] = useState<Contact[]>([]);
@@ -32,9 +33,33 @@ const Contacts: React.FC = () => {
     const navigate = useNavigate();
     const { canExportCSV, canExportExcel, canExportBulkVCard, canExportVCard } = useAuth();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [persistedFolders, setPersistedFolders] = useState<string[]>([]);
+    const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+    const [vcfPreview, setVcfPreview] = useState<ParsedVCard[] | null>(null);
+    const [vcfFolder, setVcfFolder] = useState('Uncategorized');
+    const [vcfImporting, setVcfImporting] = useState(false);
+    const vcfFileRef = useRef<HTMLInputElement>(null);
+    const createFolderInputRef = useRef<HTMLInputElement>(null);
+    const editNewFolderInputRef = useRef<HTMLInputElement>(null);
+
+    // iOS-safe focus: autoFocus doesn't work reliably on iOS WebKit
+    useEffect(() => {
+        if (showCreateFolder) {
+            const timer = setTimeout(() => createFolderInputRef.current?.focus(), 300);
+            return () => clearTimeout(timer);
+        }
+    }, [showCreateFolder]);
+
+    useEffect(() => {
+        if (editFormData.folder === '__new__') {
+            const timer = setTimeout(() => editNewFolderInputRef.current?.focus(), 300);
+            return () => clearTimeout(timer);
+        }
+    }, [editFormData.folder]);
 
     useEffect(() => {
         loadContacts();
+        loadFolders();
     }, []);
 
     const loadContacts = async () => {
@@ -47,6 +72,52 @@ const Contacts: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const loadFolders = async () => {
+        try {
+            const saved = await storage.getAllFolders();
+            setPersistedFolders(saved);
+        } catch (error) {
+            console.error("Failed to load folders:", error);
+        }
+    };
+
+    const toggleFolderCollapse = (folder: string) => {
+        setCollapsedFolders(prev => {
+            const next = new Set(prev);
+            if (next.has(folder)) next.delete(folder);
+            else next.add(folder);
+            return next;
+        });
+    };
+
+    const handleVcfFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        const text = await file.text();
+        const parsed = parseVCF(text);
+        if (parsed.length === 0) {
+            alert('No contacts found in this VCF file.');
+            return;
+        }
+        setVcfPreview(parsed);
+        setVcfFolder('Uncategorized');
+    };
+
+    const handleVcfImport = async () => {
+        if (!vcfPreview) return;
+        setVcfImporting(true);
+        const newContacts = vcfToContacts(vcfPreview, vcfFolder);
+        await storage.batchSave(newContacts);
+        if (vcfFolder !== 'Uncategorized') {
+            await storage.saveFolder(vcfFolder);
+            setPersistedFolders(prev => [...new Set([...prev, vcfFolder])].sort());
+        }
+        setVcfPreview(null);
+        setVcfImporting(false);
+        loadContacts();
     };
 
     const handleExport = (type: 'csv' | 'excel' | 'vcard') => {
@@ -147,8 +218,9 @@ const Contacts: React.FC = () => {
         loadContacts();
     };
 
-    // Get unique folders from contacts
-    const folders = Array.from(new Set(contacts.map(c => c.folder || 'Uncategorized'))).sort();
+    // Get unique folders from contacts + persisted folders
+    const contactFolders = contacts.map(c => c.folder || 'Uncategorized');
+    const folders = Array.from(new Set([...contactFolders, ...persistedFolders])).sort();
 
     // Filter contacts by search and folder
     const filteredContacts = contacts.filter(c => {
@@ -185,9 +257,25 @@ const Contacts: React.FC = () => {
                     </div>
                 )}
 
-                {/* Image Preview */}
-                <div className="w-24 aspect-[1.586/1] rounded-xl overflow-hidden bg-brand-900 flex-shrink-0 border border-brand-800">
-                    <img src={contact.imageData} alt={contact.name} className="h-full w-full object-cover" />
+                {/* Image Preview + Photo Thumbnails */}
+                <div className="flex-shrink-0 space-y-1.5">
+                    <div className="w-24 aspect-[1.586/1] rounded-xl overflow-hidden bg-brand-900 border border-brand-800">
+                        <img src={contact.imageData} alt={contact.name} className="h-full w-full object-cover" />
+                    </div>
+                    {(contact.personPhoto || contact.locationPhoto) && (
+                        <div className="flex gap-1">
+                            {contact.personPhoto && (
+                                <div className="w-11 h-11 rounded-lg overflow-hidden border border-brand-700" title="Person">
+                                    <img src={contact.personPhoto} alt="Person" className="w-full h-full object-cover" />
+                                </div>
+                            )}
+                            {contact.locationPhoto && (
+                                <div className="w-11 h-11 rounded-lg overflow-hidden border border-brand-700" title="Location">
+                                    <img src={contact.locationPhoto} alt="Location" className="w-full h-full object-cover" />
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -287,6 +375,15 @@ const Contacts: React.FC = () => {
                     </button>
                     <h1 className="text-lg font-semibold gradient-text">My Contacts</h1>
                     <div className="flex items-center gap-1">
+                        {/* VCF Import */}
+                        <input ref={vcfFileRef} type="file" accept=".vcf" className="hidden" onChange={handleVcfFile} />
+                        <button
+                            onClick={() => vcfFileRef.current?.click()}
+                            className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400 hover:text-white"
+                            title="Import VCF"
+                        >
+                            <Upload size={20} />
+                        </button>
                         {/* Select Mode Toggle */}
                         <button
                             onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
@@ -372,16 +469,37 @@ const Contacts: React.FC = () => {
                                 All Folders ({contacts.length})
                             </button>
                             {folders.map(folder => (
-                                <button
-                                    key={folder}
-                                    onClick={() => {
-                                        setSelectedFolder(folder);
-                                        setShowFolderDropdown(false);
-                                    }}
-                                    className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors border-t border-brand-800 ${selectedFolder === folder ? 'bg-brand-500/20 text-brand-400' : ''}`}
-                                >
-                                    {folder} ({contacts.filter(c => (c.folder || 'Uncategorized') === folder).length})
-                                </button>
+                                <div key={folder} className="flex items-center border-t border-brand-800">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedFolder(folder);
+                                            setShowFolderDropdown(false);
+                                        }}
+                                        className={`flex-1 text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors ${selectedFolder === folder ? 'bg-brand-500/20 text-brand-400' : ''}`}
+                                    >
+                                        {folder} ({contacts.filter(c => (c.folder || 'Uncategorized') === folder).length})
+                                    </button>
+                                    {folder !== 'Uncategorized' && (
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (!window.confirm(`Delete folder "${folder}"? Contacts will be moved to Uncategorized.`)) return;
+                                                const folderContacts = contacts.filter(c => c.folder === folder);
+                                                for (const c of folderContacts) {
+                                                    await storage.saveContact({ ...c, folder: 'Uncategorized', updatedAt: Date.now() });
+                                                }
+                                                await storage.deleteFolder(folder);
+                                                setPersistedFolders(prev => prev.filter(f => f !== folder));
+                                                if (selectedFolder === folder) setSelectedFolder('all');
+                                                loadContacts();
+                                            }}
+                                            className="p-2 mr-2 text-brand-600 hover:text-red-400 transition-colors"
+                                            title={`Delete folder "${folder}"`}
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
+                                </div>
                             ))}
                             <button
                                 onClick={() => {
@@ -410,16 +528,31 @@ const Contacts: React.FC = () => {
                     </div>
                 ) : selectedFolder === 'all' ? (
                     // Show grouped by folders
-                    Object.entries(groupedContacts).sort(([a], [b]) => a.localeCompare(b)).map(([folder, folderContacts]) => (
+                    Object.entries(groupedContacts).sort(([a], [b]) => {
+                        if (a === 'Uncategorized') return -1;
+                        if (b === 'Uncategorized') return 1;
+                        return a.localeCompare(b);
+                    }).map(([folder, folderContacts]) => (
                         <div key={folder} className="space-y-3">
-                            <div className="flex items-center gap-2 px-2">
+                            <button
+                                onClick={() => toggleFolderCollapse(folder)}
+                                className="flex items-center gap-2 px-2 w-full text-left"
+                            >
                                 <Folder size={16} className="text-brand-500" />
                                 <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider">{folder}</h3>
                                 <span className="text-xs text-brand-600">({folderContacts.length})</span>
-                            </div>
-                            <div className="space-y-4">
-                                {folderContacts.map((contact) => renderContactCard(contact))}
-                            </div>
+                                <div className="ml-auto">
+                                    {collapsedFolders.has(folder)
+                                        ? <ChevronDown size={16} className="text-brand-600" />
+                                        : <ChevronUp size={16} className="text-brand-600" />
+                                    }
+                                </div>
+                            </button>
+                            {!collapsedFolders.has(folder) && (
+                                <div className="space-y-4">
+                                    {folderContacts.map((contact) => renderContactCard(contact))}
+                                </div>
+                            )}
                         </div>
                     ))
                 ) : (
@@ -482,18 +615,23 @@ const Contacts: React.FC = () => {
                             <div className="relative">
                                 <FolderPlus className="absolute left-3 top-3 text-brand-500" size={18} />
                                 <input
+                                    ref={createFolderInputRef}
                                     type="text"
+                                    inputMode="text"
+                                    enterKeyHint="done"
                                     value={newFolderName}
                                     onChange={(e) => setNewFolderName(e.target.value)}
-                                    onKeyDown={(e) => {
+                                    onKeyDown={async (e) => {
                                         if (e.key === 'Enter' && newFolderName.trim()) {
-                                            setSelectedFolder(newFolderName.trim());
+                                            const name = newFolderName.trim();
+                                            await storage.saveFolder(name);
+                                            setPersistedFolders(prev => [...new Set([...prev, name])].sort());
+                                            setSelectedFolder(name);
                                             setNewFolderName('');
                                             setShowCreateFolder(false);
                                         }
                                     }}
                                     placeholder="Folder name (e.g., Clients, Suppliers)"
-                                    autoFocus
                                     className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
                                 />
                             </div>
@@ -509,9 +647,12 @@ const Contacts: React.FC = () => {
                                 Cancel
                             </button>
                             <button
-                                onClick={() => {
+                                onClick={async () => {
                                     if (newFolderName.trim()) {
-                                        setSelectedFolder(newFolderName.trim());
+                                        const name = newFolderName.trim();
+                                        await storage.saveFolder(name);
+                                        setPersistedFolders(prev => [...new Set([...prev, name])].sort());
+                                        setSelectedFolder(name);
                                         setNewFolderName('');
                                         setShowCreateFolder(false);
                                     }
@@ -546,11 +687,25 @@ const Contacts: React.FC = () => {
                             </button>
                         </div>
 
-                        {/* Card Preview */}
-                        <div className="p-4">
+                        {/* Card Preview + Photos */}
+                        <div className="p-4 space-y-3">
                             <div className="w-full aspect-[1.586/1] rounded-xl overflow-hidden bg-brand-800 border border-brand-700">
                                 <img src={editingContact.imageData} alt="card" className="w-full h-full object-cover" />
                             </div>
+                            {(editingContact.personPhoto || editingContact.locationPhoto) && (
+                                <div className="flex gap-2">
+                                    {editingContact.personPhoto && (
+                                        <div className="flex-1 rounded-xl overflow-hidden border border-brand-700 aspect-square">
+                                            <img src={editingContact.personPhoto} alt="Person" className="w-full h-full object-cover" />
+                                        </div>
+                                    )}
+                                    {editingContact.locationPhoto && (
+                                        <div className="flex-1 rounded-xl overflow-hidden border border-brand-700 aspect-square">
+                                            <img src={editingContact.locationPhoto} alt="Location" className="w-full h-full object-cover" />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Form Fields */}
@@ -653,7 +808,10 @@ const Contacts: React.FC = () => {
                                 <div className="relative">
                                     <FolderPlus className="absolute left-3 top-3 text-brand-500" size={18} />
                                     <input
+                                        ref={editNewFolderInputRef}
                                         type="text"
+                                        inputMode="text"
+                                        enterKeyHint="done"
                                         placeholder="Enter new folder name..."
                                         onBlur={(e) => {
                                             const newFolder = e.target.value.trim();
@@ -673,7 +831,6 @@ const Contacts: React.FC = () => {
                                                 }
                                             }
                                         }}
-                                        autoFocus
                                         className="w-full glass border border-brand-500 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
                                     />
                                 </div>
@@ -688,6 +845,71 @@ const Contacts: React.FC = () => {
                             >
                                 <Save size={18} />
                                 Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* VCF Import Preview Modal */}
+            {vcfPreview && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                    <div className="bg-brand-900 rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col border border-brand-800 shadow-2xl">
+                        <div className="p-4 border-b border-brand-800 flex items-center justify-between">
+                            <h3 className="text-lg font-bold gradient-text">Import Contacts</h3>
+                            <button onClick={() => setVcfPreview(null)} className="p-2 text-brand-600 hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-4 space-y-3 border-b border-brand-800">
+                            <p className="text-sm text-brand-300">
+                                {vcfPreview.length} contact{vcfPreview.length !== 1 ? 's' : ''} found
+                            </p>
+                            <div className="relative">
+                                <Folder className="absolute left-3 top-3 text-brand-500" size={18} />
+                                <select
+                                    value={vcfFolder}
+                                    onChange={(e) => setVcfFolder(e.target.value)}
+                                    className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 bg-brand-900"
+                                >
+                                    <option value="Uncategorized">Uncategorized</option>
+                                    {folders.filter(f => f !== 'Uncategorized').map(f => (
+                                        <option key={f} value={f}>{f}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {vcfPreview.map((c, i) => (
+                                <div key={i} className="glass border border-brand-800 rounded-xl p-3">
+                                    <p className="font-medium text-sm text-slate-100 truncate">{c.name || 'No name'}</p>
+                                    {c.company && <p className="text-xs text-brand-400 truncate">{c.company}</p>}
+                                    {c.phone.length > 0 && <p className="text-xs text-slate-500 truncate">{c.phone.join(', ')}</p>}
+                                    {c.email.length > 0 && <p className="text-xs text-slate-500 truncate">{c.email.join(', ')}</p>}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="p-4 border-t border-brand-800 flex gap-2">
+                            <button
+                                onClick={() => setVcfPreview(null)}
+                                className="flex-1 py-2.5 bg-brand-800 hover:bg-brand-700 rounded-xl font-medium transition-colors text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleVcfImport}
+                                disabled={vcfImporting}
+                                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-medium transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {vcfImporting ? (
+                                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                                ) : (
+                                    <Upload size={16} />
+                                )}
+                                Import {vcfPreview.length} Contact{vcfPreview.length !== 1 ? 's' : ''}
                             </button>
                         </div>
                     </div>

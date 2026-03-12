@@ -14,4 +14,6 @@ export interface Contact {
     isVerified: boolean;
     createdAt: number;    // Unix timestamp
     updatedAt?: number;   // Unix timestamp for last edit
+    personPhoto?: string;   // Base64 photo of the person
+    locationPhoto?: string; // Base64 photo of location/booth
 }

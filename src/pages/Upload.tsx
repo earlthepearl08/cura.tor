@@ -19,6 +19,8 @@ interface QueuedFile {
     status: 'queued' | 'processing' | 'completed' | 'error';
     error?: string;
     ocrResult?: OCRResult;
+    editedNotes?: string;
+    editedFolder?: string;
 }
 
 /** Convert a File to a base64 data URL */
@@ -238,8 +240,8 @@ const Uploader: React.FC = () => {
                 imageData: item.dataURL,
                 confidence: result.confidence,
                 isVerified: false,
-                notes: '',
-                folder: 'Uncategorized',
+                notes: item.editedNotes ?? '',
+                folder: item.editedFolder ?? 'Uncategorized',
                 createdAt: Date.now()
             };
             await storage.saveContact(contact);
@@ -503,6 +505,8 @@ const Uploader: React.FC = () => {
                     reviewOnly
                     ocrResult={reviewItem.ocrResult}
                     imageData={reviewItem.dataURL}
+                    initialNotes={reviewItem.editedNotes}
+                    initialFolder={reviewItem.editedFolder}
                     onCancel={() => setReviewingId(null)}
                     onDelete={() => {
                         removeFile(reviewItem.id);
@@ -521,7 +525,9 @@ const Uploader: React.FC = () => {
                                 phone: contact.phone,
                                 email: contact.email,
                                 address: contact.address,
-                            }
+                            },
+                            editedNotes: contact.notes,
+                            editedFolder: contact.folder,
                         } : q));
                         setReviewingId(null);
                     }}

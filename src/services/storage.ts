@@ -2,8 +2,9 @@ import { openDB, IDBPDatabase } from 'idb';
 import { Contact } from '@/types/contact';
 
 const DB_PREFIX = 'CardScannerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'contacts';
+const FOLDERS_STORE = 'folders';
 
 export class StorageService {
     private db: Promise<IDBPDatabase>;
@@ -24,9 +25,14 @@ export class StorageService {
     private openUserDB(uid: string | null): Promise<IDBPDatabase> {
         const dbName = uid ? `${DB_PREFIX}_${uid}` : DB_PREFIX;
         return openDB(dbName, DB_VERSION, {
-            upgrade(db) {
+            upgrade(db, oldVersion) {
                 if (!db.objectStoreNames.contains(STORE_NAME)) {
                     db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                }
+                if (oldVersion < 2) {
+                    if (!db.objectStoreNames.contains(FOLDERS_STORE)) {
+                        db.createObjectStore(FOLDERS_STORE, { keyPath: 'name' });
+                    }
                 }
             },
         });
@@ -61,6 +67,22 @@ export class StorageService {
         await db.clear(STORE_NAME);
     }
 
+    async getAllFolders(): Promise<string[]> {
+        const db = await this.db;
+        const records = await db.getAll(FOLDERS_STORE);
+        return records.map((r: any) => r.name);
+    }
+
+    async saveFolder(name: string): Promise<void> {
+        const db = await this.db;
+        await db.put(FOLDERS_STORE, { name });
+    }
+
+    async deleteFolder(name: string): Promise<void> {
+        const db = await this.db;
+        await db.delete(FOLDERS_STORE, name);
+    }
+
     /** One-time migration: copy contacts from the old shared DB into the current user's DB, then clear the old one. */
     async migrateFromLegacyDB(): Promise<number> {
         if (!this.currentUid) return 0;
@@ -84,9 +106,14 @@ export class StorageService {
     private async migrateFromDB(dbName: string): Promise<number> {
         try {
             const sourceDb = await openDB(dbName, DB_VERSION, {
-                upgrade(db) {
+                upgrade(db, oldVersion) {
                     if (!db.objectStoreNames.contains(STORE_NAME)) {
                         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                    if (oldVersion < 2) {
+                        if (!db.objectStoreNames.contains(FOLDERS_STORE)) {
+                            db.createObjectStore(FOLDERS_STORE, { keyPath: 'name' });
+                        }
                     }
                 },
             });

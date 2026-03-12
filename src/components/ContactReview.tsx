@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus, MessageCircle, Download, Camera, Users, Lock, Trash2 } from 'lucide-react';
 import { OCRResult, ocrService } from '@/services/ocr';
 import { Contact } from '@/types/contact';
@@ -6,6 +6,34 @@ import { storage } from '@/services/storage';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { exportService } from '@/services/export';
 import { useAuth } from '@/contexts/AuthContext';
+
+/** Compress an image file to max 800px JPEG at 0.7 quality, returns base64 data URL */
+function compressPhoto(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const MAX = 800;
+                let w = img.width, h = img.height;
+                if (w > MAX || h > MAX) {
+                    const ratio = Math.min(MAX / w, MAX / h);
+                    w = Math.round(w * ratio);
+                    h = Math.round(h * ratio);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.onerror = reject;
+            img.src = reader.result as string;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
 
 interface ContactReviewProps {
     ocrResult: OCRResult;
@@ -15,6 +43,8 @@ interface ContactReviewProps {
     onScanAnother?: () => void;
     onDelete?: () => void; // Delete/discard this item (e.g., remove from upload queue)
     reviewOnly?: boolean; // Skip saving to storage and success screen (for upload review)
+    initialNotes?: string;  // Pre-populate notes (for re-opening edited items)
+    initialFolder?: string; // Pre-populate folder (for re-opening edited items)
 }
 
 const NOTE_CONTEXTS = [
@@ -22,7 +52,7 @@ const NOTE_CONTEXTS = [
     'Referral', 'Meeting', 'Exhibition'
 ];
 
-const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, onDelete, reviewOnly }) => {
+const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, onDelete, reviewOnly, initialNotes, initialFolder }) => {
     const { canExportVCard } = useAuth();
     const [formData, setFormData] = useState({
         name: ocrResult.name,
@@ -31,8 +61,8 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         phone: ocrResult.phone.join(', '),
         email: ocrResult.email.join(', '),
         address: ocrResult.address,
-        notes: '',
-        folder: 'Uncategorized',
+        notes: initialNotes ?? '',
+        folder: initialFolder ?? 'Uncategorized',
     });
 
     const [duplicateWarning, setDuplicateWarning] = useState<DuplicateResult | null>(null);
@@ -45,12 +75,27 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
     const [showCreateFolderInline, setShowCreateFolderInline] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
     const [savedContact, setSavedContact] = useState<Contact | null>(null);
+    const [personPhoto, setPersonPhoto] = useState<string | null>(null);
+    const [locationPhoto, setLocationPhoto] = useState<string | null>(null);
+    const newFolderInputRef = useRef<HTMLInputElement>(null);
+    const personPhotoRef = useRef<HTMLInputElement>(null);
+    const locationPhotoRef = useRef<HTMLInputElement>(null);
 
-    // Load existing folders on mount
+    // iOS-safe focus
+    useEffect(() => {
+        if (showCreateFolderInline) {
+            const timer = setTimeout(() => newFolderInputRef.current?.focus(), 300);
+            return () => clearTimeout(timer);
+        }
+    }, [showCreateFolderInline]);
+
+    // Load existing folders on mount (from contacts + persisted)
     useEffect(() => {
         const loadFolders = async () => {
             const existingContacts = await storage.getAllContacts();
-            const uniqueFolders = Array.from(new Set(existingContacts.map(c => c.folder || 'Uncategorized'))).sort();
+            const contactFolders = existingContacts.map(c => c.folder || 'Uncategorized');
+            const persistedFolders = await storage.getAllFolders();
+            const uniqueFolders = Array.from(new Set([...contactFolders, ...persistedFolders])).sort();
             setFolders(uniqueFolders);
         };
         loadFolders();
@@ -128,7 +173,9 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
             imageData: imageData,
             confidence: ocrResult.confidence,
             isVerified: true,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            ...(personPhoto ? { personPhoto } : {}),
+            ...(locationPhoto ? { locationPhoto } : {}),
         };
 
         if (reviewOnly) {
@@ -174,6 +221,78 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                 {/* Card Preview */}
                 <div className="w-full aspect-[1.586/1] rounded-2xl overflow-hidden glass border border-brand-800 shadow-2xl">
                     <img src={imageData} alt="original card" className="w-full h-full object-cover" />
+                </div>
+
+                {/* Photo Capture: Person & Location */}
+                <div className="flex gap-3">
+                    {/* Person Photo */}
+                    <input
+                        ref={personPhotoRef}
+                        type="file"
+                        accept="image/*"
+                        capture="user"
+                        className="hidden"
+                        onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) setPersonPhoto(await compressPhoto(file));
+                            e.target.value = '';
+                        }}
+                    />
+                    <button
+                        onClick={() => personPhotoRef.current?.click()}
+                        className="flex-1 flex flex-col items-center gap-2 py-3 glass border border-brand-800 rounded-xl hover:bg-white/5 active:scale-95 transition-all overflow-hidden"
+                    >
+                        {personPhoto ? (
+                            <div className="relative w-full">
+                                <img src={personPhoto} alt="Person" className="w-full h-20 object-cover rounded-lg" />
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setPersonPhoto(null); }}
+                                    className="absolute top-1 right-1 p-1 bg-black/60 rounded-full"
+                                >
+                                    <X size={12} className="text-white" />
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <User size={20} className="text-brand-400" />
+                                <span className="text-xs text-brand-400 font-medium">Photo of Person</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Location Photo */}
+                    <input
+                        ref={locationPhotoRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) setLocationPhoto(await compressPhoto(file));
+                            e.target.value = '';
+                        }}
+                    />
+                    <button
+                        onClick={() => locationPhotoRef.current?.click()}
+                        className="flex-1 flex flex-col items-center gap-2 py-3 glass border border-brand-800 rounded-xl hover:bg-white/5 active:scale-95 transition-all overflow-hidden"
+                    >
+                        {locationPhoto ? (
+                            <div className="relative w-full">
+                                <img src={locationPhoto} alt="Location" className="w-full h-20 object-cover rounded-lg" />
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setLocationPhoto(null); }}
+                                    className="absolute top-1 right-1 p-1 bg-black/60 rounded-full"
+                                >
+                                    <X size={12} className="text-white" />
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <MapPin size={20} className="text-brand-400" />
+                                <span className="text-xs text-brand-400 font-medium">Photo of Location</span>
+                            </>
+                        )}
+                    </button>
                 </div>
 
                 {/* Confidence + Raw Text Toggle */}
@@ -369,27 +488,33 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             <div className="relative">
                                 <FolderPlus className="absolute left-3 top-3 text-brand-500" size={18} />
                                 <input
+                                    ref={newFolderInputRef}
                                     type="text"
+                                    inputMode="text"
+                                    enterKeyHint="done"
                                     value={newFolderName}
                                     onChange={(e) => setNewFolderName(e.target.value)}
                                     onBlur={() => {
                                         if (newFolderName.trim()) {
-                                            setFormData({ ...formData, folder: newFolderName.trim() });
-                                            setFolders([...folders, newFolderName.trim()].sort());
+                                            const name = newFolderName.trim();
+                                            storage.saveFolder(name);
+                                            setFormData({ ...formData, folder: name });
+                                            setFolders([...folders, name].sort());
                                         }
                                         setShowCreateFolderInline(false);
                                         setNewFolderName('');
                                     }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && newFolderName.trim()) {
-                                            setFormData({ ...formData, folder: newFolderName.trim() });
-                                            setFolders([...folders, newFolderName.trim()].sort());
+                                            const name = newFolderName.trim();
+                                            storage.saveFolder(name);
+                                            setFormData({ ...formData, folder: name });
+                                            setFolders([...folders, name].sort());
                                             setShowCreateFolderInline(false);
                                             setNewFolderName('');
                                         }
                                     }}
                                     placeholder="Enter new folder name..."
-                                    autoFocus
                                     className="w-full glass border border-brand-500 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
                                 />
                             </div>

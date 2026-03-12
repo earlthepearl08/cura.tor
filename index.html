@@ -30,45 +30,6 @@
 
 <body>
     <div id="root"></div>
-    <script>
-        window.__APP_LOADED = false;
-        window.onerror = function(msg, url, line, col, error) {
-            document.getElementById('root').innerHTML =
-                '<div style="padding:20px;font-family:monospace;font-size:14px;color:#ef4444;background:#1e1e1e;min-height:100vh;white-space:pre-wrap;word-break:break-all;">' +
-                'APP ERROR:\n\n' + msg + '\n\nFile: ' + url + '\nLine: ' + line + ':' + col +
-                '\n\nStack:\n' + (error && error.stack ? error.stack : 'N/A') + '</div>';
-        };
-        window.addEventListener('unhandledrejection', function(e) {
-            document.getElementById('root').innerHTML =
-                '<div style="padding:20px;font-family:monospace;font-size:14px;color:#ef4444;background:#1e1e1e;min-height:100vh;white-space:pre-wrap;word-break:break-all;">' +
-                'PROMISE ERROR:\n\n' + (e.reason ? (e.reason.stack || e.reason.message || e.reason) : 'Unknown') + '</div>';
-        });
-        // Detect if JS module failed to load entirely
-        setTimeout(function() {
-            if (!window.__APP_LOADED) {
-                var root = document.getElementById('root');
-                if (!root.children.length || root.innerHTML.trim() === '') {
-                    root.innerHTML =
-                        '<div style="padding:20px;font-family:monospace;font-size:13px;color:#fbbf24;background:#1e1e1e;min-height:100vh;white-space:pre-wrap;word-break:break-all;">' +
-                        'DIAGNOSTIC: App did not load after 8 seconds.\n\n' +
-                        'User Agent: ' + navigator.userAgent + '\n\n' +
-                        'URL: ' + location.href + '\n\n' +
-                        'Online: ' + navigator.onLine + '\n\n' +
-                        'Protocol: ' + location.protocol + '\n\n' +
-                        'Testing script fetch...\n</div>';
-                    // Try to fetch the built JS to see if it returns an error
-                    var scripts = document.querySelectorAll('script[type=module]');
-                    if (scripts.length) {
-                        fetch(scripts[0].src).then(function(r) {
-                            root.innerHTML += '<div style="padding:0 20px;font-family:monospace;font-size:13px;color:#fbbf24;background:#1e1e1e;white-space:pre-wrap;">JS fetch status: ' + r.status + ' ' + r.statusText + '\nContent-Type: ' + r.headers.get('content-type') + '\nContent-Length: ' + r.headers.get('content-length') + '</div>';
-                        }).catch(function(err) {
-                            root.innerHTML += '<div style="padding:0 20px;font-family:monospace;font-size:13px;color:#ef4444;background:#1e1e1e;white-space:pre-wrap;">JS fetch FAILED: ' + err.message + '</div>';
-                        });
-                    }
-                }
-            }
-        }, 8000);
-    </script>
     <script type="module" src="/src/main.tsx"></script>
 </body>
 
