@@ -8,6 +8,33 @@ import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
 
+function compressPhoto(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const MAX = 800;
+                let w = img.width, h = img.height;
+                if (w > MAX || h > MAX) {
+                    const ratio = Math.min(MAX / w, MAX / h);
+                    w = Math.round(w * ratio);
+                    h = Math.round(h * ratio);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.onerror = reject;
+            img.src = reader.result as string;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
 const Contacts: React.FC = () => {
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +65,10 @@ const Contacts: React.FC = () => {
     const [vcfPreview, setVcfPreview] = useState<ParsedVCard[] | null>(null);
     const [vcfFolder, setVcfFolder] = useState('Uncategorized');
     const [vcfImporting, setVcfImporting] = useState(false);
+    const [editPersonPhoto, setEditPersonPhoto] = useState<string | null>(null);
+    const [editLocationPhoto, setEditLocationPhoto] = useState<string | null>(null);
+    const editPersonPhotoRef = useRef<HTMLInputElement>(null);
+    const editLocationPhotoRef = useRef<HTMLInputElement>(null);
     const vcfFileRef = useRef<HTMLInputElement>(null);
     const createFolderInputRef = useRef<HTMLInputElement>(null);
     const editNewFolderInputRef = useRef<HTMLInputElement>(null);
@@ -181,6 +212,8 @@ const Contacts: React.FC = () => {
 
     const openEditModal = (contact: Contact) => {
         setEditingContact(contact);
+        setEditPersonPhoto(contact.personPhoto || null);
+        setEditLocationPhoto(contact.locationPhoto || null);
         setEditFormData({
             name: contact.name,
             position: contact.position,
@@ -210,6 +243,8 @@ const Contacts: React.FC = () => {
             address: editFormData.address,
             notes: editFormData.notes,
             folder: editFormData.folder || 'Uncategorized',
+            personPhoto: editPersonPhoto || undefined,
+            locationPhoto: editLocationPhoto || undefined,
             updatedAt: Date.now(),
         };
 
@@ -692,20 +727,61 @@ const Contacts: React.FC = () => {
                             <div className="w-full aspect-[1.586/1] rounded-xl overflow-hidden bg-brand-800 border border-brand-700">
                                 <img src={editingContact.imageData} alt="card" className="w-full h-full object-cover" />
                             </div>
-                            {(editingContact.personPhoto || editingContact.locationPhoto) && (
-                                <div className="flex gap-2">
-                                    {editingContact.personPhoto && (
-                                        <div className="flex-1 rounded-xl overflow-hidden border border-brand-700 aspect-square">
-                                            <img src={editingContact.personPhoto} alt="Person" className="w-full h-full object-cover" />
+                            <div className="flex gap-3">
+                                <input ref={editPersonPhotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) setEditPersonPhoto(await compressPhoto(file));
+                                    e.target.value = '';
+                                }} />
+                                <button
+                                    onClick={() => editPersonPhotoRef.current?.click()}
+                                    className="flex-1 flex flex-col items-center gap-2 py-3 glass border border-brand-800 rounded-xl hover:bg-white/5 active:scale-95 transition-all overflow-hidden"
+                                >
+                                    {editPersonPhoto ? (
+                                        <div className="relative w-full">
+                                            <img src={editPersonPhoto} alt="Person" className="w-full h-20 object-cover rounded-lg" />
+                                            <button
+                                                onClick={(ev) => { ev.stopPropagation(); setEditPersonPhoto(null); }}
+                                                className="absolute top-1 right-1 p-1 bg-black/60 rounded-full"
+                                            >
+                                                <X size={12} className="text-white" />
+                                            </button>
                                         </div>
+                                    ) : (
+                                        <>
+                                            <User size={20} className="text-brand-400" />
+                                            <span className="text-xs text-brand-400 font-medium">Photo of Person</span>
+                                        </>
                                     )}
-                                    {editingContact.locationPhoto && (
-                                        <div className="flex-1 rounded-xl overflow-hidden border border-brand-700 aspect-square">
-                                            <img src={editingContact.locationPhoto} alt="Location" className="w-full h-full object-cover" />
+                                </button>
+
+                                <input ref={editLocationPhotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) setEditLocationPhoto(await compressPhoto(file));
+                                    e.target.value = '';
+                                }} />
+                                <button
+                                    onClick={() => editLocationPhotoRef.current?.click()}
+                                    className="flex-1 flex flex-col items-center gap-2 py-3 glass border border-brand-800 rounded-xl hover:bg-white/5 active:scale-95 transition-all overflow-hidden"
+                                >
+                                    {editLocationPhoto ? (
+                                        <div className="relative w-full">
+                                            <img src={editLocationPhoto} alt="Location" className="w-full h-20 object-cover rounded-lg" />
+                                            <button
+                                                onClick={(ev) => { ev.stopPropagation(); setEditLocationPhoto(null); }}
+                                                className="absolute top-1 right-1 p-1 bg-black/60 rounded-full"
+                                            >
+                                                <X size={12} className="text-white" />
+                                            </button>
                                         </div>
+                                    ) : (
+                                        <>
+                                            <MapPin size={20} className="text-brand-400" />
+                                            <span className="text-xs text-brand-400 font-medium">Photo of Location</span>
+                                        </>
                                     )}
-                                </div>
-                            )}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Form Fields */}

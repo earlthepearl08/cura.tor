@@ -230,7 +230,6 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         ref={personPhotoRef}
                         type="file"
                         accept="image/*"
-                        capture="user"
                         className="hidden"
                         onChange={async (e) => {
                             const file = e.target.files?.[0];
