@@ -1023,12 +1023,134 @@ Return ONLY the JSON object. No explanation, no markdown.`;
         return isProperCase || hasNamePattern;
     }
 
+    async parseLogSheet(base64Image: string): Promise<LogSheetEntry[]> {
+        console.log('[LogSheet] Parsing log sheet with Gemini...');
+
+        const prompt = `You are an expert data extractor specializing in event log sheets and sign-in sheets.
+
+## Task
+Analyze this image of a log sheet / sign-in sheet from an event, conference, or trade show.
+Each ROW in the sheet represents a DIFFERENT person who signed in.
+
+## Instructions
+1. Identify the table/grid structure in the image.
+2. Identify column headers (they may be: Name, Company, Position/Title, Phone, Email, Address, Purpose/Notes, etc.)
+3. For EACH row (each person), extract the data into the corresponding fields.
+4. If a column doesn't exist in the sheet, leave that field as an empty string.
+5. Skip any empty rows or header rows.
+6. Handle handwritten text as best you can - if unclear, make your best guess.
+7. Each row MUST be a separate entry in the array.
+
+## Output Format
+Return ONLY a JSON array of objects with these fields:
+- name: Person's full name
+- company: Company/organization name
+- position: Job title/role
+- phone: Phone number
+- email: Email address
+- address: Physical address
+- notes: Any other info (purpose of visit, booth interest, etc.)`;
+
+        const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 90000);
+
+        try {
+            const response = await fetch('/api/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            { inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } }
+                        ]
+                    }],
+                    model: 'gemini-2.5-flash',
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 8192,
+                        responseMimeType: 'application/json',
+                        responseSchema: {
+                            type: 'ARRAY',
+                            items: {
+                                type: 'OBJECT',
+                                properties: {
+                                    name: { type: 'STRING' },
+                                    company: { type: 'STRING' },
+                                    position: { type: 'STRING' },
+                                    phone: { type: 'STRING' },
+                                    email: { type: 'STRING' },
+                                    address: { type: 'STRING' },
+                                    notes: { type: 'STRING' }
+                                },
+                                required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
+                            }
+                        }
+                    }
+                }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error('No response from Gemini');
+
+            console.log('[LogSheet] Raw response:', text);
+
+            let parsed;
+            try {
+                parsed = JSON.parse(text);
+            } catch {
+                const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
+                if (!jsonMatch) throw new Error('No JSON array in Gemini response');
+                parsed = JSON.parse(jsonMatch[0]);
+            }
+
+            if (!Array.isArray(parsed)) throw new Error('Gemini did not return an array');
+
+            return parsed
+                .filter((e: any) => e.name?.trim() || e.company?.trim() || e.phone?.trim() || e.email?.trim())
+                .map((e: any) => ({
+                    name: e.name || '',
+                    company: e.company || '',
+                    position: e.position || '',
+                    phone: e.phone || '',
+                    email: e.email || '',
+                    address: e.address || '',
+                    notes: e.notes || ''
+                }));
+        } catch (error) {
+            clearTimeout(timeout);
+            throw error;
+        }
+    }
+
     async terminate(): Promise<void> {
         if (this.worker) {
             this.worker.terminate();
             this.worker = null;
         }
     }
+}
+
+export interface LogSheetEntry {
+    name: string;
+    company: string;
+    position: string;
+    phone: string;
+    email: string;
+    address: string;
+    notes: string;
 }
 
 export const ocrService = new OCRService();

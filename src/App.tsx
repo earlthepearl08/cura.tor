@@ -7,6 +7,7 @@ import Contacts from '@/pages/Contacts';
 import ManualInput from '@/pages/ManualInput';
 import Settings from '@/pages/Settings';
 import QRScan from '@/pages/QRScan';
+import LogScan from '@/pages/LogScan';
 import Auth from '@/pages/Auth';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -30,6 +31,7 @@ function App() {
                         <Route path="/manual" element={<ProtectedRoute><ManualInput /></ProtectedRoute>} />
                         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                         <Route path="/qr-scan" element={<ProtectedRoute><QRScan /></ProtectedRoute>} />
+                        <Route path="/log-scan" element={<ProtectedRoute><LogScan /></ProtectedRoute>} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </div>

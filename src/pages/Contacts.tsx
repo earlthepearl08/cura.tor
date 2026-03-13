@@ -1,39 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, Camera, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
-
-function compressPhoto(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const img = new Image();
-            img.onload = () => {
-                const MAX = 800;
-                let w = img.width, h = img.height;
-                if (w > MAX || h > MAX) {
-                    const ratio = Math.min(MAX / w, MAX / h);
-                    w = Math.round(w * ratio);
-                    h = Math.round(h * ratio);
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-                resolve(canvas.toDataURL('image/jpeg', 0.7));
-            };
-            img.onerror = reject;
-            img.src = reader.result as string;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
+import { compressPhoto } from '@/utils/compressPhoto';
+import PhotoActionSheet from '@/components/PhotoActionSheet';
 
 const Contacts: React.FC = () => {
     const [contacts, setContacts] = useState<Contact[]>([]);
@@ -67,6 +42,7 @@ const Contacts: React.FC = () => {
     const [vcfImporting, setVcfImporting] = useState(false);
     const [editPersonPhoto, setEditPersonPhoto] = useState<string | null>(null);
     const [editLocationPhoto, setEditLocationPhoto] = useState<string | null>(null);
+    const [editPhotoSheet, setEditPhotoSheet] = useState<'person' | 'location' | null>(null);
     const editPersonCamRef = useRef<HTMLInputElement>(null);
     const editPersonGalRef = useRef<HTMLInputElement>(null);
     const editLocationCamRef = useRef<HTMLInputElement>(null);
@@ -734,57 +710,44 @@ const Contacts: React.FC = () => {
                             <input ref={editLocationCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setEditLocationPhoto(await compressPhoto(f)); e.target.value = ''; }} />
                             <input ref={editLocationGalRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setEditLocationPhoto(await compressPhoto(f)); e.target.value = ''; }} />
                             <div className="flex gap-3">
-                                <div className="flex-1 glass border border-brand-800 rounded-xl overflow-hidden">
+                                <div
+                                    className="flex-1 glass border border-brand-800 rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-all"
+                                    onClick={() => setEditPhotoSheet('person')}
+                                >
                                     {editPersonPhoto ? (
-                                        <div className="relative">
-                                            <img src={editPersonPhoto} alt="Person" className="w-full h-20 object-cover" />
-                                            <button onClick={() => setEditPersonPhoto(null)} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full">
-                                                <X size={12} className="text-white" />
-                                            </button>
-                                        </div>
+                                        <img src={editPersonPhoto} alt="Person" className="w-full h-24 object-cover" />
                                     ) : (
-                                        <div className="flex items-center justify-center gap-1 py-2">
-                                            <User size={14} className="text-brand-500" />
-                                            <span className="text-[10px] text-brand-400 font-medium">Person</span>
+                                        <div className="flex flex-col items-center justify-center gap-1 py-4">
+                                            <User size={20} className="text-brand-500" />
+                                            <span className="text-[10px] text-brand-400 font-medium">Person Photo</span>
+                                            <span className="text-[8px] text-brand-600">Tap to add</span>
                                         </div>
                                     )}
-                                    <div className="flex border-t border-brand-800">
-                                        <button onClick={() => editPersonCamRef.current?.click()} className="flex-1 flex items-center justify-center gap-1 py-2 hover:bg-white/5 active:scale-95 transition-all border-r border-brand-800">
-                                            <Camera size={14} className="text-brand-400" />
-                                            <span className="text-[10px] text-brand-400">Camera</span>
-                                        </button>
-                                        <button onClick={() => editPersonGalRef.current?.click()} className="flex-1 flex items-center justify-center gap-1 py-2 hover:bg-white/5 active:scale-95 transition-all">
-                                            <ImageIcon size={14} className="text-brand-400" />
-                                            <span className="text-[10px] text-brand-400">Gallery</span>
-                                        </button>
-                                    </div>
                                 </div>
-                                <div className="flex-1 glass border border-brand-800 rounded-xl overflow-hidden">
+                                <div
+                                    className="flex-1 glass border border-brand-800 rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-all"
+                                    onClick={() => setEditPhotoSheet('location')}
+                                >
                                     {editLocationPhoto ? (
-                                        <div className="relative">
-                                            <img src={editLocationPhoto} alt="Location" className="w-full h-20 object-cover" />
-                                            <button onClick={() => setEditLocationPhoto(null)} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full">
-                                                <X size={12} className="text-white" />
-                                            </button>
-                                        </div>
+                                        <img src={editLocationPhoto} alt="Location" className="w-full h-24 object-cover" />
                                     ) : (
-                                        <div className="flex items-center justify-center gap-1 py-2">
-                                            <MapPin size={14} className="text-brand-500" />
-                                            <span className="text-[10px] text-brand-400 font-medium">Location</span>
+                                        <div className="flex flex-col items-center justify-center gap-1 py-4">
+                                            <MapPin size={20} className="text-brand-500" />
+                                            <span className="text-[10px] text-brand-400 font-medium">Location Photo</span>
+                                            <span className="text-[8px] text-brand-600">Tap to add</span>
                                         </div>
                                     )}
-                                    <div className="flex border-t border-brand-800">
-                                        <button onClick={() => editLocationCamRef.current?.click()} className="flex-1 flex items-center justify-center gap-1 py-2 hover:bg-white/5 active:scale-95 transition-all border-r border-brand-800">
-                                            <Camera size={14} className="text-brand-400" />
-                                            <span className="text-[10px] text-brand-400">Camera</span>
-                                        </button>
-                                        <button onClick={() => editLocationGalRef.current?.click()} className="flex-1 flex items-center justify-center gap-1 py-2 hover:bg-white/5 active:scale-95 transition-all">
-                                            <ImageIcon size={14} className="text-brand-400" />
-                                            <span className="text-[10px] text-brand-400">Gallery</span>
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
+                            <PhotoActionSheet
+                                isOpen={editPhotoSheet !== null}
+                                label={editPhotoSheet === 'person' ? 'Person Photo' : 'Location Photo'}
+                                hasPhoto={editPhotoSheet === 'person' ? !!editPersonPhoto : !!editLocationPhoto}
+                                onTakePhoto={() => { if (editPhotoSheet === 'person') editPersonCamRef.current?.click(); else editLocationCamRef.current?.click(); setEditPhotoSheet(null); }}
+                                onChooseGallery={() => { if (editPhotoSheet === 'person') editPersonGalRef.current?.click(); else editLocationGalRef.current?.click(); setEditPhotoSheet(null); }}
+                                onRemovePhoto={() => { if (editPhotoSheet === 'person') setEditPersonPhoto(null); else setEditLocationPhoto(null); setEditPhotoSheet(null); }}
+                                onClose={() => setEditPhotoSheet(null)}
+                            />
                         </div>
 
                         {/* Form Fields */}
