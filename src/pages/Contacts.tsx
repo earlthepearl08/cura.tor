@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, Camera, Image as ImageIcon } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
@@ -67,8 +67,10 @@ const Contacts: React.FC = () => {
     const [vcfImporting, setVcfImporting] = useState(false);
     const [editPersonPhoto, setEditPersonPhoto] = useState<string | null>(null);
     const [editLocationPhoto, setEditLocationPhoto] = useState<string | null>(null);
-    const editPersonPhotoRef = useRef<HTMLInputElement>(null);
-    const editLocationPhotoRef = useRef<HTMLInputElement>(null);
+    const editPersonCamRef = useRef<HTMLInputElement>(null);
+    const editPersonGalRef = useRef<HTMLInputElement>(null);
+    const editLocationCamRef = useRef<HTMLInputElement>(null);
+    const editLocationGalRef = useRef<HTMLInputElement>(null);
     const vcfFileRef = useRef<HTMLInputElement>(null);
     const createFolderInputRef = useRef<HTMLInputElement>(null);
     const editNewFolderInputRef = useRef<HTMLInputElement>(null);
@@ -727,60 +729,61 @@ const Contacts: React.FC = () => {
                             <div className="w-full aspect-[1.586/1] rounded-xl overflow-hidden bg-brand-800 border border-brand-700">
                                 <img src={editingContact.imageData} alt="card" className="w-full h-full object-cover" />
                             </div>
+                            <input ref={editPersonCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setEditPersonPhoto(await compressPhoto(f)); e.target.value = ''; }} />
+                            <input ref={editPersonGalRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setEditPersonPhoto(await compressPhoto(f)); e.target.value = ''; }} />
+                            <input ref={editLocationCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setEditLocationPhoto(await compressPhoto(f)); e.target.value = ''; }} />
+                            <input ref={editLocationGalRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setEditLocationPhoto(await compressPhoto(f)); e.target.value = ''; }} />
                             <div className="flex gap-3">
-                                <input ref={editPersonPhotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) setEditPersonPhoto(await compressPhoto(file));
-                                    e.target.value = '';
-                                }} />
-                                <button
-                                    onClick={() => editPersonPhotoRef.current?.click()}
-                                    className="flex-1 flex flex-col items-center gap-2 py-3 glass border border-brand-800 rounded-xl hover:bg-white/5 active:scale-95 transition-all overflow-hidden"
-                                >
+                                <div className="flex-1 glass border border-brand-800 rounded-xl overflow-hidden">
                                     {editPersonPhoto ? (
-                                        <div className="relative w-full">
-                                            <img src={editPersonPhoto} alt="Person" className="w-full h-20 object-cover rounded-lg" />
-                                            <button
-                                                onClick={(ev) => { ev.stopPropagation(); setEditPersonPhoto(null); }}
-                                                className="absolute top-1 right-1 p-1 bg-black/60 rounded-full"
-                                            >
+                                        <div className="relative">
+                                            <img src={editPersonPhoto} alt="Person" className="w-full h-20 object-cover" />
+                                            <button onClick={() => setEditPersonPhoto(null)} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full">
                                                 <X size={12} className="text-white" />
                                             </button>
                                         </div>
                                     ) : (
-                                        <>
-                                            <User size={20} className="text-brand-400" />
-                                            <span className="text-xs text-brand-400 font-medium">Photo of Person</span>
-                                        </>
+                                        <div className="flex items-center justify-center gap-1 py-2">
+                                            <User size={14} className="text-brand-500" />
+                                            <span className="text-[10px] text-brand-400 font-medium">Person</span>
+                                        </div>
                                     )}
-                                </button>
-
-                                <input ref={editLocationPhotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) setEditLocationPhoto(await compressPhoto(file));
-                                    e.target.value = '';
-                                }} />
-                                <button
-                                    onClick={() => editLocationPhotoRef.current?.click()}
-                                    className="flex-1 flex flex-col items-center gap-2 py-3 glass border border-brand-800 rounded-xl hover:bg-white/5 active:scale-95 transition-all overflow-hidden"
-                                >
+                                    <div className="flex border-t border-brand-800">
+                                        <button onClick={() => editPersonCamRef.current?.click()} className="flex-1 flex items-center justify-center gap-1 py-2 hover:bg-white/5 active:scale-95 transition-all border-r border-brand-800">
+                                            <Camera size={14} className="text-brand-400" />
+                                            <span className="text-[10px] text-brand-400">Camera</span>
+                                        </button>
+                                        <button onClick={() => editPersonGalRef.current?.click()} className="flex-1 flex items-center justify-center gap-1 py-2 hover:bg-white/5 active:scale-95 transition-all">
+                                            <ImageIcon size={14} className="text-brand-400" />
+                                            <span className="text-[10px] text-brand-400">Gallery</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 glass border border-brand-800 rounded-xl overflow-hidden">
                                     {editLocationPhoto ? (
-                                        <div className="relative w-full">
-                                            <img src={editLocationPhoto} alt="Location" className="w-full h-20 object-cover rounded-lg" />
-                                            <button
-                                                onClick={(ev) => { ev.stopPropagation(); setEditLocationPhoto(null); }}
-                                                className="absolute top-1 right-1 p-1 bg-black/60 rounded-full"
-                                            >
+                                        <div className="relative">
+                                            <img src={editLocationPhoto} alt="Location" className="w-full h-20 object-cover" />
+                                            <button onClick={() => setEditLocationPhoto(null)} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full">
                                                 <X size={12} className="text-white" />
                                             </button>
                                         </div>
                                     ) : (
-                                        <>
-                                            <MapPin size={20} className="text-brand-400" />
-                                            <span className="text-xs text-brand-400 font-medium">Photo of Location</span>
-                                        </>
+                                        <div className="flex items-center justify-center gap-1 py-2">
+                                            <MapPin size={14} className="text-brand-500" />
+                                            <span className="text-[10px] text-brand-400 font-medium">Location</span>
+                                        </div>
                                     )}
-                                </button>
+                                    <div className="flex border-t border-brand-800">
+                                        <button onClick={() => editLocationCamRef.current?.click()} className="flex-1 flex items-center justify-center gap-1 py-2 hover:bg-white/5 active:scale-95 transition-all border-r border-brand-800">
+                                            <Camera size={14} className="text-brand-400" />
+                                            <span className="text-[10px] text-brand-400">Camera</span>
+                                        </button>
+                                        <button onClick={() => editLocationGalRef.current?.click()} className="flex-1 flex items-center justify-center gap-1 py-2 hover:bg-white/5 active:scale-95 transition-all">
+                                            <ImageIcon size={14} className="text-brand-400" />
+                                            <span className="text-[10px] text-brand-400">Gallery</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
