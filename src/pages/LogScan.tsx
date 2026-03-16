@@ -96,7 +96,7 @@ const LogScan: React.FC = () => {
 
         let allEntries = append ? [...(entries || [])] : [];
         let sheetsProcessed = append ? sheetCount : 0;
-        let failedSheets = 0;
+        const failedIndices: number[] = [];
 
         for (let i = 0; i < files.length; i++) {
             setProcessingProgress(`Analyzing sheet ${i + 1} of ${files.length}...`);
@@ -111,7 +111,7 @@ const LogScan: React.FC = () => {
                     sheetsProcessed++;
                 }
             } catch (err: any) {
-                failedSheets++;
+                failedIndices.push(i + 1);
                 console.error(`Failed to process sheet ${i + 1}:`, err?.message || err);
             }
         }
@@ -120,14 +120,14 @@ const LogScan: React.FC = () => {
         setSheetCount(sheetsProcessed);
         if (allEntries.length > 0) {
             setEntries(allEntries);
-            if (failedSheets > 0) {
-                setError(`${failedSheets} of ${files.length} sheet(s) failed to process.`);
+            if (failedIndices.length > 0) {
+                setError(`Sheet${failedIndices.length > 1 ? 's' : ''} ${failedIndices.join(', ')} failed to process.`);
             }
             await checkEntriesForDuplicates(allEntries);
         } else {
             setEntries(null);
-            setError(failedSheets > 0
-                ? `All ${files.length} sheets failed to process. Try selecting fewer sheets or use camera instead.`
+            setError(failedIndices.length > 0
+                ? `All ${files.length} sheets failed (${failedIndices.join(', ')}). Try selecting fewer sheets or use camera instead.`
                 : 'No entries found on any sheet.');
         }
         setIsProcessing(false);
