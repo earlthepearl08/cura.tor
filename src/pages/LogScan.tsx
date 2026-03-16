@@ -425,7 +425,7 @@ const LogScan: React.FC = () => {
                                 <AlertTriangle size={20} className="text-red-400 flex-shrink-0" />
                                 <div>
                                     <p className="text-sm text-red-300">{error}</p>
-                                    <button onClick={() => processLogSheet(imageData)} className="text-xs text-red-400 underline mt-1">
+                                    <button onClick={() => entries && entries.length > 0 ? processLogSheetAppend(imageData!) : processLogSheet(imageData!)} className="text-xs text-red-400 underline mt-1">
                                         Retry
                                     </button>
                                 </div>
