@@ -38,7 +38,15 @@ export class StorageService {
         });
     }
 
+    /** Get all active (non-deleted) contacts */
     async getAllContacts(): Promise<Contact[]> {
+        const db = await this.db;
+        const all: Contact[] = await db.getAll(STORE_NAME);
+        return all.filter(c => !c.isDeleted);
+    }
+
+    /** Get all contacts including soft-deleted tombstones (used by sync) */
+    async getAllContactsIncludingDeleted(): Promise<Contact[]> {
         const db = await this.db;
         return db.getAll(STORE_NAME);
     }
@@ -48,9 +56,62 @@ export class StorageService {
         await db.put(STORE_NAME, contact);
     }
 
+    /** Soft-delete: marks contact as deleted (tombstone) so sync can propagate the deletion */
     async deleteContact(id: string): Promise<void> {
         const db = await this.db;
+        const contact = await db.get(STORE_NAME, id);
+        if (contact) {
+            contact.isDeleted = true;
+            contact.deletedAt = Date.now();
+            contact.updatedAt = Date.now();
+            // Strip heavy data from tombstone to save space
+            contact.imageData = '';
+            contact.rawText = '';
+            contact.personPhoto = undefined;
+            contact.locationPhoto = undefined;
+            await db.put(STORE_NAME, contact);
+        }
+    }
+
+    /** Hard-delete: permanently removes a contact record (used after sync propagation) */
+    async hardDeleteContact(id: string): Promise<void> {
+        const db = await this.db;
         await db.delete(STORE_NAME, id);
+    }
+
+    /** Get all soft-deleted contacts (recently deleted, recoverable) */
+    async getDeletedContacts(): Promise<Contact[]> {
+        const db = await this.db;
+        const all: Contact[] = await db.getAll(STORE_NAME);
+        return all.filter(c => c.isDeleted).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+    }
+
+    /** Restore a soft-deleted contact (un-delete) */
+    async restoreContact(id: string): Promise<void> {
+        const db = await this.db;
+        const contact = await db.get(STORE_NAME, id);
+        if (contact && contact.isDeleted) {
+            contact.isDeleted = false;
+            contact.deletedAt = undefined;
+            contact.updatedAt = Date.now();
+            await db.put(STORE_NAME, contact);
+        }
+    }
+
+    /** Remove tombstones older than the given age (default 30 days) */
+    async purgeTombstones(maxAgeMs: number = 30 * 24 * 60 * 60 * 1000): Promise<number> {
+        const db = await this.db;
+        const all: Contact[] = await db.getAll(STORE_NAME);
+        const cutoff = Date.now() - maxAgeMs;
+        const toDelete = all.filter(c => c.isDeleted && c.deletedAt && c.deletedAt < cutoff);
+        if (toDelete.length > 0) {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            for (const c of toDelete) {
+                tx.store.delete(c.id);
+            }
+            await tx.done;
+        }
+        return toDelete.length;
     }
 
     async batchSave(contacts: Contact[]): Promise<void> {
@@ -86,21 +147,22 @@ export class StorageService {
     /** One-time migration: copy contacts from the old shared DB into the current user's DB, then clear the old one. */
     async migrateFromLegacyDB(): Promise<number> {
         if (!this.currentUid) return 0;
+        return this.migrateFromDB(DB_PREFIX);
+    }
 
-        let total = 0;
-
-        // Migrate from the old shared (no-UID) DB
-        total += await this.migrateFromDB(DB_PREFIX);
-
-        // One-time fix: contacts were accidentally migrated to wrong account.
-        // Copy them from that account's DB to the current user, then clean up.
-        const WRONG_UID = '5disr5WXONYXDCe6l2ONfduk2Ht2';
-        const TARGET_UID = 'sNu5XECxkQfddPQXxuuOw9YFn2n2';
-        if (this.currentUid === TARGET_UID) {
-            total += await this.migrateFromDB(`${DB_PREFIX}_${WRONG_UID}`);
+    /** Batch update folder for multiple contacts (used by bulk move) */
+    async batchUpdateFolder(ids: string[], folder: string): Promise<void> {
+        const db = await this.db;
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        for (const id of ids) {
+            const contact = await tx.store.get(id);
+            if (contact) {
+                contact.folder = folder;
+                contact.updatedAt = Date.now();
+                tx.store.put(contact);
+            }
         }
-
-        return total;
+        await tx.done;
     }
 
     private async migrateFromDB(dbName: string): Promise<number> {

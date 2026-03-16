@@ -24,3 +24,7 @@ build/
 .env
 .env.local
 .vercel
+
+# Test scripts with potential secrets
+test-*.mjs
+test-*.js

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
+import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
@@ -40,6 +41,14 @@ const Contacts: React.FC = () => {
     const [vcfPreview, setVcfPreview] = useState<ParsedVCard[] | null>(null);
     const [vcfFolder, setVcfFolder] = useState('Uncategorized');
     const [vcfImporting, setVcfImporting] = useState(false);
+    const [vcfNewFolder, setVcfNewFolder] = useState('');
+    const [vcfDuplicateMap, setVcfDuplicateMap] = useState<Map<number, DuplicateResult>>(new Map());
+    const [vcfSelectedEntries, setVcfSelectedEntries] = useState<Set<number>>(new Set());
+    const [deletedContacts, setDeletedContacts] = useState<Contact[]>([]);
+    const [showDeleted, setShowDeleted] = useState(false);
+    const [showMoveModal, setShowMoveModal] = useState(false);
+    const [moveTargetFolder, setMoveTargetFolder] = useState('Uncategorized');
+    const [moveNewFolder, setMoveNewFolder] = useState('');
     const [editPersonPhoto, setEditPersonPhoto] = useState<string | null>(null);
     const [editLocationPhoto, setEditLocationPhoto] = useState<string | null>(null);
     const [editPhotoSheet, setEditPhotoSheet] = useState<'person' | 'location' | null>(null);
@@ -69,6 +78,7 @@ const Contacts: React.FC = () => {
     useEffect(() => {
         loadContacts();
         loadFolders();
+        loadDeletedContacts();
     }, []);
 
     const loadContacts = async () => {
@@ -92,6 +102,27 @@ const Contacts: React.FC = () => {
         }
     };
 
+    const loadDeletedContacts = async () => {
+        try {
+            const deleted = await storage.getDeletedContacts();
+            setDeletedContacts(deleted);
+        } catch (error) {
+            console.error("Failed to load deleted contacts:", error);
+        }
+    };
+
+    const restoreContact = async (id: string) => {
+        await storage.restoreContact(id);
+        loadContacts();
+        loadDeletedContacts();
+    };
+
+    const permanentlyDeleteContact = async (id: string) => {
+        if (!window.confirm("Permanently delete this contact? This cannot be undone.")) return;
+        await storage.hardDeleteContact(id);
+        loadDeletedContacts();
+    };
+
     const toggleFolderCollapse = (folder: string) => {
         setCollapsedFolders(prev => {
             const next = new Set(prev);
@@ -113,18 +144,49 @@ const Contacts: React.FC = () => {
         }
         setVcfPreview(parsed);
         setVcfFolder('Uncategorized');
+
+        // Check for duplicates
+        const existingContacts = await storage.getAllContacts();
+        const dupMap = new Map<number, DuplicateResult>();
+        const selected = new Set<number>();
+        parsed.forEach((card, index) => {
+            const result = checkDuplicate(
+                { name: card.name, email: card.email, phone: card.phone, company: card.company },
+                existingContacts
+            );
+            if (result.isDuplicate) {
+                dupMap.set(index, result);
+            } else {
+                selected.add(index);
+            }
+        });
+        setVcfDuplicateMap(dupMap);
+        setVcfSelectedEntries(selected);
+    };
+
+    const toggleVcfSelection = (index: number) => {
+        setVcfSelectedEntries(prev => {
+            const next = new Set(prev);
+            if (next.has(index)) next.delete(index);
+            else next.add(index);
+            return next;
+        });
     };
 
     const handleVcfImport = async () => {
         if (!vcfPreview) return;
+        const selectedCards = vcfPreview.filter((_, i) => vcfSelectedEntries.has(i));
+        if (selectedCards.length === 0) return;
         setVcfImporting(true);
-        const newContacts = vcfToContacts(vcfPreview, vcfFolder);
+        const newContacts = vcfToContacts(selectedCards, vcfFolder);
         await storage.batchSave(newContacts);
         if (vcfFolder !== 'Uncategorized') {
             await storage.saveFolder(vcfFolder);
             setPersistedFolders(prev => [...new Set([...prev, vcfFolder])].sort());
         }
         setVcfPreview(null);
+        setVcfDuplicateMap(new Map());
+        setVcfSelectedEntries(new Set());
         setVcfImporting(false);
         loadContacts();
     };
@@ -174,15 +236,32 @@ const Contacts: React.FC = () => {
         if (window.confirm("Delete this contact?")) {
             await storage.deleteContact(id);
             loadContacts();
+            loadDeletedContacts();
         }
     };
 
     const deleteSelected = async () => {
         if (selectedIds.size === 0) return;
-        if (!window.confirm(`Delete ${selectedIds.size} contact${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+        if (!window.confirm(`Delete ${selectedIds.size} contact${selectedIds.size > 1 ? 's' : ''}?`)) return;
         for (const id of selectedIds) {
             await storage.deleteContact(id);
         }
+        setSelectedIds(new Set());
+        setSelectMode(false);
+        loadContacts();
+        loadDeletedContacts();
+    };
+
+    const moveSelectedToFolder = async () => {
+        if (selectedIds.size === 0) return;
+        const folder = moveTargetFolder === '__new__' ? moveNewFolder.trim() || 'Uncategorized' : moveTargetFolder;
+        await storage.batchUpdateFolder(Array.from(selectedIds), folder);
+        if (folder !== 'Uncategorized') {
+            await storage.saveFolder(folder);
+            setPersistedFolders(prev => [...new Set([...prev, folder])].sort());
+        }
+        setShowMoveModal(false);
+        setMoveNewFolder('');
         setSelectedIds(new Set());
         setSelectMode(false);
         loadContacts();
@@ -524,6 +603,18 @@ const Contacts: React.FC = () => {
                                 <FolderPlus size={16} />
                                 Create New Folder
                             </button>
+                            {deletedContacts.length > 0 && (
+                                <button
+                                    onClick={() => {
+                                        setShowDeleted(true);
+                                        setShowFolderDropdown(false);
+                                    }}
+                                    className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors border-t border-brand-800 text-red-400 flex items-center gap-2"
+                                >
+                                    <Trash2 size={16} />
+                                    Recently Deleted ({deletedContacts.length})
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -593,17 +684,24 @@ const Contacts: React.FC = () => {
                         </button>
                     </div>
                     {selectedIds.size > 0 && (
-                        <div className="flex gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                             <button
                                 onClick={() => setShowExportOptions(true)}
-                                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-800/50 hover:bg-brand-800 border border-brand-700 rounded-xl text-sm font-medium transition-colors"
+                                className="flex items-center justify-center gap-2 py-2.5 bg-brand-800/50 hover:bg-brand-800 border border-brand-700 rounded-xl text-sm font-medium transition-colors"
                             >
                                 <Download size={16} className="text-brand-400" />
                                 Export
                             </button>
                             <button
+                                onClick={() => { setMoveTargetFolder('Uncategorized'); setMoveNewFolder(''); setShowMoveModal(true); }}
+                                className="flex items-center justify-center gap-2 py-2.5 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 rounded-xl text-sm font-medium text-violet-400 transition-colors"
+                            >
+                                <Folder size={16} />
+                                Move
+                            </button>
+                            <button
                                 onClick={deleteSelected}
-                                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-sm font-medium text-red-400 transition-colors"
+                                className="flex items-center justify-center gap-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-sm font-medium text-red-400 transition-colors"
                             >
                                 <Trash2 size={16} />
                                 Delete
@@ -905,33 +1003,92 @@ const Contacts: React.FC = () => {
                         </div>
 
                         <div className="p-4 space-y-3 border-b border-brand-800">
-                            <p className="text-sm text-brand-300">
-                                {vcfPreview.length} contact{vcfPreview.length !== 1 ? 's' : ''} found
-                            </p>
+                            <div>
+                                <p className="text-sm text-brand-300">
+                                    {vcfPreview.length} contact{vcfPreview.length !== 1 ? 's' : ''} found
+                                </p>
+                                {vcfDuplicateMap.size > 0 && (
+                                    <p className="text-xs text-amber-400 mt-0.5">
+                                        {vcfDuplicateMap.size} duplicate{vcfDuplicateMap.size !== 1 ? 's' : ''} detected — deselected by default
+                                    </p>
+                                )}
+                            </div>
                             <div className="relative">
                                 <Folder className="absolute left-3 top-3 text-brand-500" size={18} />
                                 <select
                                     value={vcfFolder}
-                                    onChange={(e) => setVcfFolder(e.target.value)}
+                                    onChange={(e) => { setVcfFolder(e.target.value); if (e.target.value !== '__new__') setVcfNewFolder(''); }}
                                     className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 bg-brand-900"
                                 >
                                     <option value="Uncategorized">Uncategorized</option>
                                     {folders.filter(f => f !== 'Uncategorized').map(f => (
                                         <option key={f} value={f}>{f}</option>
                                     ))}
+                                    <option value="__new__">+ Create New Folder</option>
                                 </select>
+                                {vcfFolder === '__new__' && (
+                                    <div className="relative mt-2">
+                                        <FolderPlus className="absolute left-3 top-3 text-brand-500" size={18} />
+                                        <input
+                                            type="text"
+                                            value={vcfNewFolder}
+                                            onChange={(e) => setVcfNewFolder(e.target.value)}
+                                            onBlur={() => {
+                                                const name = vcfNewFolder.trim();
+                                                if (name) setVcfFolder(name);
+                                                else setVcfFolder('Uncategorized');
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    const name = vcfNewFolder.trim();
+                                                    if (name) setVcfFolder(name);
+                                                    else setVcfFolder('Uncategorized');
+                                                }
+                                            }}
+                                            placeholder="Enter new folder name..."
+                                            className="w-full glass border border-brand-500 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                                            autoFocus
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                            {vcfPreview.map((c, i) => (
-                                <div key={i} className="glass border border-brand-800 rounded-xl p-3">
-                                    <p className="font-medium text-sm text-slate-100 truncate">{c.name || 'No name'}</p>
-                                    {c.company && <p className="text-xs text-brand-400 truncate">{c.company}</p>}
-                                    {c.phone.length > 0 && <p className="text-xs text-slate-500 truncate">{c.phone.join(', ')}</p>}
-                                    {c.email.length > 0 && <p className="text-xs text-slate-500 truncate">{c.email.join(', ')}</p>}
+                            {vcfPreview.map((c, i) => {
+                                const isDup = vcfDuplicateMap.has(i);
+                                const isSelected = vcfSelectedEntries.has(i);
+                                return (
+                                <div key={i} className={`glass border rounded-xl p-3 transition-all ${isDup && !isSelected ? 'border-amber-500/30 opacity-60' : isSelected ? 'border-brand-800' : 'border-brand-800 opacity-60'}`}>
+                                    <div className="flex items-start gap-2">
+                                        <button onClick={() => toggleVcfSelection(i)} className="flex-shrink-0 mt-0.5">
+                                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-brand-500 border-brand-500' : 'border-brand-600'}`}>
+                                                {isSelected && <Check size={12} className="text-white" />}
+                                            </div>
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-medium text-sm text-slate-100 truncate">{c.name || 'No name'}</p>
+                                                {isDup && (
+                                                    <span className="flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded text-[9px] font-bold text-amber-400">
+                                                        <AlertCircle size={9} />
+                                                        DUP
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {isDup && vcfDuplicateMap.get(i) && (
+                                                <p className="text-[10px] text-amber-400/70 truncate">
+                                                    Matches "{vcfDuplicateMap.get(i)!.matchedContact?.name}" — {vcfDuplicateMap.get(i)!.matchReasons.join(', ')}
+                                                </p>
+                                            )}
+                                            {c.company && <p className="text-xs text-brand-400 truncate">{c.company}</p>}
+                                            {c.phone.length > 0 && <p className="text-xs text-slate-500 truncate">{c.phone.join(', ')}</p>}
+                                            {c.email.length > 0 && <p className="text-xs text-slate-500 truncate">{c.email.join(', ')}</p>}
+                                        </div>
+                                    </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         <div className="p-4 border-t border-brand-800 flex gap-2">
@@ -943,7 +1100,7 @@ const Contacts: React.FC = () => {
                             </button>
                             <button
                                 onClick={handleVcfImport}
-                                disabled={vcfImporting}
+                                disabled={vcfImporting || vcfFolder === '__new__' || vcfSelectedEntries.size === 0}
                                 className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-medium transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {vcfImporting ? (
@@ -951,7 +1108,135 @@ const Contacts: React.FC = () => {
                                 ) : (
                                     <Upload size={16} />
                                 )}
-                                Import {vcfPreview.length} Contact{vcfPreview.length !== 1 ? 's' : ''}
+                                Import {vcfSelectedEntries.size} of {vcfPreview.length} Contact{vcfPreview.length !== 1 ? 's' : ''}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Recently Deleted Modal */}
+            {showDeleted && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                    <div className="bg-brand-900 rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col border border-brand-800 shadow-2xl">
+                        <div className="p-4 border-b border-brand-800 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-red-400">Recently Deleted</h3>
+                            <button onClick={() => setShowDeleted(false)} className="p-2 text-brand-600 hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-4 border-b border-brand-800">
+                            <p className="text-xs text-brand-500">
+                                Deleted contacts are kept for 30 days, then permanently removed. Restored contacts may lose their card image and photos.
+                            </p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {deletedContacts.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 text-brand-500">
+                                    <Trash2 size={32} className="mb-3 opacity-30" />
+                                    <p className="text-sm">No recently deleted contacts</p>
+                                </div>
+                            ) : (
+                                deletedContacts.map(c => (
+                                    <div key={c.id} className="glass border border-brand-800 rounded-xl p-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex-1 min-w-0 mr-3">
+                                                <p className="font-medium text-sm text-slate-100 truncate">{c.name || 'No name'}</p>
+                                                {c.company && <p className="text-xs text-brand-400 truncate">{c.company}</p>}
+                                                {c.deletedAt && (
+                                                    <p className="text-[10px] text-brand-600 mt-1">
+                                                        Deleted {new Date(c.deletedAt).toLocaleDateString()}
+                                                        {' '}— expires {new Date(c.deletedAt + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-1.5 flex-shrink-0">
+                                                <button
+                                                    onClick={() => restoreContact(c.id)}
+                                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs font-medium text-emerald-400 transition-colors"
+                                                >
+                                                    <RotateCcw size={12} />
+                                                    Restore
+                                                </button>
+                                                <button
+                                                    onClick={() => permanentlyDeleteContact(c.id)}
+                                                    className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                    title="Permanently delete"
+                                                >
+                                                    <X size={14} className="text-red-400" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t border-brand-800">
+                            <button
+                                onClick={() => setShowDeleted(false)}
+                                className="w-full py-2.5 bg-brand-800 hover:bg-brand-700 rounded-xl font-medium transition-colors text-sm"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Move to Folder Modal */}
+            {showMoveModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                    <div className="bg-brand-900 rounded-2xl w-full max-w-sm border border-brand-800 shadow-2xl">
+                        <div className="p-4 border-b border-brand-800">
+                            <h3 className="text-lg font-bold gradient-text">Move {selectedIds.size} Contact{selectedIds.size !== 1 ? 's' : ''}</h3>
+                        </div>
+                        <div className="p-4 space-y-3">
+                            <div className="relative">
+                                <Folder className="absolute left-3 top-3 text-brand-500" size={18} />
+                                <select
+                                    value={moveTargetFolder}
+                                    onChange={(e) => { setMoveTargetFolder(e.target.value); if (e.target.value !== '__new__') setMoveNewFolder(''); }}
+                                    className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 bg-brand-900"
+                                >
+                                    <option value="Uncategorized">Uncategorized</option>
+                                    {folders.filter(f => f !== 'Uncategorized').map(f => (
+                                        <option key={f} value={f}>{f}</option>
+                                    ))}
+                                    <option value="__new__">+ Create New Folder</option>
+                                </select>
+                            </div>
+                            {moveTargetFolder === '__new__' && (
+                                <div className="relative">
+                                    <FolderPlus className="absolute left-3 top-3 text-brand-500" size={18} />
+                                    <input
+                                        type="text"
+                                        value={moveNewFolder}
+                                        onChange={(e) => setMoveNewFolder(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && moveNewFolder.trim()) moveSelectedToFolder(); }}
+                                        placeholder="Enter new folder name..."
+                                        className="w-full glass border border-brand-500 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
+                                        autoFocus
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-brand-800 flex gap-2">
+                            <button
+                                onClick={() => { setShowMoveModal(false); setMoveNewFolder(''); }}
+                                className="flex-1 py-2.5 bg-brand-800 hover:bg-brand-700 rounded-xl font-medium transition-colors text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={moveSelectedToFolder}
+                                disabled={moveTargetFolder === '__new__' && !moveNewFolder.trim()}
+                                className="flex-1 py-2.5 bg-violet-500 hover:bg-violet-400 rounded-xl font-medium transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                <Folder size={16} />
+                                Move
                             </button>
                         </div>
                     </div>

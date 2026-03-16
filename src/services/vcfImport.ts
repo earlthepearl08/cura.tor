@@ -129,5 +129,6 @@ export function vcfToContacts(parsed: ParsedVCard[], folder: string): Contact[] 
         confidence: 100,
         isVerified: true,
         createdAt: Date.now(),
+        updatedAt: Date.now(),
     }));
 }

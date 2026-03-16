@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus } from 'lucide-react';
 import { ocrService, LogSheetEntry } from '@/services/ocr';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
+import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 
@@ -12,6 +13,8 @@ const LogScan: React.FC = () => {
     const navigate = useNavigate();
     const camRef = useRef<HTMLInputElement>(null);
     const galRef = useRef<HTMLInputElement>(null);
+    const addMoreCamRef = useRef<HTMLInputElement>(null);
+    const addMoreGalRef = useRef<HTMLInputElement>(null);
     const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel } = useAuth();
 
     const [imageData, setImageData] = useState<string | null>(null);
@@ -23,6 +26,12 @@ const LogScan: React.FC = () => {
     const [isImporting, setIsImporting] = useState(false);
     const [showExportOptions, setShowExportOptions] = useState(false);
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [editForm, setEditForm] = useState<LogSheetEntry>({ name: '', company: '', position: '', phone: '', email: '', address: '', notes: '' });
+    const [duplicateMap, setDuplicateMap] = useState<Map<number, DuplicateResult>>(new Map());
+    const [selectedEntries, setSelectedEntries] = useState<Set<number>>(new Set());
+    const [sheetCount, setSheetCount] = useState(0);
+    const [showAddMoreSheet, setShowAddMoreSheet] = useState(false);
 
     useEffect(() => {
         const loadFolders = async () => {
@@ -48,6 +57,74 @@ const LogScan: React.FC = () => {
         reader.readAsDataURL(file);
     };
 
+    const handleAddMoreImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const data = reader.result as string;
+            setImageData(data);
+            processLogSheetAppend(data);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const checkEntriesForDuplicates = async (entryList: LogSheetEntry[]) => {
+        const existingContacts = await storage.getAllContacts();
+        const dupMap = new Map<number, DuplicateResult>();
+        const selected = new Set<number>();
+
+        entryList.forEach((entry, index) => {
+            const result = checkDuplicate(
+                {
+                    name: entry.name,
+                    email: entry.email ? [entry.email] : [],
+                    phone: entry.phone ? [entry.phone] : [],
+                    company: entry.company,
+                },
+                existingContacts
+            );
+            if (result.isDuplicate) {
+                dupMap.set(index, result);
+            } else {
+                selected.add(index); // Auto-select non-duplicates
+            }
+        });
+
+        setDuplicateMap(dupMap);
+        setSelectedEntries(selected);
+    };
+
+    const processLogSheetAppend = async (base64Image: string) => {
+        if (!canPerformScan()) {
+            setShowUpgradePrompt(true);
+            return;
+        }
+
+        setIsProcessing(true);
+        setError(null);
+
+        try {
+            const results = await ocrService.parseLogSheet(base64Image);
+            if (results.length === 0) {
+                setError('No entries found on this sheet.');
+            } else {
+                await incrementScanCount();
+                const prevEntries = entries || [];
+                const combined = [...prevEntries, ...results];
+                setEntries(combined);
+                setSheetCount(prev => prev + 1);
+                await checkEntriesForDuplicates(combined);
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to process log sheet');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const processLogSheet = async (base64Image: string) => {
         if (!canPerformScan()) {
             setShowUpgradePrompt(true);
@@ -57,13 +134,18 @@ const LogScan: React.FC = () => {
         setIsProcessing(true);
         setError(null);
         setEntries(null);
+        setDuplicateMap(new Map());
+        setSelectedEntries(new Set());
 
         try {
             const results = await ocrService.parseLogSheet(base64Image);
-            await incrementScanCount();
             setEntries(results);
             if (results.length === 0) {
                 setError('No entries found. Make sure the log sheet is clearly visible.');
+            } else {
+                await incrementScanCount();
+                setSheetCount(1);
+                await checkEntriesForDuplicates(results);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to process log sheet');
@@ -90,10 +172,21 @@ const LogScan: React.FC = () => {
             createdAt: Date.now(),
         }));
 
+    const toggleEntrySelection = (index: number) => {
+        setSelectedEntries(prev => {
+            const next = new Set(prev);
+            if (next.has(index)) next.delete(index);
+            else next.add(index);
+            return next;
+        });
+    };
+
     const handleImport = async () => {
         if (!entries) return;
+        const toImport = entries.filter((_, i) => selectedEntries.has(i));
+        if (toImport.length === 0) return;
         setIsImporting(true);
-        await storage.batchSave(entriesToContacts(entries));
+        await storage.batchSave(entriesToContacts(toImport));
         if (importFolder !== 'Uncategorized') {
             await storage.saveFolder(importFolder);
         }
@@ -116,6 +209,33 @@ const LogScan: React.FC = () => {
         setEntries(null);
         setError(null);
         setIsProcessing(false);
+        setEditingIndex(null);
+        setDuplicateMap(new Map());
+        setSelectedEntries(new Set());
+        setSheetCount(0);
+    };
+
+    const openEntryEdit = (index: number) => {
+        setEditingIndex(index);
+        setEditForm({ ...entries![index] });
+    };
+
+    const saveEntryEdit = () => {
+        if (editingIndex === null || !entries) return;
+        const updated = [...entries];
+        updated[editingIndex] = { ...editForm };
+        setEntries(updated);
+        setEditingIndex(null);
+    };
+
+    const deleteEntry = (index: number) => {
+        if (!entries) return;
+        const updated = entries.filter((_, i) => i !== index);
+        setEntries(updated.length > 0 ? updated : null);
+        if (updated.length === 0) {
+            setError('All entries removed. Scan another sheet or start over.');
+        }
+        if (editingIndex === index) setEditingIndex(null);
     };
 
     return (
@@ -185,6 +305,10 @@ const LogScan: React.FC = () => {
                     </div>
                 )}
 
+                {/* Hidden inputs for "Add More Sheet" */}
+                <input ref={addMoreCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddMoreImage} />
+                <input ref={addMoreGalRef} type="file" accept="image/*" className="hidden" onChange={handleAddMoreImage} />
+
                 {/* Stage 3: Results */}
                 {imageData && !isProcessing && (entries || error) && (
                     <div className="space-y-4">
@@ -207,13 +331,30 @@ const LogScan: React.FC = () => {
 
                         {entries && entries.length > 0 && (
                             <>
-                                <div className="flex items-center justify-between">
-                                    <p className="text-sm font-medium text-brand-300">
-                                        {entries.length} entr{entries.length === 1 ? 'y' : 'ies'} found
-                                    </p>
-                                    <button onClick={reset} className="flex items-center gap-1 text-xs text-brand-500 hover:text-brand-400">
-                                        <RotateCcw size={12} />
-                                        Scan Another
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-brand-300">
+                                                {entries.length} entr{entries.length === 1 ? 'y' : 'ies'} found
+                                                {sheetCount > 1 && <span className="text-brand-500"> from {sheetCount} sheets</span>}
+                                            </p>
+                                            {duplicateMap.size > 0 && (
+                                                <p className="text-xs text-amber-400 mt-0.5">
+                                                    {duplicateMap.size} duplicate{duplicateMap.size !== 1 ? 's' : ''} detected — deselected by default
+                                                </p>
+                                            )}
+                                        </div>
+                                        <button onClick={reset} className="flex items-center gap-1 text-xs text-brand-500 hover:text-brand-400">
+                                            <RotateCcw size={12} />
+                                            Start Over
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowAddMoreSheet(true)}
+                                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300"
+                                    >
+                                        <Plus size={16} />
+                                        Add Another Sheet
                                     </button>
                                 </div>
 
@@ -234,16 +375,70 @@ const LogScan: React.FC = () => {
 
                                 {/* Entry list */}
                                 <div className="space-y-2 max-h-[45vh] overflow-y-auto">
-                                    {entries.map((e, i) => (
-                                        <div key={i} className="glass border border-brand-800 rounded-xl p-3">
-                                            <p className="font-medium text-sm text-slate-100 truncate">{e.name || 'No name'}</p>
-                                            {e.company && <p className="text-xs text-brand-400 truncate">{e.company}</p>}
-                                            {e.position && <p className="text-xs text-slate-500 truncate">{e.position}</p>}
-                                            {e.phone && <p className="text-xs text-slate-500 truncate">{e.phone}</p>}
-                                            {e.email && <p className="text-xs text-slate-500 truncate">{e.email}</p>}
-                                            {e.notes && <p className="text-xs text-amber-400/70 truncate mt-1">{e.notes}</p>}
+                                    {entries.map((e, i) => {
+                                        const isDup = duplicateMap.has(i);
+                                        const isSelected = selectedEntries.has(i);
+                                        return (
+                                        <div key={i} className={`glass border rounded-xl p-3 transition-all ${isDup && !isSelected ? 'border-amber-500/30 opacity-60' : isSelected ? 'border-brand-800' : 'border-brand-800 opacity-60'}`}>
+                                            {editingIndex === i ? (
+                                                <div className="space-y-2">
+                                                    <input type="text" value={editForm.name} onChange={(ev) => setEditForm({...editForm, name: ev.target.value})} placeholder="Name" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
+                                                    <input type="text" value={editForm.company} onChange={(ev) => setEditForm({...editForm, company: ev.target.value})} placeholder="Company" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
+                                                    <input type="text" value={editForm.position} onChange={(ev) => setEditForm({...editForm, position: ev.target.value})} placeholder="Position" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
+                                                    <input type="text" value={editForm.phone} onChange={(ev) => setEditForm({...editForm, phone: ev.target.value})} placeholder="Phone" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
+                                                    <input type="text" value={editForm.email} onChange={(ev) => setEditForm({...editForm, email: ev.target.value})} placeholder="Email" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
+                                                    <input type="text" value={editForm.notes} onChange={(ev) => setEditForm({...editForm, notes: ev.target.value})} placeholder="Notes" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
+                                                    <div className="flex gap-2 pt-1">
+                                                        <button onClick={saveEntryEdit} className="flex-1 flex items-center justify-center gap-1 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs font-medium text-emerald-400">
+                                                            <Check size={12} /> Save
+                                                        </button>
+                                                        <button onClick={() => setEditingIndex(null)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-brand-800 rounded-lg text-xs font-medium text-slate-400">
+                                                            <X size={12} /> Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-start gap-2">
+                                                    {/* Selection checkbox */}
+                                                    <button onClick={() => toggleEntrySelection(i)} className="flex-shrink-0 mt-0.5">
+                                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-brand-500 border-brand-500' : 'border-brand-600'}`}>
+                                                            {isSelected && <Check size={12} className="text-white" />}
+                                                        </div>
+                                                    </button>
+                                                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEntryEdit(i)}>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-medium text-sm text-slate-100 truncate">{e.name || 'No name'}</p>
+                                                            {isDup && (
+                                                                <span className="flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded text-[9px] font-bold text-amber-400">
+                                                                    <AlertCircle size={9} />
+                                                                    DUP
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {isDup && duplicateMap.get(i) && (
+                                                            <p className="text-[10px] text-amber-400/70 truncate">
+                                                                Matches "{duplicateMap.get(i)!.matchedContact?.name}" — {duplicateMap.get(i)!.matchReasons.join(', ')}
+                                                            </p>
+                                                        )}
+                                                        {e.company && <p className="text-xs text-brand-400 truncate">{e.company}</p>}
+                                                        {e.position && <p className="text-xs text-slate-500 truncate">{e.position}</p>}
+                                                        {e.phone && <p className="text-xs text-slate-500 truncate">{e.phone}</p>}
+                                                        {e.email && <p className="text-xs text-slate-500 truncate">{e.email}</p>}
+                                                        {e.notes && <p className="text-xs text-amber-400/70 truncate mt-1">{e.notes}</p>}
+                                                    </div>
+                                                    <div className="flex flex-col gap-1 flex-shrink-0">
+                                                        <button onClick={() => openEntryEdit(i)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
+                                                            <Edit3 size={14} className="text-brand-400" />
+                                                        </button>
+                                                        <button onClick={() => deleteEntry(i)} className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors">
+                                                            <Trash2 size={14} className="text-red-400" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </>
                         )}
@@ -256,7 +451,7 @@ const LogScan: React.FC = () => {
                 <div className="sticky bottom-0 glass border-t border-brand-800 p-4 space-y-2 z-10">
                     <button
                         onClick={handleImport}
-                        disabled={isImporting}
+                        disabled={isImporting || selectedEntries.size === 0}
                         className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95"
                     >
                         {isImporting ? (
@@ -264,7 +459,7 @@ const LogScan: React.FC = () => {
                         ) : (
                             <Upload size={16} />
                         )}
-                        Import {entries.length} Contact{entries.length !== 1 ? 's' : ''}
+                        Import {selectedEntries.size} of {entries.length} Contact{entries.length !== 1 ? 's' : ''}
                     </button>
                     <div className="relative">
                         <button
@@ -290,6 +485,36 @@ const LogScan: React.FC = () => {
 
             {showUpgradePrompt && (
                 <UpgradePrompt feature="export" onDismiss={() => setShowUpgradePrompt(false)} />
+            )}
+
+            {/* Add More Sheet Action Sheet */}
+            {showAddMoreSheet && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowAddMoreSheet(false)}>
+                    <div className="bg-brand-900 rounded-t-2xl w-full max-w-md border-t border-brand-800 p-4 space-y-2 animate-in slide-in-from-bottom duration-200" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-8 h-1 bg-brand-700 rounded-full mx-auto mb-3" />
+                        <p className="text-sm font-semibold text-brand-300 text-center mb-2">Add Another Sheet</p>
+                        <button
+                            onClick={() => { addMoreCamRef.current?.click(); setShowAddMoreSheet(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 rounded-xl transition-colors"
+                        >
+                            <Camera size={20} className="text-brand-400" />
+                            <span className="text-sm font-medium">Take Photo</span>
+                        </button>
+                        <button
+                            onClick={() => { addMoreGalRef.current?.click(); setShowAddMoreSheet(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 rounded-xl transition-colors"
+                        >
+                            <ImageIcon size={20} className="text-brand-400" />
+                            <span className="text-sm font-medium">Choose from Gallery</span>
+                        </button>
+                        <button
+                            onClick={() => setShowAddMoreSheet(false)}
+                            className="w-full py-3 bg-brand-800 hover:bg-brand-700 rounded-xl font-medium text-sm text-brand-400 transition-colors mt-2"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );

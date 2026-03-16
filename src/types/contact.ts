@@ -16,4 +16,6 @@ export interface Contact {
     updatedAt?: number;   // Unix timestamp for last edit
     personPhoto?: string;   // Base64 photo of the person
     locationPhoto?: string; // Base64 photo of location/booth
+    isDeleted?: boolean;    // Soft-delete flag (tombstone for sync)
+    deletedAt?: number;     // When the contact was deleted
 }

@@ -8,16 +8,17 @@ import { Contact } from '@/types/contact';
 const getTimestamp = (c: Contact): number => c.updatedAt || c.createdAt || 0;
 
 /**
- * Two-way merge: combines local and Drive contacts.
+ * Two-way merge with soft-delete support.
  * - Contacts with the same ID: keep the version with the newer timestamp
+ * - If the newer version is deleted (tombstone), mark it deleted in merged result
  * - Contacts only in local: keep them
- * - Contacts only in Drive: add them
- * Returns the merged array.
+ * - Contacts only in Drive: add them (unless they are tombstones)
+ * Returns the merged array (includes tombstones so they propagate to Drive).
  */
 const mergeContacts = (local: Contact[], drive: Contact[]): Contact[] => {
   const merged = new Map<string, Contact>();
 
-  // Add all local contacts first
+  // Add all local contacts first (including tombstones)
   for (const c of local) {
     merged.set(c.id, c);
   }
@@ -26,7 +27,7 @@ const mergeContacts = (local: Contact[], drive: Contact[]): Contact[] => {
   for (const driveContact of drive) {
     const localContact = merged.get(driveContact.id);
     if (!localContact) {
-      // Only on Drive — add it
+      // Only on Drive — add it (tombstones from Drive are kept to propagate)
       merged.set(driveContact.id, driveContact);
     } else {
       // Exists in both — keep the newer version
@@ -77,8 +78,8 @@ export const useGoogleDrive = () => {
       setIsSyncing(true);
       setError(null);
 
-      // Load both sides
-      const localContacts = await storage.getAllContacts();
+      // Load both sides (including tombstones for proper sync)
+      const localContacts = await storage.getAllContactsIncludingDeleted();
       let driveContacts: Contact[] = [];
       try {
         driveContacts = await googleDrive.loadContacts();
@@ -87,19 +88,29 @@ export const useGoogleDrive = () => {
         console.log('[Sync] No existing Drive data, will push local contacts');
       }
 
-      // Merge
+      // Merge (includes tombstones)
       const merged = mergeContacts(localContacts, driveContacts);
 
-      // Save merged result to both local and Drive
+      // Save merged result to local (including tombstones)
       await storage.batchSave(merged);
+
+      // Save only non-deleted contacts to Drive (no need to store tombstones on Drive)
+      // But we DO save tombstones to Drive so other devices can pick up deletions
       await googleDrive.saveContacts(merged);
+
+      // Purge old tombstones (> 30 days) from local storage
+      const purged = await storage.purgeTombstones();
+      if (purged > 0) {
+        console.log(`[Sync] Purged ${purged} old tombstones`);
+      }
 
       // Update last sync time
       const now = Date.now();
       setLastSyncTime(now);
       localStorage.setItem('lastDriveSync', now.toString());
 
-      return merged.length;
+      // Return count of active (non-deleted) contacts
+      return merged.filter(c => !c.isDeleted).length;
     } catch (err: any) {
       setError(err.message || 'Failed to sync contacts');
       throw err;
