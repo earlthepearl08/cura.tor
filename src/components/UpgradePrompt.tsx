@@ -4,7 +4,7 @@ import { Lock, X, Settings, Ticket } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface UpgradePromptProps {
-    feature: 'scan' | 'export' | 'drive' | 'storage';
+    feature: 'scan' | 'export' | 'drive' | 'storage' | 'bulk-scan';
     onDismiss: () => void;
     scansUsed?: number;
     scansLimit?: number;
@@ -23,6 +23,12 @@ function getFeatureMessage(feature: string, tier: string): { title: string; mess
         return {
             title: 'Scan Limit Reached',
             message: 'You\'ve used all 5 free scans this month. Enter an access code to unlock more, or your scans will reset next month.',
+        };
+    }
+    if (feature === 'bulk-scan') {
+        return {
+            title: 'Premium Feature',
+            message: 'Log Sheet Scan and Multi-Card Scan are premium features. Enter an access code to unlock them.',
         };
     }
     if (feature === 'export') {

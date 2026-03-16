@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet } from 'lucide-react';
+import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useAuth } from '@/contexts/AuthContext';
@@ -158,15 +158,24 @@ const Home = () => {
 
                     <Link
                         to="/log-scan"
-                        className="col-span-2 card-elevated rounded-2xl p-4 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
                     >
                         <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-orange-600/20 rounded-xl flex items-center justify-center">
                             <FileSpreadsheet className="w-5 h-5 text-amber-400" />
                         </div>
-                        <div>
-                            <span className="font-semibold text-sm text-white">Log Sheet</span>
-                            <span className="text-[10px] text-slate-500 block">Event Sign-in Sheets</span>
+                        <span className="font-semibold text-sm text-white">Log Sheet</span>
+                        <span className="text-[10px] text-slate-500">Sign-in Sheets</span>
+                    </Link>
+
+                    <Link
+                        to="/multi-card"
+                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                        <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-rose-600/20 rounded-xl flex items-center justify-center">
+                            <Layers className="w-5 h-5 text-pink-400" />
                         </div>
+                        <span className="font-semibold text-sm text-white">Multi-Card</span>
+                        <span className="text-[10px] text-slate-500">Batch Cards</span>
                     </Link>
                 </div>
             </div>

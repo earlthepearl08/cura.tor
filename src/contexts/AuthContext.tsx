@@ -42,6 +42,7 @@ interface AuthContextType {
     canExportBulkVCard: () => boolean;
     canExportVCard: () => boolean;
     canUseGoogleDrive: () => boolean;
+    canUseBulkScan: () => boolean;
 
     // Scan tracking
     incrementScanCount: (count?: number) => Promise<boolean>;
@@ -165,6 +166,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return tierLimits.googleDriveSync;
     }, [tierLimits]);
 
+    const canUseBulkScan = useCallback((): boolean => {
+        return tierLimits.bulkScan;
+    }, [tierLimits]);
+
     // --- Scan tracking ---
 
     const incrementScanCount = useCallback(async (count: number = 1): Promise<boolean> => {
@@ -206,6 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             canExportBulkVCard,
             canExportVCard,
             canUseGoogleDrive,
+            canUseBulkScan,
             incrementScanCount,
             redeemAccessCode,
             refreshUserProfile,

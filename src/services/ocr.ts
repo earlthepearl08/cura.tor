@@ -1135,6 +1135,124 @@ Return ONLY a JSON array of objects with these fields:
         }
     }
 
+    /**
+     * Parse multiple business cards from a single photo.
+     * Gemini identifies each card visually and returns separate contact entries.
+     */
+    async parseMultiCards(base64Image: string): Promise<LogSheetEntry[]> {
+        console.log('[MultiCard] Parsing multiple cards with Gemini...');
+
+        const prompt = `You are an expert business card data extractor. This image contains MULTIPLE business cards laid out together (on a table, desk, or surface).
+
+## Task
+Identify each SEPARATE business card in the image and extract contact information from each one independently.
+
+## Instructions
+1. Visually identify the boundaries of each business card in the image.
+2. For EACH card, extract the person's contact information.
+3. Each card MUST be a separate entry in the output array.
+4. If a card is partially visible or too blurry, extract what you can.
+5. Include professional credentials/designations as part of the name (e.g., "Dr. John Smith, MD", "Engr. Maria Santos, REE").
+6. Phone numbers: include country codes when visible, prefix with "+".
+7. Combine multi-line addresses into one string separated by commas.
+8. If a field cannot be determined from a card, use an empty string.
+9. Do NOT invent or guess information not visible on the card.
+10. Do NOT merge data from different cards into one entry.
+
+## Output Format
+Return a JSON array where each object represents ONE business card with these fields:
+- name: Person's full name (with credentials)
+- company: Company/organization name
+- position: Job title/role
+- phone: Primary phone number (string, not array)
+- email: Primary email address
+- address: Physical address
+- notes: Any other notable info (website, fax, etc.)`;
+
+        const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 90000);
+
+        try {
+            const response = await fetch('/api/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            { inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } }
+                        ]
+                    }],
+                    model: 'gemini-2.5-flash',
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 8192,
+                        responseMimeType: 'application/json',
+                        responseSchema: {
+                            type: 'ARRAY',
+                            items: {
+                                type: 'OBJECT',
+                                properties: {
+                                    name: { type: 'STRING' },
+                                    company: { type: 'STRING' },
+                                    position: { type: 'STRING' },
+                                    phone: { type: 'STRING' },
+                                    email: { type: 'STRING' },
+                                    address: { type: 'STRING' },
+                                    notes: { type: 'STRING' }
+                                },
+                                required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
+                            }
+                        }
+                    }
+                }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error('No response from Gemini');
+
+            console.log('[MultiCard] Raw response:', text);
+
+            let parsed;
+            try {
+                parsed = JSON.parse(text);
+            } catch {
+                const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
+                if (!jsonMatch) throw new Error('No JSON array in Gemini response');
+                parsed = JSON.parse(jsonMatch[0]);
+            }
+
+            if (!Array.isArray(parsed)) throw new Error('Gemini did not return an array');
+
+            return parsed
+                .filter((e: any) => e.name?.trim() || e.company?.trim() || e.phone?.trim() || e.email?.trim())
+                .map((e: any) => ({
+                    name: e.name || '',
+                    company: e.company || '',
+                    position: e.position || '',
+                    phone: e.phone || '',
+                    email: e.email || '',
+                    address: e.address || '',
+                    notes: e.notes || ''
+                }));
+        } catch (error) {
+            clearTimeout(timeout);
+            throw error;
+        }
+    }
+
     async terminate(): Promise<void> {
         if (this.worker) {
             this.worker.terminate();

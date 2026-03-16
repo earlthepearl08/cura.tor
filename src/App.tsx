@@ -8,6 +8,7 @@ import ManualInput from '@/pages/ManualInput';
 import Settings from '@/pages/Settings';
 import QRScan from '@/pages/QRScan';
 import LogScan from '@/pages/LogScan';
+import MultiCardScan from '@/pages/MultiCardScan';
 import Auth from '@/pages/Auth';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -32,6 +33,7 @@ function App() {
                         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                         <Route path="/qr-scan" element={<ProtectedRoute><QRScan /></ProtectedRoute>} />
                         <Route path="/log-scan" element={<ProtectedRoute><LogScan /></ProtectedRoute>} />
+                        <Route path="/multi-card" element={<ProtectedRoute><MultiCardScan /></ProtectedRoute>} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </div>

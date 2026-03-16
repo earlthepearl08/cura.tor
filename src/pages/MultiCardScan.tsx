@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle } from 'lucide-react';
 import { ocrService, LogSheetEntry } from '@/services/ocr';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
@@ -10,12 +10,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { compressForOCR } from '@/utils/compressPhoto';
 
-const LogScan: React.FC = () => {
+const MultiCardScan: React.FC = () => {
     const navigate = useNavigate();
     const camRef = useRef<HTMLInputElement>(null);
     const galRef = useRef<HTMLInputElement>(null);
-    const addMoreCamRef = useRef<HTMLInputElement>(null);
-    const addMoreGalRef = useRef<HTMLInputElement>(null);
     const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canUseBulkScan } = useAuth();
 
     const [imageData, setImageData] = useState<string | null>(null);
@@ -31,8 +29,6 @@ const LogScan: React.FC = () => {
     const [editForm, setEditForm] = useState<LogSheetEntry>({ name: '', company: '', position: '', phone: '', email: '', address: '', notes: '' });
     const [duplicateMap, setDuplicateMap] = useState<Map<number, DuplicateResult>>(new Map());
     const [selectedEntries, setSelectedEntries] = useState<Set<number>>(new Set());
-    const [sheetCount, setSheetCount] = useState(0);
-    const [processingProgress, setProcessingProgress] = useState<string | null>(null);
 
     useEffect(() => {
         const loadFolders = async () => {
@@ -45,9 +41,8 @@ const LogScan: React.FC = () => {
     }, []);
 
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-        const fileArr = Array.from(files);
+        const file = e.target.files?.[0];
+        if (!file) return;
         e.target.value = '';
 
         if (!canUseBulkScan()) {
@@ -55,43 +50,6 @@ const LogScan: React.FC = () => {
             return;
         }
 
-        if (fileArr.length === 1) {
-            const data = await compressForOCR(fileArr[0]);
-            setImageData(data);
-            processLogSheet(data);
-        } else {
-            processMultipleSheets(fileArr, false);
-        }
-    };
-
-    const handleAddMoreImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-        const fileArr = Array.from(files);
-        e.target.value = '';
-
-        if (!canUseBulkScan()) {
-            setUpgradeFeature('bulk-scan');
-            return;
-        }
-
-        if (fileArr.length === 1) {
-            const data = await compressForOCR(fileArr[0]);
-            setImageData(data);
-            processLogSheetAppend(data);
-        } else {
-            processMultipleSheets(fileArr, true);
-        }
-    };
-
-    /** Wrap a promise with a hard timeout so we never get stuck */
-    const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
-        Promise.race([
-            promise,
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms))
-        ]);
-
-    const processMultipleSheets = async (files: File[], append: boolean) => {
         if (!canPerformScan()) {
             setUpgradeFeature('scan');
             return;
@@ -99,93 +57,55 @@ const LogScan: React.FC = () => {
 
         setIsProcessing(true);
         setError(null);
-        if (!append) {
-            setEntries(null);
-            setDuplicateMap(new Map());
-            setSelectedEntries(new Set());
+        setEntries(null);
+        setDuplicateMap(new Map());
+        setSelectedEntries(new Set());
+
+        try {
+            const data = await compressForOCR(file);
+            setImageData(data);
+            const results = await parseWithRetry(data);
+            setEntries(results);
+            if (results.length === 0) {
+                setError('No cards detected. Make sure cards are spread out and clearly visible.');
+            } else {
+                await incrementScanCount();
+                await checkEntriesForDuplicates(results);
+            }
+        } catch (err) {
+            setError(friendlyError(err));
+        } finally {
+            setIsProcessing(false);
         }
+    };
 
-        // Compress first image immediately so the spinner is visible
-        setProcessingProgress(`Preparing ${files.length} sheets...`);
-        const firstData = await compressForOCR(files[0]);
-        setImageData(firstData);
+    const friendlyError = (err: unknown): string => {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('timed out') || msg.includes('abort'))
+            return 'The server took too long to respond. Tap "Try Again" to retry.';
+        if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
+            return 'The server is busy right now. Please wait a moment and try again.';
+        if (msg.includes('500') || msg.includes('503'))
+            return 'The server encountered a temporary issue. Tap "Try Again" to retry.';
+        return msg;
+    };
 
-        let allEntries = append ? [...(entries || [])] : [];
-        let sheetsProcessed = append ? sheetCount : 0;
-        const failedIndices: number[] = [];
-
-        for (let i = 0; i < files.length; i++) {
-            setProcessingProgress(`Analyzing sheet ${i + 1} of ${files.length}...`);
+    /** Try parsing with up to 2 silent retries before surfacing an error */
+    const parseWithRetry = async (base64Image: string): Promise<LogSheetEntry[]> => {
+        const MAX_SILENT_RETRIES = 2;
+        for (let attempt = 0; attempt <= MAX_SILENT_RETRIES; attempt++) {
             try {
-                const data = i === 0 ? firstData : await compressForOCR(files[i]);
-                setImageData(data);
-                // 60-second hard timeout per sheet so we never get stuck
-                const results = await withTimeout(
-                    ocrService.parseLogSheet(data),
-                    60000,
-                    `Sheet ${i + 1}`
-                );
-                if (results.length > 0) {
-                    await incrementScanCount();
-                    allEntries = [...allEntries, ...results];
-                    sheetsProcessed++;
-                }
-            } catch (err: any) {
-                failedIndices.push(i);
-                console.error(`Failed to process sheet ${i + 1}:`, err?.message || err);
-            }
-            // Progressive delay: longer waits for later sheets to respect Gemini rate limits
-            if (i < files.length - 1) {
-                const baseDelay = failedIndices.length > 0 ? 10000 : 6000;
-                const progressiveDelay = baseDelay + (i * 2000); // +2s per sheet
-                setProcessingProgress(`Preparing next sheet...`);
-                await new Promise(r => setTimeout(r, progressiveDelay));
-            }
-        }
-
-        // Auto-retry failed sheets up to 3 times with increasing delays
-        const MAX_RETRIES = 3;
-        for (let attempt = 1; attempt <= MAX_RETRIES && failedIndices.length > 0 && failedIndices.length < files.length; attempt++) {
-            const retryDelay = 10000 + (attempt * 4000); // 14s, 18s, 22s
-            for (let r = failedIndices.length - 1; r >= 0; r--) {
-                const idx = failedIndices[r];
-                setProcessingProgress(`Re-analyzing sheet ${idx + 1}... (attempt ${attempt + 1})`);
-                await new Promise(res => setTimeout(res, retryDelay));
-                try {
-                    const data = await compressForOCR(files[idx]);
-                    const results = await withTimeout(
-                        ocrService.parseLogSheet(data),
-                        60000,
-                        `Sheet ${idx + 1} retry ${attempt}`
-                    );
-                    if (results.length > 0) {
-                        await incrementScanCount();
-                        allEntries = [...allEntries, ...results];
-                        sheetsProcessed++;
-                        failedIndices.splice(r, 1);
-                    }
-                } catch (err: any) {
-                    console.error(`Retry ${attempt} failed for sheet ${idx + 1}:`, err?.message || err);
+                return await ocrService.parseMultiCards(base64Image);
+            } catch (err) {
+                console.log(`[MultiCard] Attempt ${attempt + 1} failed:`, err);
+                if (attempt < MAX_SILENT_RETRIES) {
+                    await new Promise(r => setTimeout(r, 8000 + attempt * 4000));
+                } else {
+                    throw err;
                 }
             }
         }
-
-        setProcessingProgress(null);
-        setSheetCount(sheetsProcessed);
-        if (allEntries.length > 0) {
-            setEntries(allEntries);
-            if (failedIndices.length > 0) {
-                const nums = failedIndices.map(i => i + 1);
-                setError(`partial:Sheet${nums.length > 1 ? 's' : ''} ${nums.join(', ')} couldn't be read. You can add them again later.`);
-            }
-            await checkEntriesForDuplicates(allEntries);
-        } else {
-            setEntries(null);
-            setError(failedIndices.length > 0
-                ? 'The server is busy right now. Try again in a moment, or try fewer sheets at a time.'
-                : 'No entries found on any sheet.');
-        }
-        setIsProcessing(false);
+        throw new Error('All attempts failed');
     };
 
     const checkEntriesForDuplicates = async (entryList: LogSheetEntry[]) => {
@@ -206,101 +126,12 @@ const LogScan: React.FC = () => {
             if (result.isDuplicate) {
                 dupMap.set(index, result);
             } else {
-                selected.add(index); // Auto-select non-duplicates
+                selected.add(index);
             }
         });
 
         setDuplicateMap(dupMap);
         setSelectedEntries(selected);
-    };
-
-    const friendlyError = (err: unknown): string => {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('timed out') || msg.includes('abort'))
-            return 'The server took too long to respond. Tap retry to try again.';
-        if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
-            return 'The server is busy right now. Please wait a moment and try again.';
-        if (msg.includes('500') || msg.includes('503'))
-            return 'The server encountered a temporary issue. Tap retry to try again.';
-        return msg;
-    };
-
-    /** Try parsing with up to 2 silent retries before surfacing an error */
-    const parseWithRetry = async (base64Image: string): Promise<LogSheetEntry[]> => {
-        const MAX_SILENT_RETRIES = 2;
-        for (let attempt = 0; attempt <= MAX_SILENT_RETRIES; attempt++) {
-            try {
-                return await withTimeout(ocrService.parseLogSheet(base64Image), 60000, `Sheet attempt ${attempt + 1}`);
-            } catch (err) {
-                console.log(`[LogScan] Attempt ${attempt + 1} failed:`, err);
-                if (attempt < MAX_SILENT_RETRIES) {
-                    setProcessingProgress(attempt === 0 ? 'Still working...' : 'Almost there...');
-                    await new Promise(r => setTimeout(r, 8000 + attempt * 4000));
-                } else {
-                    throw err;
-                }
-            }
-        }
-        throw new Error('All attempts failed');
-    };
-
-    const processLogSheetAppend = async (base64Image: string) => {
-        if (!canPerformScan()) {
-            setUpgradeFeature('scan');
-            return;
-        }
-
-        setIsProcessing(true);
-        setError(null);
-
-        try {
-            const results = await parseWithRetry(base64Image);
-            if (results.length === 0) {
-                setError('No entries found on this sheet.');
-            } else {
-                await incrementScanCount();
-                const prevEntries = entries || [];
-                const combined = [...prevEntries, ...results];
-                setEntries(combined);
-                setSheetCount(prev => prev + 1);
-                await checkEntriesForDuplicates(combined);
-            }
-        } catch (err) {
-            setError(friendlyError(err));
-        } finally {
-            setProcessingProgress(null);
-            setIsProcessing(false);
-        }
-    };
-
-    const processLogSheet = async (base64Image: string) => {
-        if (!canPerformScan()) {
-            setUpgradeFeature('scan');
-            return;
-        }
-
-        setIsProcessing(true);
-        setError(null);
-        setEntries(null);
-        setDuplicateMap(new Map());
-        setSelectedEntries(new Set());
-
-        try {
-            const results = await parseWithRetry(base64Image);
-            setEntries(results);
-            if (results.length === 0) {
-                setError('No entries found. Make sure the log sheet is clearly visible.');
-            } else {
-                await incrementScanCount();
-                setSheetCount(1);
-                await checkEntriesForDuplicates(results);
-            }
-        } catch (err) {
-            setError(friendlyError(err));
-        } finally {
-            setProcessingProgress(null);
-            setIsProcessing(false);
-        }
     };
 
     const entriesToContacts = (list: LogSheetEntry[]): Contact[] =>
@@ -361,7 +192,6 @@ const LogScan: React.FC = () => {
         setEditingIndex(null);
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
-        setSheetCount(0);
     };
 
     const openEntryEdit = (index: number) => {
@@ -382,7 +212,7 @@ const LogScan: React.FC = () => {
         const updated = entries.filter((_, i) => i !== index);
         setEntries(updated.length > 0 ? updated : null);
         if (updated.length === 0) {
-            setError('All entries removed. Scan another sheet or start over.');
+            setError('All entries removed. Take another photo or start over.');
         }
         if (editingIndex === index) setEditingIndex(null);
 
@@ -406,7 +236,7 @@ const LogScan: React.FC = () => {
                 <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                     <ArrowLeft size={24} />
                 </button>
-                <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
+                <h1 className="text-lg font-semibold gradient-text">Multi-Card Scan</h1>
                 <div className="w-10" />
             </div>
 
@@ -415,14 +245,14 @@ const LogScan: React.FC = () => {
                 {!imageData && (
                     <div className="flex flex-col items-center justify-center gap-6 py-12">
                         <div className="text-center space-y-2 mb-4">
-                            <h2 className="text-xl font-bold text-slate-100">Scan a Log Sheet</h2>
+                            <h2 className="text-xl font-bold text-slate-100">Scan Multiple Cards</h2>
                             <p className="text-sm text-brand-400 max-w-xs mx-auto">
-                                Take a photo of an event sign-in sheet. Each row will be parsed into a separate contact.
+                                Lay out multiple business cards on a flat surface, then take one photo. Each card will be parsed into a separate contact.
                             </p>
                         </div>
 
                         <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelect} />
-                        <input ref={galRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
+                        <input ref={galRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
 
                         <div className="w-full max-w-sm space-y-3">
                             <button
@@ -444,9 +274,10 @@ const LogScan: React.FC = () => {
                         <div className="glass border border-brand-800 rounded-xl p-4 max-w-sm mt-4">
                             <p className="text-[10px] text-brand-500 uppercase tracking-wider font-bold mb-2">Tips</p>
                             <ul className="text-xs text-brand-400 space-y-1">
-                                <li>- Ensure the sheet is flat and well-lit</li>
-                                <li>- Printed sheets work best</li>
-                                <li>- Include all rows in the frame</li>
+                                <li>- Spread cards out with space between them</li>
+                                <li>- Keep all cards face-up and right-side up</li>
+                                <li>- Use good, even lighting</li>
+                                <li>- Works best with 2-8 cards per photo</li>
                             </ul>
                         </div>
                     </div>
@@ -456,45 +287,34 @@ const LogScan: React.FC = () => {
                 {imageData && isProcessing && (
                     <div className="flex flex-col items-center gap-6 py-8">
                         <div className="w-full max-w-sm rounded-2xl overflow-hidden border border-brand-800">
-                            <img src={imageData} alt="Log sheet" className="w-full object-contain max-h-48" />
+                            <img src={imageData} alt="Cards" className="w-full object-contain max-h-48" />
                         </div>
                         <div className="flex flex-col items-center gap-3">
                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-400" />
-                            <p className="text-sm text-brand-400 font-medium">{processingProgress || 'Analyzing log sheet...'}</p>
-                            <p className="text-xs text-brand-600">This may take a moment for large sheets</p>
+                            <p className="text-sm text-brand-400 font-medium">Identifying cards...</p>
+                            <p className="text-xs text-brand-600">Analyzing each card in the photo</p>
                         </div>
                     </div>
                 )}
 
-                {/* Hidden inputs for "Add More Sheet" */}
-                <input ref={addMoreCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddMoreImage} />
-                <input ref={addMoreGalRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddMoreImage} />
-
                 {/* Stage 3: Results */}
                 {imageData && !isProcessing && (entries || error) && (
                     <div className="space-y-4">
-                        {/* Small image preview */}
                         <div className="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-brand-800">
-                            <img src={imageData} alt="Log sheet" className="w-full object-contain max-h-32" />
+                            <img src={imageData} alt="Cards" className="w-full object-contain max-h-32" />
                         </div>
 
-                        {error && (() => {
-                            const isPartial = error.startsWith('partial:');
-                            const displayMsg = isPartial ? error.slice(8) : error;
-                            return (
-                                <div className={`flex items-center gap-3 p-4 rounded-xl ${isPartial ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
-                                    <AlertTriangle size={20} className={`flex-shrink-0 ${isPartial ? 'text-amber-400' : 'text-red-400'}`} />
-                                    <div>
-                                        <p className={`text-sm ${isPartial ? 'text-amber-300' : 'text-red-300'}`}>{displayMsg}</p>
-                                        {!isPartial && (
-                                            <button onClick={() => entries && entries.length > 0 ? processLogSheetAppend(imageData!) : processLogSheet(imageData!)} className="text-xs text-red-400 underline mt-1">
-                                                Retry
-                                            </button>
-                                        )}
-                                    </div>
+                        {error && (
+                            <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                                <AlertTriangle size={20} className="text-red-400 flex-shrink-0" />
+                                <div>
+                                    <p className="text-sm text-red-300">{error}</p>
+                                    <button onClick={reset} className="text-xs text-red-400 underline mt-1">
+                                        Try Again
+                                    </button>
                                 </div>
-                            );
-                        })()}
+                            </div>
+                        )}
 
                         {entries && entries.length > 0 && (
                             <>
@@ -502,8 +322,7 @@ const LogScan: React.FC = () => {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm font-medium text-brand-300">
-                                                {entries.length} entr{entries.length === 1 ? 'y' : 'ies'} found
-                                                {sheetCount > 1 && <span className="text-brand-500"> from {sheetCount} sheets</span>}
+                                                {entries.length} card{entries.length !== 1 ? 's' : ''} detected
                                             </p>
                                             {duplicateMap.size > 0 && (
                                                 <p className="text-xs text-amber-400 mt-0.5">
@@ -514,22 +333,6 @@ const LogScan: React.FC = () => {
                                         <button onClick={reset} className="flex items-center gap-1 text-xs text-brand-500 hover:text-brand-400">
                                             <RotateCcw size={12} />
                                             Start Over
-                                        </button>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => addMoreCamRef.current?.click()}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300 active:scale-95"
-                                        >
-                                            <Camera size={15} />
-                                            Add via Camera
-                                        </button>
-                                        <button
-                                            onClick={() => addMoreGalRef.current?.click()}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300 active:scale-95"
-                                        >
-                                            <ImageIcon size={15} />
-                                            Add via Gallery
                                         </button>
                                     </div>
                                 </div>
@@ -576,7 +379,6 @@ const LogScan: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 <div className="flex items-start gap-2">
-                                                    {/* Selection checkbox */}
                                                     <button onClick={() => toggleEntrySelection(i)} className="flex-shrink-0 mt-0.5">
                                                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-brand-500 border-brand-500' : 'border-brand-600'}`}>
                                                             {isSelected && <Check size={12} className="text-white" />}
@@ -601,7 +403,6 @@ const LogScan: React.FC = () => {
                                                         {e.position && <p className="text-xs text-slate-500 truncate">{e.position}</p>}
                                                         {e.phone && <p className="text-xs text-slate-500 truncate">{e.phone}</p>}
                                                         {e.email && <p className="text-xs text-slate-500 truncate">{e.email}</p>}
-                                                        {e.notes && <p className="text-xs text-amber-400/70 truncate mt-1">{e.notes}</p>}
                                                     </div>
                                                     <div className="flex flex-col gap-1 flex-shrink-0">
                                                         <button onClick={() => openEntryEdit(i)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
@@ -663,9 +464,8 @@ const LogScan: React.FC = () => {
             {upgradeFeature && (
                 <UpgradePrompt feature={upgradeFeature} onDismiss={() => setUpgradeFeature(null)} />
             )}
-
         </div>
     );
 };
 
-export default LogScan;
+export default MultiCardScan;

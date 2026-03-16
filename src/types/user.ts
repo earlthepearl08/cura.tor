@@ -29,6 +29,7 @@ export interface TierLimits {
     bulkVCardExport: boolean;
     googleDriveSync: boolean;
     individualVCard: boolean;
+    bulkScan: boolean;                 // log sheet scan + multi-card scan
 }
 
 export const TIER_LIMITS: Record<UserTier, TierLimits> = {
@@ -40,6 +41,7 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         bulkVCardExport: false,
         googleDriveSync: false,
         individualVCard: false,
+        bulkScan: false,
     },
     early_access: {
         scansPerMonth: null,           // controlled by lifetimeLimit in user doc
@@ -49,6 +51,7 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         bulkVCardExport: true,
         googleDriveSync: true,
         individualVCard: true,
+        bulkScan: true,
     },
     pro: {
         scansPerMonth: null,
@@ -58,5 +61,6 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         bulkVCardExport: true,
         googleDriveSync: true,
         individualVCard: true,
+        bulkScan: true,
     },
 };
