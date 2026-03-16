@@ -32,6 +32,7 @@ const LogScan: React.FC = () => {
     const [selectedEntries, setSelectedEntries] = useState<Set<number>>(new Set());
     const [sheetCount, setSheetCount] = useState(0);
     const [showAddMoreSheet, setShowAddMoreSheet] = useState(false);
+    const [processingProgress, setProcessingProgress] = useState<string | null>(null);
 
     useEffect(() => {
         const loadFolders = async () => {
@@ -43,32 +44,85 @@ const LogScan: React.FC = () => {
         loadFolders();
     }, []);
 
+    const readFileAsDataURL = (file: File): Promise<string> =>
+        new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
         e.target.value = '';
 
-        const reader = new FileReader();
-        reader.onload = () => {
-            const data = reader.result as string;
+        if (files.length === 1) {
+            const data = await readFileAsDataURL(files[0]);
             setImageData(data);
             processLogSheet(data);
-        };
-        reader.readAsDataURL(file);
+        } else {
+            processMultipleSheets(Array.from(files), false);
+        }
     };
 
     const handleAddMoreImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
         e.target.value = '';
 
-        const reader = new FileReader();
-        reader.onload = () => {
-            const data = reader.result as string;
+        if (files.length === 1) {
+            const data = await readFileAsDataURL(files[0]);
             setImageData(data);
             processLogSheetAppend(data);
-        };
-        reader.readAsDataURL(file);
+        } else {
+            processMultipleSheets(Array.from(files), true);
+        }
+    };
+
+    const processMultipleSheets = async (files: File[], append: boolean) => {
+        if (!canPerformScan()) {
+            setShowUpgradePrompt(true);
+            return;
+        }
+
+        setIsProcessing(true);
+        setError(null);
+        if (!append) {
+            setEntries(null);
+            setDuplicateMap(new Map());
+            setSelectedEntries(new Set());
+        }
+
+        let allEntries = append ? [...(entries || [])] : [];
+        let sheetsProcessed = append ? sheetCount : 0;
+
+        for (let i = 0; i < files.length; i++) {
+            setProcessingProgress(`Analyzing sheet ${i + 1} of ${files.length}...`);
+            try {
+                const data = await readFileAsDataURL(files[i]);
+                setImageData(data);
+                const results = await ocrService.parseLogSheet(data);
+                if (results.length > 0) {
+                    await incrementScanCount();
+                    allEntries = [...allEntries, ...results];
+                    sheetsProcessed++;
+                }
+            } catch (err) {
+                console.error(`Failed to process sheet ${i + 1}:`, err);
+            }
+        }
+
+        setProcessingProgress(null);
+        setSheetCount(sheetsProcessed);
+        if (allEntries.length > 0) {
+            setEntries(allEntries);
+            await checkEntriesForDuplicates(allEntries);
+        } else {
+            setEntries(null);
+            setError('No entries found on any sheet.');
+        }
+        setIsProcessing(false);
     };
 
     const checkEntriesForDuplicates = async (entryList: LogSheetEntry[]) => {
@@ -261,7 +315,7 @@ const LogScan: React.FC = () => {
                         </div>
 
                         <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelect} />
-                        <input ref={galRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                        <input ref={galRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
 
                         <div className="w-full max-w-sm space-y-3">
                             <button
@@ -299,7 +353,7 @@ const LogScan: React.FC = () => {
                         </div>
                         <div className="flex flex-col items-center gap-3">
                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-400" />
-                            <p className="text-sm text-brand-400 font-medium">Analyzing log sheet...</p>
+                            <p className="text-sm text-brand-400 font-medium">{processingProgress || 'Analyzing log sheet...'}</p>
                             <p className="text-xs text-brand-600">This may take a moment for large sheets</p>
                         </div>
                     </div>
@@ -307,7 +361,7 @@ const LogScan: React.FC = () => {
 
                 {/* Hidden inputs for "Add More Sheet" */}
                 <input ref={addMoreCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddMoreImage} />
-                <input ref={addMoreGalRef} type="file" accept="image/*" className="hidden" onChange={handleAddMoreImage} />
+                <input ref={addMoreGalRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddMoreImage} />
 
                 {/* Stage 3: Results */}
                 {imageData && !isProcessing && (entries || error) && (
