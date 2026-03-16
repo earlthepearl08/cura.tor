@@ -8,6 +8,7 @@ import { Contact } from '@/types/contact';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
+import { compressForOCR } from '@/utils/compressPhoto';
 
 const LogScan: React.FC = () => {
     const navigate = useNavigate();
@@ -44,39 +45,33 @@ const LogScan: React.FC = () => {
         loadFolders();
     }, []);
 
-    const readFileAsDataURL = (file: File): Promise<string> =>
-        new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
+        const fileArr = Array.from(files);
         e.target.value = '';
 
-        if (files.length === 1) {
-            const data = await readFileAsDataURL(files[0]);
+        if (fileArr.length === 1) {
+            const data = await compressForOCR(fileArr[0]);
             setImageData(data);
             processLogSheet(data);
         } else {
-            processMultipleSheets(Array.from(files), false);
+            processMultipleSheets(fileArr, false);
         }
     };
 
     const handleAddMoreImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
+        const fileArr = Array.from(files);
         e.target.value = '';
 
-        if (files.length === 1) {
-            const data = await readFileAsDataURL(files[0]);
+        if (fileArr.length === 1) {
+            const data = await compressForOCR(fileArr[0]);
             setImageData(data);
             processLogSheetAppend(data);
         } else {
-            processMultipleSheets(Array.from(files), true);
+            processMultipleSheets(fileArr, true);
         }
     };
 
@@ -94,13 +89,20 @@ const LogScan: React.FC = () => {
             setSelectedEntries(new Set());
         }
 
+        // Compress first image immediately so the spinner is visible
+        setProcessingProgress(`Preparing ${files.length} sheets...`);
+        const firstData = await compressForOCR(files[0]);
+        setImageData(firstData);
+
         let allEntries = append ? [...(entries || [])] : [];
         let sheetsProcessed = append ? sheetCount : 0;
+        let failedSheets = 0;
 
         for (let i = 0; i < files.length; i++) {
             setProcessingProgress(`Analyzing sheet ${i + 1} of ${files.length}...`);
             try {
-                const data = await readFileAsDataURL(files[i]);
+                // Use already-compressed first image, compress the rest on demand
+                const data = i === 0 ? firstData : await compressForOCR(files[i]);
                 setImageData(data);
                 const results = await ocrService.parseLogSheet(data);
                 if (results.length > 0) {
@@ -108,8 +110,9 @@ const LogScan: React.FC = () => {
                     allEntries = [...allEntries, ...results];
                     sheetsProcessed++;
                 }
-            } catch (err) {
-                console.error(`Failed to process sheet ${i + 1}:`, err);
+            } catch (err: any) {
+                failedSheets++;
+                console.error(`Failed to process sheet ${i + 1}:`, err?.message || err);
             }
         }
 
@@ -117,10 +120,15 @@ const LogScan: React.FC = () => {
         setSheetCount(sheetsProcessed);
         if (allEntries.length > 0) {
             setEntries(allEntries);
+            if (failedSheets > 0) {
+                setError(`${failedSheets} of ${files.length} sheet(s) failed to process.`);
+            }
             await checkEntriesForDuplicates(allEntries);
         } else {
             setEntries(null);
-            setError('No entries found on any sheet.');
+            setError(failedSheets > 0
+                ? `All ${files.length} sheets failed to process. Try selecting fewer sheets or use camera instead.`
+                : 'No entries found on any sheet.');
         }
         setIsProcessing(false);
     };
