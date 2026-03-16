@@ -1,7 +1,7 @@
 import { Contact } from '@/types/contact';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid';
+const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
 const FILE_NAME = 'cura-tor-contacts.json';
 
@@ -172,14 +172,15 @@ class GoogleDriveService {
         reject(new Error(msg === 'popup_closed' ? 'Sign-in popup was closed. Please try again.' : msg));
       };
 
-      this.tokenClient.requestAccessToken({ prompt: 'consent' });
+      this.tokenClient.requestAccessToken({ prompt: '' });
     });
   }
 
   signOut(): void {
-    // Clear local state only — don't revoke the token on Google's side
-    // Token revocation poisons subsequent sign-in attempts with prompt: ''
-    this.accessToken = null;
+    if (this.accessToken) {
+      (window as any).google.accounts.oauth2.revoke(this.accessToken);
+      this.accessToken = null;
+    }
     this.state.isSignedIn = false;
     this.state.user = null;
     this.state.fileId = null;
