@@ -98,12 +98,13 @@ const LogScan: React.FC = () => {
         let sheetsProcessed = append ? sheetCount : 0;
         const failedIndices: number[] = [];
 
+        const compressedImages: string[] = [];
         for (let i = 0; i < files.length; i++) {
             setProcessingProgress(`Analyzing sheet ${i + 1} of ${files.length}...`);
+            const data = i === 0 ? firstData : await compressForOCR(files[i]);
+            compressedImages.push(data);
+            setImageData(data);
             try {
-                // Use already-compressed first image, compress the rest on demand
-                const data = i === 0 ? firstData : await compressForOCR(files[i]);
-                setImageData(data);
                 const results = await ocrService.parseLogSheet(data);
                 if (results.length > 0) {
                     await incrementScanCount();
@@ -111,8 +112,31 @@ const LogScan: React.FC = () => {
                     sheetsProcessed++;
                 }
             } catch (err: any) {
-                failedIndices.push(i + 1);
+                failedIndices.push(i);
                 console.error(`Failed to process sheet ${i + 1}:`, err?.message || err);
+            }
+            // Brief pause between API calls to avoid Gemini rate limits
+            if (i < files.length - 1) {
+                await new Promise(r => setTimeout(r, 1500));
+            }
+        }
+
+        // Retry failed sheets once with a longer delay
+        if (failedIndices.length > 0 && failedIndices.length < files.length) {
+            for (const idx of [...failedIndices]) {
+                setProcessingProgress(`Retrying sheet ${idx + 1}...`);
+                await new Promise(r => setTimeout(r, 3000));
+                try {
+                    const results = await ocrService.parseLogSheet(compressedImages[idx]);
+                    if (results.length > 0) {
+                        await incrementScanCount();
+                        allEntries = [...allEntries, ...results];
+                        sheetsProcessed++;
+                        failedIndices.splice(failedIndices.indexOf(idx), 1);
+                    }
+                } catch (err: any) {
+                    console.error(`Retry failed for sheet ${idx + 1}:`, err?.message || err);
+                }
             }
         }
 
@@ -121,7 +145,8 @@ const LogScan: React.FC = () => {
         if (allEntries.length > 0) {
             setEntries(allEntries);
             if (failedIndices.length > 0) {
-                setError(`Sheet${failedIndices.length > 1 ? 's' : ''} ${failedIndices.join(', ')} failed to process.`);
+                const nums = failedIndices.map(i => i + 1);
+                setError(`Sheet${nums.length > 1 ? 's' : ''} ${nums.join(', ')} failed to process.`);
             }
             await checkEntriesForDuplicates(allEntries);
         } else {
