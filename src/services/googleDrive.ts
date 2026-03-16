@@ -142,9 +142,16 @@ class GoogleDriveService {
       throw new Error('Google Drive is not configured. Please contact support.');
     }
     return new Promise((resolve, reject) => {
+      // Timeout: if the popup closes without completing, don't hang forever
+      const timeout = setTimeout(() => {
+        reject(new Error('Sign-in timed out. Make sure popups are allowed and try again.'));
+      }, 120000);
+
       this.tokenClient.callback = async (response: any) => {
+        clearTimeout(timeout);
         try {
           if (response.error) {
+            console.error('[GDrive] OAuth error:', response);
             reject(new Error(response.error_description || response.error));
             return;
           }
@@ -157,6 +164,14 @@ class GoogleDriveService {
           reject(err);
         }
       };
+
+      this.tokenClient.error_callback = (err: any) => {
+        clearTimeout(timeout);
+        console.error('[GDrive] Token error:', err);
+        const msg = err?.message || err?.type || 'Sign-in failed';
+        reject(new Error(msg === 'popup_closed' ? 'Sign-in popup was closed. Please try again.' : msg));
+      };
+
       this.tokenClient.requestAccessToken({ prompt: '' });
     });
   }
