@@ -48,8 +48,8 @@ class GoogleDriveService {
   }
 
   async init(): Promise<void> {
-    // Load both scripts in parallel, wait for BOTH before resolving
-    const loadGapi = new Promise<void>((resolve, reject) => {
+    return new Promise((resolve, reject) => {
+      // Load Google API script
       if (!document.querySelector('script[src*="apis.google.com/js/api.js"]')) {
         const script = document.createElement('script');
         script.src = 'https://apis.google.com/js/api.js';
@@ -63,27 +63,21 @@ class GoogleDriveService {
         this.gapiLoaded = true;
         this.initializeGapiClient().then(resolve).catch(reject);
       }
-    });
 
-    const loadGis = new Promise<void>((resolve, reject) => {
+      // Load Google Identity Services
       if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
         const gisScript = document.createElement('script');
         gisScript.src = 'https://accounts.google.com/gsi/client';
         gisScript.onload = () => {
           this.gisLoaded = true;
           this.initializeGisClient();
-          resolve();
         };
-        gisScript.onerror = reject;
         document.head.appendChild(gisScript);
       } else {
         this.gisLoaded = true;
         this.initializeGisClient();
-        resolve();
       }
     });
-
-    await Promise.all([loadGapi, loadGis]);
   }
 
   private async initializeGapiClient(): Promise<void> {
@@ -138,40 +132,17 @@ class GoogleDriveService {
     if (!this.tokenClient) {
       await this.init();
     }
-    if (!this.tokenClient) {
-      throw new Error('Google Drive is not configured. Please contact support.');
-    }
-    return new Promise((resolve, reject) => {
-      // Timeout: if the popup closes without completing, don't hang forever
-      const timeout = setTimeout(() => {
-        reject(new Error('Sign-in timed out. Make sure popups are allowed and try again.'));
-      }, 120000);
-
+    return new Promise((resolve) => {
       this.tokenClient.callback = async (response: any) => {
-        clearTimeout(timeout);
-        try {
-          if (response.error) {
-            console.error('[GDrive] OAuth error:', response);
-            reject(new Error(response.error_description || response.error));
-            return;
-          }
-          this.accessToken = response.access_token;
-          this.state.isSignedIn = true;
-          await this.loadUserInfo();
-          this.persistSession();
-          resolve();
-        } catch (err) {
-          reject(err);
+        if (response.error) {
+          throw new Error(response.error);
         }
+        this.accessToken = response.access_token;
+        this.state.isSignedIn = true;
+        await this.loadUserInfo();
+        this.persistSession();
+        resolve();
       };
-
-      this.tokenClient.error_callback = (err: any) => {
-        clearTimeout(timeout);
-        console.error('[GDrive] Token error:', err);
-        const msg = err?.message || err?.type || 'Sign-in failed';
-        reject(new Error(msg === 'popup_closed' ? 'Sign-in popup was closed. Please try again.' : msg));
-      };
-
       this.tokenClient.requestAccessToken({ prompt: '' });
     });
   }
