@@ -32,7 +32,6 @@ const LogScan: React.FC = () => {
     const [duplicateMap, setDuplicateMap] = useState<Map<number, DuplicateResult>>(new Map());
     const [selectedEntries, setSelectedEntries] = useState<Set<number>>(new Set());
     const [sheetCount, setSheetCount] = useState(0);
-    const [showAddMoreSheet, setShowAddMoreSheet] = useState(false);
     const [processingProgress, setProcessingProgress] = useState<string | null>(null);
 
     useEffect(() => {
@@ -436,13 +435,22 @@ const LogScan: React.FC = () => {
                                             Start Over
                                         </button>
                                     </div>
-                                    <button
-                                        onClick={() => setShowAddMoreSheet(true)}
-                                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300"
-                                    >
-                                        <Plus size={16} />
-                                        Add Another Sheet
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => addMoreCamRef.current?.click()}
+                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300 active:scale-95"
+                                        >
+                                            <Camera size={15} />
+                                            Add via Camera
+                                        </button>
+                                        <button
+                                            onClick={() => addMoreGalRef.current?.click()}
+                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300 active:scale-95"
+                                        >
+                                            <ImageIcon size={15} />
+                                            Add via Gallery
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Folder picker */}
@@ -574,35 +582,6 @@ const LogScan: React.FC = () => {
                 <UpgradePrompt feature="export" onDismiss={() => setShowUpgradePrompt(false)} />
             )}
 
-            {/* Add More Sheet Action Sheet */}
-            {showAddMoreSheet && (
-                <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowAddMoreSheet(false)}>
-                    <div className="bg-brand-900 rounded-t-2xl w-full max-w-md border-t border-brand-800 p-4 space-y-2 animate-in slide-in-from-bottom duration-200" onClick={(e) => e.stopPropagation()}>
-                        <div className="w-8 h-1 bg-brand-700 rounded-full mx-auto mb-3" />
-                        <p className="text-sm font-semibold text-brand-300 text-center mb-2">Add Another Sheet</p>
-                        <button
-                            onClick={() => { addMoreCamRef.current?.click(); setShowAddMoreSheet(false); }}
-                            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 rounded-xl transition-colors"
-                        >
-                            <Camera size={20} className="text-brand-400" />
-                            <span className="text-sm font-medium">Take Photo</span>
-                        </button>
-                        <button
-                            onClick={() => { addMoreGalRef.current?.click(); setShowAddMoreSheet(false); }}
-                            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 rounded-xl transition-colors"
-                        >
-                            <ImageIcon size={20} className="text-brand-400" />
-                            <span className="text-sm font-medium">Choose from Gallery</span>
-                        </button>
-                        <button
-                            onClick={() => setShowAddMoreSheet(false)}
-                            className="w-full py-3 bg-brand-800 hover:bg-brand-700 rounded-xl font-medium text-sm text-brand-400 transition-colors mt-2"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
