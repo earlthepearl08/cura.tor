@@ -23,6 +23,48 @@ function normalizePhone(phone: string): string {
 }
 
 /**
+ * Check if two phone numbers match, allowing for country code differences.
+ * Compares the last 10 digits if an exact digit match fails.
+ */
+function phonesMatch(p1: string, p2: string): boolean {
+    const d1 = normalizePhone(p1);
+    const d2 = normalizePhone(p2);
+    if (!d1 || !d2) return false;
+    if (d1 === d2) return true;
+    // Compare last 10 digits (handles +1, +63, etc. country code prefixes)
+    const suffix1 = d1.slice(-10);
+    const suffix2 = d2.slice(-10);
+    return suffix1.length >= 7 && suffix1 === suffix2;
+}
+
+/**
+ * Enhanced name matching that handles abbreviations and initials.
+ * "J. Smith" vs "John Smith" → recognized as same person.
+ */
+function nameMatchScore(name1: string, name2: string): number {
+    const similarity = stringSimilarity(name1, name2);
+    if (similarity >= 70) return similarity;
+
+    // Try first-initial + last-name matching
+    const parts1 = normalize(name1).split(' ').filter(Boolean);
+    const parts2 = normalize(name2).split(' ').filter(Boolean);
+
+    if (parts1.length >= 2 && parts2.length >= 2) {
+        const last1 = parts1[parts1.length - 1];
+        const last2 = parts2[parts2.length - 1];
+        const first1 = parts1[0].replace(/\./g, '');
+        const first2 = parts2[0].replace(/\./g, '');
+
+        // Last names match AND first initial matches
+        if (stringSimilarity(last1, last2) >= 85 && first1[0] === first2[0]) {
+            return Math.max(similarity, 80); // Treat as strong match
+        }
+    }
+
+    return similarity;
+}
+
+/**
  * Calculate similarity between two strings (optimized Levenshtein-based)
  */
 function stringSimilarity(str1: string, str2: string): number {
@@ -102,12 +144,12 @@ export function checkDuplicate(
             reasons.push('Same email address');
         }
 
-        // Check phone match (strong indicator)
+        // Check phone match (strong indicator, with country code tolerance)
         const newPhones = newContact.phone || [];
         const existingPhones = existing.phone || [];
         const phoneMatch = newPhones.some(newPhone =>
             existingPhones.some(existingPhone =>
-                normalizePhone(newPhone) === normalizePhone(existingPhone)
+                phonesMatch(newPhone, existingPhone)
             )
         );
         if (phoneMatch) {
@@ -115,14 +157,14 @@ export function checkDuplicate(
             reasons.push('Same phone number');
         }
 
-        // Check name similarity
+        // Check name similarity (with initial/abbreviation handling)
         if (newContact.name && existing.name) {
-            const nameSimilarity = stringSimilarity(newContact.name, existing.name);
+            const nameSimilarity = nameMatchScore(newContact.name, existing.name);
             if (nameSimilarity >= 90) {
-                score += 45;
+                score += 50;
                 reasons.push('Same name');
             } else if (nameSimilarity >= 70) {
-                score += 20;
+                score += 25;
                 reasons.push('Similar name');
             }
         }
