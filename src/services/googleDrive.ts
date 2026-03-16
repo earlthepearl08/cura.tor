@@ -48,8 +48,8 @@ class GoogleDriveService {
   }
 
   async init(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Load Google API script
+    // Load both scripts in parallel, wait for BOTH before resolving
+    const loadGapi = new Promise<void>((resolve, reject) => {
       if (!document.querySelector('script[src*="apis.google.com/js/api.js"]')) {
         const script = document.createElement('script');
         script.src = 'https://apis.google.com/js/api.js';
@@ -63,21 +63,27 @@ class GoogleDriveService {
         this.gapiLoaded = true;
         this.initializeGapiClient().then(resolve).catch(reject);
       }
+    });
 
-      // Load Google Identity Services
+    const loadGis = new Promise<void>((resolve, reject) => {
       if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
         const gisScript = document.createElement('script');
         gisScript.src = 'https://accounts.google.com/gsi/client';
         gisScript.onload = () => {
           this.gisLoaded = true;
           this.initializeGisClient();
+          resolve();
         };
+        gisScript.onerror = reject;
         document.head.appendChild(gisScript);
       } else {
         this.gisLoaded = true;
         this.initializeGisClient();
+        resolve();
       }
     });
+
+    await Promise.all([loadGapi, loadGis]);
   }
 
   private async initializeGapiClient(): Promise<void> {
@@ -137,14 +143,19 @@ class GoogleDriveService {
     }
     return new Promise((resolve, reject) => {
       this.tokenClient.callback = async (response: any) => {
-        if (response.error) {
-          throw new Error(response.error);
+        try {
+          if (response.error) {
+            reject(new Error(response.error_description || response.error));
+            return;
+          }
+          this.accessToken = response.access_token;
+          this.state.isSignedIn = true;
+          await this.loadUserInfo();
+          this.persistSession();
+          resolve();
+        } catch (err) {
+          reject(err);
         }
-        this.accessToken = response.access_token;
-        this.state.isSignedIn = true;
-        await this.loadUserInfo();
-        this.persistSession();
-        resolve();
       };
       this.tokenClient.requestAccessToken({ prompt: '' });
     });
