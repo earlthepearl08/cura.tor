@@ -17,7 +17,7 @@ function getFeatureMessage(feature: string, tier: string): { title: string; mess
         if (tier === 'early_access') {
             return {
                 title: 'All Scans Used',
-                message: 'You\'ve used all of your Early Access scans. Stay tuned — premium upgrades are coming soon!',
+                message: 'You\'ve used all of your Pioneer scans. Stay tuned — premium upgrades are coming soon!',
             };
         }
         return {
@@ -47,7 +47,7 @@ function getFeatureMessage(feature: string, tier: string): { title: string; mess
     if (tier === 'early_access') {
         return {
             title: 'Storage Limit Reached',
-            message: 'You\'ve reached your Early Access limit of 50 contacts. Premium upgrades with more storage are coming soon!',
+            message: 'You\'ve reached your Pioneer limit of 50 contacts. Premium upgrades with more storage are coming soon!',
         };
     }
     return {

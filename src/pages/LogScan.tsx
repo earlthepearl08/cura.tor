@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus, Lock } from 'lucide-react';
 import { ocrService, LogSheetEntry } from '@/services/ocr';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
@@ -403,6 +403,33 @@ const LogScan: React.FC = () => {
         setSelectedEntries(newSelected);
         setDuplicateMap(newDupMap);
     };
+
+    if (!canUseBulkScan()) {
+        return (
+            <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
+                <div className="flex items-center justify-between glass sticky top-0 z-10 p-4">
+                    <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                        <ArrowLeft size={24} />
+                    </button>
+                    <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
+                    <div className="w-10" />
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                    <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mb-4">
+                        <Lock className="w-8 h-8 text-amber-400" />
+                    </div>
+                    <h2 className="text-xl font-bold mb-2">Premium Feature</h2>
+                    <p className="text-sm text-slate-400 mb-6 max-w-xs">Log Sheet Scan is available for Pioneer and Pro users. Enter an access code to unlock.</p>
+                    <button
+                        onClick={() => navigate('/settings')}
+                        className="px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-600 text-white rounded-xl text-sm font-semibold"
+                    >
+                        Go to Settings
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">

@@ -71,7 +71,7 @@ export const useGoogleDrive = () => {
 
   const syncContacts = useCallback(async () => {
     if (!canUseGoogleDrive()) {
-      setError('Google Drive sync requires a Pro or Early Access plan');
+      setError('Google Drive sync requires a Pioneer or Pro plan');
       return 0;
     }
     try {
@@ -121,7 +121,7 @@ export const useGoogleDrive = () => {
 
   const connect = useCallback(async () => {
     if (!canUseGoogleDrive()) {
-      setError('Google Drive sync requires a Pro or Early Access plan');
+      setError('Google Drive sync requires a Pioneer or Pro plan');
       return;
     }
     try {

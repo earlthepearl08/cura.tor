@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers } from 'lucide-react';
+import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers, Lock } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useAuth } from '@/contexts/AuthContext';
 import { TIER_LIMITS } from '@/types/user';
 import { Contact } from '@/types/contact';
+import UpgradePrompt from '@/components/UpgradePrompt';
 
 const Home = () => {
     const [contactCount, setContactCount] = useState(0);
@@ -13,12 +14,14 @@ const Home = () => {
     const [folderCount, setFolderCount] = useState(0);
     const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
     const { isConnected, user: driveUser, isSyncing } = useGoogleDrive();
-    const { user, scansRemaining } = useAuth();
+    const { user, scansRemaining, canUseBulkScan } = useAuth();
     const navigate = useNavigate();
+    const [upgradeFeature, setUpgradeFeature] = useState<'bulk-scan' | null>(null);
+    const isBulkLocked = !canUseBulkScan();
 
     const tierBadge: Record<string, { label: string; color: string; bg: string }> = {
         free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
-        early_access: { label: 'Early Access', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+        early_access: { label: 'Pioneer', color: 'text-amber-400', bg: 'bg-amber-500/20' },
         pro: { label: 'Pro', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
     };
     const badge = tierBadge[user?.tier || 'free'];
@@ -156,27 +159,61 @@ const Home = () => {
                         <span className="text-[10px] text-slate-500">Entry</span>
                     </Link>
 
-                    <Link
-                        to="/log-scan"
-                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                        <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-orange-600/20 rounded-xl flex items-center justify-center">
-                            <FileSpreadsheet className="w-5 h-5 text-amber-400" />
-                        </div>
-                        <span className="font-semibold text-sm text-white">Log Sheet</span>
-                        <span className="text-[10px] text-slate-500">Sign-in Sheets</span>
-                    </Link>
+                    {isBulkLocked ? (
+                        <button
+                            onClick={() => setUpgradeFeature('bulk-scan')}
+                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 relative opacity-60"
+                        >
+                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                <Lock size={8} className="text-amber-400" />
+                                <span className="text-[8px] font-bold text-amber-400">PRO</span>
+                            </div>
+                            <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-orange-600/20 rounded-xl flex items-center justify-center">
+                                <FileSpreadsheet className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <span className="font-semibold text-sm text-white">Log Sheet</span>
+                            <span className="text-[10px] text-slate-500">Sign-in Sheets</span>
+                        </button>
+                    ) : (
+                        <Link
+                            to="/log-scan"
+                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                            <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-orange-600/20 rounded-xl flex items-center justify-center">
+                                <FileSpreadsheet className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <span className="font-semibold text-sm text-white">Log Sheet</span>
+                            <span className="text-[10px] text-slate-500">Sign-in Sheets</span>
+                        </Link>
+                    )}
 
-                    <Link
-                        to="/multi-card"
-                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                        <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-rose-600/20 rounded-xl flex items-center justify-center">
-                            <Layers className="w-5 h-5 text-pink-400" />
-                        </div>
-                        <span className="font-semibold text-sm text-white">Multi-Card</span>
-                        <span className="text-[10px] text-slate-500">Batch Cards</span>
-                    </Link>
+                    {isBulkLocked ? (
+                        <button
+                            onClick={() => setUpgradeFeature('bulk-scan')}
+                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 relative opacity-60"
+                        >
+                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                <Lock size={8} className="text-amber-400" />
+                                <span className="text-[8px] font-bold text-amber-400">PRO</span>
+                            </div>
+                            <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-rose-600/20 rounded-xl flex items-center justify-center">
+                                <Layers className="w-5 h-5 text-pink-400" />
+                            </div>
+                            <span className="font-semibold text-sm text-white">Multi-Card</span>
+                            <span className="text-[10px] text-slate-500">Batch Cards</span>
+                        </button>
+                    ) : (
+                        <Link
+                            to="/multi-card"
+                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                            <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-rose-600/20 rounded-xl flex items-center justify-center">
+                                <Layers className="w-5 h-5 text-pink-400" />
+                            </div>
+                            <span className="font-semibold text-sm text-white">Multi-Card</span>
+                            <span className="text-[10px] text-slate-500">Batch Cards</span>
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -285,6 +322,9 @@ const Home = () => {
                     </span>
                 </div>
             </div>
+            {upgradeFeature && (
+                <UpgradePrompt feature={upgradeFeature} onDismiss={() => setUpgradeFeature(null)} />
+            )}
         </div>
     );
 };

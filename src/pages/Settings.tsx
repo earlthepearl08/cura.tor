@@ -10,7 +10,7 @@ import AccessCodeInput from '@/components/AccessCodeInput';
 
 const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> = {
     free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
-    early_access: { label: 'Early Access', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+    early_access: { label: 'Pioneer', color: 'text-amber-400', bg: 'bg-amber-500/20' },
     pro: { label: 'Pro', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
 };
 
