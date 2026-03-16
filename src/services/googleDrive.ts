@@ -143,15 +143,12 @@ class GoogleDriveService {
         this.persistSession();
         resolve();
       };
-      this.tokenClient.requestAccessToken({ prompt: '' });
+      this.tokenClient.requestAccessToken({ prompt: 'consent' });
     });
   }
 
   signOut(): void {
-    if (this.accessToken) {
-      (window as any).google.accounts.oauth2.revoke(this.accessToken);
-      this.accessToken = null;
-    }
+    this.accessToken = null;
     this.state.isSignedIn = false;
     this.state.user = null;
     this.state.fileId = null;
