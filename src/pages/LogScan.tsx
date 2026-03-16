@@ -74,6 +74,13 @@ const LogScan: React.FC = () => {
         }
     };
 
+    /** Wrap a promise with a hard timeout so we never get stuck */
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
+        Promise.race([
+            promise,
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms))
+        ]);
+
     const processMultipleSheets = async (files: File[], append: boolean) => {
         if (!canPerformScan()) {
             setShowUpgradePrompt(true);
@@ -97,14 +104,17 @@ const LogScan: React.FC = () => {
         let sheetsProcessed = append ? sheetCount : 0;
         const failedIndices: number[] = [];
 
-        const compressedImages: string[] = [];
         for (let i = 0; i < files.length; i++) {
             setProcessingProgress(`Analyzing sheet ${i + 1} of ${files.length}...`);
-            const data = i === 0 ? firstData : await compressForOCR(files[i]);
-            compressedImages.push(data);
-            setImageData(data);
             try {
-                const results = await ocrService.parseLogSheet(data);
+                const data = i === 0 ? firstData : await compressForOCR(files[i]);
+                setImageData(data);
+                // 45-second hard timeout per sheet so we never get stuck
+                const results = await withTimeout(
+                    ocrService.parseLogSheet(data),
+                    45000,
+                    `Sheet ${i + 1}`
+                );
                 if (results.length > 0) {
                     await incrementScanCount();
                     allEntries = [...allEntries, ...results];
@@ -114,19 +124,26 @@ const LogScan: React.FC = () => {
                 failedIndices.push(i);
                 console.error(`Failed to process sheet ${i + 1}:`, err?.message || err);
             }
-            // Brief pause between API calls to avoid Gemini rate limits
+            // Pause between API calls to respect Gemini rate limits
             if (i < files.length - 1) {
-                await new Promise(r => setTimeout(r, 1500));
+                const delay = failedIndices.length > 0 ? 5000 : 3000;
+                setProcessingProgress(`Waiting before sheet ${i + 2}...`);
+                await new Promise(r => setTimeout(r, delay));
             }
         }
 
-        // Retry failed sheets once with a longer delay
+        // Retry failed sheets once with longer delays
         if (failedIndices.length > 0 && failedIndices.length < files.length) {
             for (const idx of [...failedIndices]) {
-                setProcessingProgress(`Retrying sheet ${idx + 1}...`);
-                await new Promise(r => setTimeout(r, 3000));
+                setProcessingProgress(`Retrying sheet ${idx + 1} of ${files.length}...`);
+                await new Promise(r => setTimeout(r, 8000));
                 try {
-                    const results = await ocrService.parseLogSheet(compressedImages[idx]);
+                    const data = await compressForOCR(files[idx]);
+                    const results = await withTimeout(
+                        ocrService.parseLogSheet(data),
+                        45000,
+                        `Sheet ${idx + 1} retry`
+                    );
                     if (results.length > 0) {
                         await incrementScanCount();
                         allEntries = [...allEntries, ...results];
@@ -151,7 +168,7 @@ const LogScan: React.FC = () => {
         } else {
             setEntries(null);
             setError(failedIndices.length > 0
-                ? `All ${files.length} sheets failed (${failedIndices.join(', ')}). Try selecting fewer sheets or use camera instead.`
+                ? `All ${files.length} sheets failed. Try selecting fewer sheets or use camera instead.`
                 : 'No entries found on any sheet.');
         }
         setIsProcessing(false);
