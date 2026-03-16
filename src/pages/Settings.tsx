@@ -315,6 +315,9 @@ const Settings = () => {
                                     <LinkIcon className="w-4 h-4" />
                                     Connect Google Drive
                                 </button>
+                                {error && (
+                                    <p className="mt-3 text-xs text-red-400">{error}</p>
+                                )}
                             </>
                         )}
                     </div>

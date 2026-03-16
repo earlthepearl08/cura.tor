@@ -78,6 +78,7 @@ const Uploader: React.FC = () => {
         accept: {
             'image/*': ['.jpeg', '.jpg', '.png']
         },
+        multiple: true,
         disabled: isProcessing
     });
 
@@ -350,7 +351,8 @@ const Uploader: React.FC = () => {
                         <Upload size={48} />
                     </div>
                     <h2 className="text-xl font-medium mb-2">Drop your cards here</h2>
-                    <p className="text-brand-500 text-sm">Business cards & QR codes — JPG, PNG (Bulk upload)</p>
+                    <p className="text-brand-500 text-sm">Business cards & QR codes — JPG, PNG</p>
+                    <p className="text-brand-600 text-xs mt-1">Select multiple photos from your gallery</p>
                 </div>
 
                 {/* Queue Management */}

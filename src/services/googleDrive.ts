@@ -132,7 +132,10 @@ class GoogleDriveService {
     if (!this.tokenClient) {
       await this.init();
     }
-    return new Promise((resolve) => {
+    if (!this.tokenClient) {
+      throw new Error('Google Drive is not configured. Please contact support.');
+    }
+    return new Promise((resolve, reject) => {
       this.tokenClient.callback = async (response: any) => {
         if (response.error) {
           throw new Error(response.error);
