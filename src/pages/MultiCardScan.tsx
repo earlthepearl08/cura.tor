@@ -178,7 +178,8 @@ const MultiCardScan: React.FC = () => {
         if (!entries) return;
         if (type === 'csv' && !canExportCSV()) { setUpgradeFeature('export'); return; }
         if (type === 'excel' && !canExportExcel()) { setUpgradeFeature('export'); return; }
-        const contacts = entriesToContacts(entries);
+        const selected = entries.filter((_, i) => selectedEntries.has(i));
+        const contacts = entriesToContacts(selected.length > 0 ? selected : entries);
         if (type === 'csv') exportService.toCSV(contacts);
         else exportService.toExcel(contacts);
         setShowExportOptions(false);
@@ -214,7 +215,11 @@ const MultiCardScan: React.FC = () => {
         if (updated.length === 0) {
             setError('All entries removed. Take another photo or start over.');
         }
-        if (editingIndex === index) setEditingIndex(null);
+        if (editingIndex === index) {
+            setEditingIndex(null);
+        } else if (editingIndex !== null && editingIndex > index) {
+            setEditingIndex(editingIndex - 1);
+        }
 
         // Rebuild index-based maps to account for shifted indices
         const newSelected = new Set<number>();

@@ -33,6 +33,19 @@ const fileToDataURL = (file: File): Promise<string> => {
     });
 };
 
+const MAX_SILENT_RETRIES = 2;
+
+const friendlyError = (err: unknown): string => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('timed out') || msg.includes('abort'))
+        return 'Server took too long. It will retry automatically next time.';
+    if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
+        return 'Server is busy. Try again in a moment.';
+    if (msg.includes('500') || msg.includes('503'))
+        return 'Temporary server issue. Try again shortly.';
+    return 'Processing failed. Tap to retry.';
+};
+
 const Uploader: React.FC = () => {
     const [queue, setQueue] = useState<QueuedFile[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -88,24 +101,42 @@ const Uploader: React.FC = () => {
                 setSelectedIds(prev => new Set(prev).add(item.id));
                 setQrIds(prev => new Set(prev).add(item.id));
                 setProcessedCount(prev => prev + 1);
-                // QR decode is free — no scan count increment
                 return { id: item.id, ocrResult: qrResult };
             }
-
-            // No QR code found — use OCR pipeline (counts as scan)
-            const result = await ocrService.processImage(item.dataURL);
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed', ocrResult: result } : q));
-            setSelectedIds(prev => new Set(prev).add(item.id));
-            setProcessedCount(prev => prev + 1);
-            await incrementScanCount();
-            return { id: item.id, ocrResult: result };
-        } catch (error: any) {
-            const errorMsg = error?.message || 'Processing failed';
-            console.error(`Failed to process ${item.file.name}:`, error);
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: errorMsg } : q));
-            setProcessedCount(prev => prev + 1);
-            return null;
+        } catch {
+            // QR decode failed silently — fall through to OCR
         }
+
+        // No QR code found — use OCR pipeline with silent retries (counts as scan)
+        let lastErr: unknown;
+        for (let attempt = 0; attempt <= MAX_SILENT_RETRIES; attempt++) {
+            try {
+                const result = await ocrService.processImage(item.dataURL);
+                const counted = await incrementScanCount();
+                if (!counted) {
+                    // Scan limit reached mid-batch — mark as error, don't give free results
+                    setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: 'Scan limit reached' } : q));
+                    setProcessedCount(prev => prev + 1);
+                    return null;
+                }
+                setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed', ocrResult: result } : q));
+                setSelectedIds(prev => new Set(prev).add(item.id));
+                setProcessedCount(prev => prev + 1);
+                return { id: item.id, ocrResult: result };
+            } catch (err) {
+                lastErr = err;
+                console.log(`[Upload] ${item.file.name} attempt ${attempt + 1} failed:`, err);
+                if (attempt < MAX_SILENT_RETRIES) {
+                    await new Promise(r => setTimeout(r, 8000 + attempt * 4000));
+                }
+            }
+        }
+        // All retries exhausted
+        const errorMsg = friendlyError(lastErr);
+        console.error(`Failed to process ${item.file.name} after ${MAX_SILENT_RETRIES + 1} attempts`);
+        setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: errorMsg } : q));
+        setProcessedCount(prev => prev + 1);
+        return null;
     };
 
     const startProcessing = async () => {
@@ -121,7 +152,7 @@ const Uploader: React.FC = () => {
         setProcessedCount(0);
 
         const items = [...queue].filter(item => item.status !== 'completed');
-        const BATCH_SIZE = 3;
+        const BATCH_SIZE = 2;
         const completedResults: Array<{ id: string; ocrResult: OCRResult }> = [];
 
         for (let i = 0; i < items.length; i += BATCH_SIZE) {
@@ -134,6 +165,14 @@ const Uploader: React.FC = () => {
 
         setIsProcessing(false);
         runDuplicateCheck(completedResults);
+    };
+
+    const retryFailed = async () => {
+        // Reset errored items back to queued so startProcessing picks them up
+        setQueue(prev => prev.map(q => q.status === 'error' ? { ...q, status: 'queued' as const, error: undefined } : q));
+        // Small delay to let state update before re-processing
+        await new Promise(r => setTimeout(r, 100));
+        startProcessing();
     };
 
     const runDuplicateCheck = async (completedResults: Array<{ id: string; ocrResult: OCRResult }>) => {
@@ -474,12 +513,23 @@ const Uploader: React.FC = () => {
                             </div>
                         )}
 
-                        {!isProcessing && errorItems > 0 && completedItems === 0 && (
-                            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-3">
-                                <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
-                                <p className="text-sm text-red-400">
-                                    All images failed to process. Check your internet connection and try again.
-                                </p>
+                        {!isProcessing && errorItems > 0 && (
+                            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                    <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
+                                    <p className="text-sm text-red-400">
+                                        {completedItems === 0
+                                            ? 'All images failed to process. Check your connection and retry.'
+                                            : `${errorItems} image${errorItems > 1 ? 's' : ''} failed. You can retry them.`
+                                        }
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={retryFailed}
+                                    className="mt-2 w-full py-2 bg-red-500/20 border border-red-500/30 rounded-xl text-sm font-medium text-red-300 hover:bg-red-500/30 transition-colors"
+                                >
+                                    Retry Failed ({errorItems})
+                                </button>
                             </div>
                         )}
                     </div>
