@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, FileText, Shield } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
@@ -320,6 +320,27 @@ const Settings = () => {
                                 )}
                             </>
                         )}
+                    </div>
+                </div>
+
+                {/* Legal */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Legal</p>
+                    <div className="card-elevated rounded-2xl p-4 space-y-2">
+                        <button
+                            onClick={() => navigate('/legal?tab=tos')}
+                            className="w-full flex items-center gap-3 py-2 px-1 rounded-lg hover:bg-white/5 transition-colors"
+                        >
+                            <FileText size={16} className="text-slate-500" />
+                            <span className="text-sm text-slate-300">Terms of Service</span>
+                        </button>
+                        <button
+                            onClick={() => navigate('/legal?tab=privacy')}
+                            className="w-full flex items-center gap-3 py-2 px-1 rounded-lg hover:bg-white/5 transition-colors"
+                        >
+                            <Shield size={16} className="text-slate-500" />
+                            <span className="text-sm text-slate-300">Privacy Policy</span>
+                        </button>
                     </div>
                 </div>
 

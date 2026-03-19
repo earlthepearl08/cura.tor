@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -215,8 +215,14 @@ const Auth: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <div className="p-4 text-center">
+            <div className="p-4 text-center space-y-2">
                 <p className="text-xs text-slate-600">Cura.tor v1.0 Beta</p>
+                <p className="text-[10px] text-slate-700">
+                    By signing in, you agree to our{' '}
+                    <Link to="/legal?tab=tos" className="text-brand-500 hover:text-brand-400">Terms of Service</Link>
+                    {' '}and{' '}
+                    <Link to="/legal?tab=privacy" className="text-brand-500 hover:text-brand-400">Privacy Policy</Link>
+                </p>
             </div>
         </div>
     );
