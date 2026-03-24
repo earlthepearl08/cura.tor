@@ -5,9 +5,11 @@ import { ocrService, LogSheetEntry } from '@/services/ocr';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
+import { Batch } from '@/types/batch';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
+import BatchNamingModal from '@/components/BatchNamingModal';
 import { compressForOCR } from '@/utils/compressPhoto';
 
 const MultiCardScan: React.FC = () => {
@@ -29,6 +31,9 @@ const MultiCardScan: React.FC = () => {
     const [editForm, setEditForm] = useState<LogSheetEntry>({ name: '', company: '', position: '', phone: '', email: '', address: '', notes: '' });
     const [duplicateMap, setDuplicateMap] = useState<Map<number, DuplicateResult>>(new Map());
     const [selectedEntries, setSelectedEntries] = useState<Set<number>>(new Set());
+    const [showBatchNaming, setShowBatchNaming] = useState(false);
+    const [scanTimestamp, setScanTimestamp] = useState<number>(Date.now());
+    const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
 
     useEffect(() => {
         const loadFolders = async () => {
@@ -71,6 +76,9 @@ const MultiCardScan: React.FC = () => {
             } else {
                 await incrementScanCount();
                 await checkEntriesForDuplicates(results);
+                const timestamp = Date.now();
+                setScanTimestamp(timestamp);
+                setShowBatchNaming(true);
             }
         } catch (err) {
             setError(friendlyError(err));
@@ -150,6 +158,7 @@ const MultiCardScan: React.FC = () => {
             confidence: 85,
             isVerified: false,
             createdAt: Date.now(),
+            batchId: currentBatchId || undefined,
         }));
 
     const toggleEntrySelection = (index: number) => {
@@ -185,6 +194,31 @@ const MultiCardScan: React.FC = () => {
         setShowExportOptions(false);
     };
 
+    const handleSaveBatch = async (name: string) => {
+        if (!entries) return;
+
+        const batchId = crypto.randomUUID();
+        const batch: Batch = {
+            id: batchId,
+            name,
+            scanType: 'multi-card',
+            scannedAt: scanTimestamp,
+            totalContacts: entries.length,
+            successCount: selectedEntries.size,
+            errorCount: duplicateMap.size,
+            thumbnailData: imageData || undefined,
+        };
+
+        await storage.saveBatch(batch);
+        setCurrentBatchId(batchId);
+        setShowBatchNaming(false);
+    };
+
+    const handleSkipBatch = () => {
+        setCurrentBatchId(null);
+        setShowBatchNaming(false);
+    };
+
     const reset = () => {
         setImageData(null);
         setEntries(null);
@@ -193,6 +227,8 @@ const MultiCardScan: React.FC = () => {
         setEditingIndex(null);
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
+        setShowBatchNaming(false);
+        setCurrentBatchId(null);
     };
 
     const openEntryEdit = (index: number) => {
@@ -495,6 +531,18 @@ const MultiCardScan: React.FC = () => {
 
             {upgradeFeature && (
                 <UpgradePrompt feature={upgradeFeature} onDismiss={() => setUpgradeFeature(null)} />
+            )}
+
+            {showBatchNaming && entries && (
+                <BatchNamingModal
+                    scanType="multi-card"
+                    totalContacts={entries.length}
+                    successCount={selectedEntries.size}
+                    errorCount={duplicateMap.size}
+                    timestamp={scanTimestamp}
+                    onSave={handleSaveBatch}
+                    onSkip={handleSkipBatch}
+                />
             )}
         </div>
     );

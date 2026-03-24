@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
+import { Batch } from '@/types/batch';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,6 +35,7 @@ const Contacts: React.FC = () => {
         folder: '',
     });
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { canExportCSV, canExportExcel, canExportBulkVCard, canExportVCard } = useAuth();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const [persistedFolders, setPersistedFolders] = useState<string[]>([]);
@@ -47,6 +49,9 @@ const Contacts: React.FC = () => {
     const [deletedContacts, setDeletedContacts] = useState<Contact[]>([]);
     const [showDeleted, setShowDeleted] = useState(false);
     const [showMoveModal, setShowMoveModal] = useState(false);
+    const [batches, setBatches] = useState<Batch[]>([]);
+    const [selectedBatch, setSelectedBatch] = useState<string>('all'); // 'all' or batch ID
+    const [showBatchDropdown, setShowBatchDropdown] = useState(false);
     const [moveTargetFolder, setMoveTargetFolder] = useState('Uncategorized');
     const [moveNewFolder, setMoveNewFolder] = useState('');
     const [editPersonPhoto, setEditPersonPhoto] = useState<string | null>(null);
@@ -79,7 +84,16 @@ const Contacts: React.FC = () => {
         loadContacts();
         loadFolders();
         loadDeletedContacts();
+        loadBatches();
     }, []);
+
+    // Handle batch query parameter from URL
+    useEffect(() => {
+        const batchParam = searchParams.get('batch');
+        if (batchParam) {
+            setSelectedBatch(batchParam);
+        }
+    }, [searchParams]);
 
     const loadContacts = async () => {
         setIsLoading(true);
@@ -108,6 +122,15 @@ const Contacts: React.FC = () => {
             setDeletedContacts(deleted);
         } catch (error) {
             console.error("Failed to load deleted contacts:", error);
+        }
+    };
+
+    const loadBatches = async () => {
+        try {
+            const allBatches = await storage.getAllBatches();
+            setBatches(allBatches);
+        } catch (error) {
+            console.error("Failed to load batches:", error);
         }
     };
 
@@ -314,7 +337,7 @@ const Contacts: React.FC = () => {
     const contactFolders = contacts.map(c => c.folder || 'Uncategorized');
     const folders = Array.from(new Set([...contactFolders, ...persistedFolders])).sort();
 
-    // Filter contacts by search and folder
+    // Filter contacts by search, folder, and batch
     const filteredContacts = contacts.filter(c => {
         const q = searchQuery.toLowerCase();
         const matchesSearch = !q ||
@@ -326,7 +349,8 @@ const Contacts: React.FC = () => {
             c.phone.some(p => p.includes(q)) ||
             c.email.some(e => e.toLowerCase().includes(q));
         const matchesFolder = selectedFolder === 'all' || (c.folder || 'Uncategorized') === selectedFolder;
-        return matchesSearch && matchesFolder;
+        const matchesBatch = selectedBatch === 'all' || c.batchId === selectedBatch;
+        return matchesSearch && matchesFolder && matchesBatch;
     });
 
     const renderContactCard = (contact: Contact) => {
@@ -385,6 +409,12 @@ const Contacts: React.FC = () => {
                             <div className="flex items-center gap-2 text-amber-400/70">
                                 <StickyNote size={12} className="text-amber-500/50" />
                                 <span className="truncate">{contact.notes}</span>
+                            </div>
+                        )}
+                        {contact.batchId && batches.find(b => b.id === contact.batchId) && (
+                            <div className="flex items-center gap-2 text-violet-400/70">
+                                <Layers size={12} className="text-violet-500/50" />
+                                <span className="truncate">{batches.find(b => b.id === contact.batchId)!.name}</span>
                             </div>
                         )}
                     </div>
@@ -618,6 +648,58 @@ const Contacts: React.FC = () => {
                         </div>
                     )}
                 </div>
+
+                {/* Batch Filter */}
+                {batches.length > 0 && (
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowBatchDropdown(!showBatchDropdown)}
+                            className="w-full flex items-center justify-between bg-brand-900/50 border border-brand-800 rounded-xl py-2.5 px-4 hover:bg-brand-900/70 transition-all text-sm"
+                        >
+                            <div className="flex items-center gap-2">
+                                <Layers size={18} className="text-violet-500" />
+                                <span>{selectedBatch === 'all' ? 'All Batches' : batches.find(b => b.id === selectedBatch)?.name || 'Unknown'}</span>
+                            </div>
+                            <span className="text-brand-500 text-xs">{filteredContacts.length}</span>
+                        </button>
+
+                        {showBatchDropdown && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 max-h-64 overflow-y-auto">
+                                <button
+                                    onClick={() => {
+                                        setSelectedBatch('all');
+                                        setShowBatchDropdown(false);
+                                    }}
+                                    className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors ${selectedBatch === 'all' ? 'bg-violet-500/20 text-violet-400' : ''}`}
+                                >
+                                    All Batches ({contacts.length})
+                                </button>
+                                {batches.map(batch => {
+                                    const batchContacts = contacts.filter(c => c.batchId === batch.id);
+                                    if (batchContacts.length === 0) return null;
+                                    return (
+                                        <button
+                                            key={batch.id}
+                                            onClick={() => {
+                                                setSelectedBatch(batch.id);
+                                                setShowBatchDropdown(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors border-t border-brand-800 ${selectedBatch === batch.id ? 'bg-violet-500/20 text-violet-400' : ''}`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="truncate flex-1">{batch.name}</span>
+                                                <span className="text-xs text-slate-500 ml-2">({batchContacts.length})</span>
+                                            </div>
+                                            <div className="text-xs text-slate-600 mt-0.5">
+                                                {new Date(batch.scannedAt).toLocaleDateString()}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 p-4 space-y-6">
@@ -973,6 +1055,35 @@ const Contacts: React.FC = () => {
                                         }}
                                         className="w-full glass border border-brand-500 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500"
                                     />
+                                </div>
+                            )}
+
+                            {/* Batch Info (read-only) */}
+                            {editingContact.batchId && batches.find(b => b.id === editingContact.batchId) && (
+                                <div className="relative">
+                                    <Layers className="absolute left-3 top-3 text-violet-500" size={18} />
+                                    <div className="w-full glass border border-brand-800/50 rounded-xl py-3 pl-10 pr-4 text-sm bg-brand-950/50">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-slate-300 text-xs">From Batch:</p>
+                                                <p className="text-violet-400 font-medium">
+                                                    {batches.find(b => b.id === editingContact.batchId)!.name}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedBatch(editingContact.batchId!);
+                                                    closeEditModal();
+                                                }}
+                                                className="text-xs text-violet-400 hover:text-violet-300 underline"
+                                            >
+                                                View All
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-600 mt-1">
+                                            Scanned on {new Date(batches.find(b => b.id === editingContact.batchId)!.scannedAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </div>

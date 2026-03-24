@@ -1,10 +1,12 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { Contact } from '@/types/contact';
+import { Batch } from '@/types/batch';
 
 const DB_PREFIX = 'CardScannerDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = 'contacts';
 const FOLDERS_STORE = 'folders';
+const BATCHES_STORE = 'batches';
 
 export class StorageService {
     private db: Promise<IDBPDatabase>;
@@ -32,6 +34,11 @@ export class StorageService {
                 if (oldVersion < 2) {
                     if (!db.objectStoreNames.contains(FOLDERS_STORE)) {
                         db.createObjectStore(FOLDERS_STORE, { keyPath: 'name' });
+                    }
+                }
+                if (oldVersion < 3) {
+                    if (!db.objectStoreNames.contains(BATCHES_STORE)) {
+                        db.createObjectStore(BATCHES_STORE, { keyPath: 'id' });
                     }
                 }
             },
@@ -196,6 +203,47 @@ export class StorageService {
             console.error(`Migration from ${dbName} failed:`, err);
             return 0;
         }
+    }
+
+    /** Batch operations */
+    async getAllBatches(): Promise<Batch[]> {
+        const db = await this.db;
+        const all: Batch[] = await db.getAll(BATCHES_STORE);
+        return all.filter(b => !b.isDeleted).sort((a, b) => b.scannedAt - a.scannedAt);
+    }
+
+    async getBatch(id: string): Promise<Batch | undefined> {
+        const db = await this.db;
+        return db.get(BATCHES_STORE, id);
+    }
+
+    async saveBatch(batch: Batch): Promise<void> {
+        const db = await this.db;
+        await db.put(BATCHES_STORE, batch);
+    }
+
+    async deleteBatch(id: string): Promise<void> {
+        const db = await this.db;
+        const batch = await db.get(BATCHES_STORE, id);
+        if (batch) {
+            batch.isDeleted = true;
+            batch.deletedAt = Date.now();
+            await db.put(BATCHES_STORE, batch);
+        }
+    }
+
+    async getContactsByBatchId(batchId: string): Promise<Contact[]> {
+        const db = await this.db;
+        const all: Contact[] = await db.getAll(STORE_NAME);
+        return all.filter(c => !c.isDeleted && c.batchId === batchId);
+    }
+
+    async getBatchStats(batchId: string): Promise<{ total: number; verified: number }> {
+        const contacts = await this.getContactsByBatchId(batchId);
+        return {
+            total: contacts.length,
+            verified: contacts.filter(c => c.isVerified).length,
+        };
     }
 }
 

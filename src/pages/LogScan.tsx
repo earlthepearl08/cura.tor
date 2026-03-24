@@ -5,9 +5,11 @@ import { ocrService, LogSheetEntry } from '@/services/ocr';
 import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
+import { Batch } from '@/types/batch';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
+import BatchNamingModal from '@/components/BatchNamingModal';
 import { compressForOCR } from '@/utils/compressPhoto';
 
 const LogScan: React.FC = () => {
@@ -33,6 +35,9 @@ const LogScan: React.FC = () => {
     const [selectedEntries, setSelectedEntries] = useState<Set<number>>(new Set());
     const [sheetCount, setSheetCount] = useState(0);
     const [processingProgress, setProcessingProgress] = useState<string | null>(null);
+    const [showBatchNaming, setShowBatchNaming] = useState(false);
+    const [scanTimestamp, setScanTimestamp] = useState<number>(Date.now());
+    const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
 
     useEffect(() => {
         const loadFolders = async () => {
@@ -179,6 +184,9 @@ const LogScan: React.FC = () => {
                 setError(`partial:Sheet${nums.length > 1 ? 's' : ''} ${nums.join(', ')} couldn't be read. You can add them again later.`);
             }
             await checkEntriesForDuplicates(allEntries);
+            const timestamp = Date.now();
+            setScanTimestamp(timestamp);
+            setShowBatchNaming(true);
         } else {
             setEntries(null);
             setError(failedIndices.length > 0
@@ -294,6 +302,9 @@ const LogScan: React.FC = () => {
                 await incrementScanCount();
                 setSheetCount(1);
                 await checkEntriesForDuplicates(results);
+                const timestamp = Date.now();
+                setScanTimestamp(timestamp);
+                setShowBatchNaming(true);
             }
         } catch (err) {
             setError(friendlyError(err));
@@ -319,6 +330,7 @@ const LogScan: React.FC = () => {
             confidence: 85,
             isVerified: false,
             createdAt: Date.now(),
+            batchId: currentBatchId || undefined,
         }));
 
     const toggleEntrySelection = (index: number) => {
@@ -354,6 +366,31 @@ const LogScan: React.FC = () => {
         setShowExportOptions(false);
     };
 
+    const handleSaveBatch = async (name: string) => {
+        if (!entries) return;
+
+        const batchId = crypto.randomUUID();
+        const batch: Batch = {
+            id: batchId,
+            name,
+            scanType: 'log-sheet',
+            scannedAt: scanTimestamp,
+            totalContacts: entries.length,
+            successCount: selectedEntries.size,
+            errorCount: duplicateMap.size,
+            thumbnailData: imageData || undefined,
+        };
+
+        await storage.saveBatch(batch);
+        setCurrentBatchId(batchId);
+        setShowBatchNaming(false);
+    };
+
+    const handleSkipBatch = () => {
+        setCurrentBatchId(null);
+        setShowBatchNaming(false);
+    };
+
     const reset = () => {
         setImageData(null);
         setEntries(null);
@@ -363,6 +400,8 @@ const LogScan: React.FC = () => {
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
         setSheetCount(0);
+        setShowBatchNaming(false);
+        setCurrentBatchId(null);
     };
 
     const openEntryEdit = (index: number) => {
@@ -694,6 +733,18 @@ const LogScan: React.FC = () => {
 
             {upgradeFeature && (
                 <UpgradePrompt feature={upgradeFeature} onDismiss={() => setUpgradeFeature(null)} />
+            )}
+
+            {showBatchNaming && entries && (
+                <BatchNamingModal
+                    scanType="log-sheet"
+                    totalContacts={entries.length}
+                    successCount={selectedEntries.size}
+                    errorCount={duplicateMap.size}
+                    timestamp={scanTimestamp}
+                    onSave={handleSaveBatch}
+                    onSkip={handleSkipBatch}
+                />
             )}
 
         </div>
