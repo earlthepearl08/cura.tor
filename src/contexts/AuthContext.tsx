@@ -3,10 +3,12 @@ import {
     onAuthStateChanged,
     signInWithPopup,
     signInWithRedirect,
+    getRedirectResult,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     updateProfile,
     signOut as firebaseSignOut,
+    GoogleAuthProvider,
     User
 } from 'firebase/auth';
 import { auth, googleProvider } from '@/config/firebase';
@@ -74,6 +76,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen to auth state
     useEffect(() => {
+        // Handle redirect sign-in result (mobile PWA fallback)
+        getRedirectResult(auth).then((result) => {
+            if (result) {
+                const credential = GoogleAuthProvider.credentialFromResult(result);
+                if (credential?.accessToken) {
+                    sessionStorage.setItem('gdrive_token', credential.accessToken);
+                    if (result.user) {
+                        sessionStorage.setItem('gdrive_user', JSON.stringify({
+                            email: result.user.email || '',
+                            name: result.user.displayName || '',
+                        }));
+                    }
+                }
+            }
+        }).catch(() => {});
+
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             setFirebaseUser(fbUser);
             if (fbUser) {
@@ -107,7 +125,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signInWithGoogle = useCallback(async () => {
         try {
-            await signInWithPopup(auth, googleProvider);
+            const result = await signInWithPopup(auth, googleProvider);
+            // Capture Google OAuth access token for automatic Drive access
+            const credential = GoogleAuthProvider.credentialFromResult(result);
+            if (credential?.accessToken) {
+                sessionStorage.setItem('gdrive_token', credential.accessToken);
+                if (result.user) {
+                    sessionStorage.setItem('gdrive_user', JSON.stringify({
+                        email: result.user.email || '',
+                        name: result.user.displayName || '',
+                    }));
+                }
+            }
         } catch (err: any) {
             // Popup blocked (common on mobile PWA) — fallback to redirect
             if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
@@ -130,6 +159,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const signOut = useCallback(async () => {
         await firebaseSignOut(auth);
         storage.switchUser(null);
+        // Clear Drive session so it doesn't persist across accounts
+        sessionStorage.removeItem('gdrive_token');
+        sessionStorage.removeItem('gdrive_user');
         setUser(null);
         setFirebaseUser(null);
     }, []);

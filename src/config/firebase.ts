@@ -15,6 +15,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('https://www.googleapis.com/auth/drive.appdata');
 
 // Owner emails that automatically get Pro tier
 export const OWNER_EMAILS = ['earldy.kinmo@gmail.com'];

@@ -19,7 +19,7 @@ const Settings = () => {
     const { theme, toggleTheme } = useTheme();
     const [ocrEngine, setOcrEngineState] = useState<OCREngine>(getOCREngine());
     const [saved, setSaved] = useState(false);
-    const { isConnected, user: driveUser, isSyncing, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
+    const { isConnected, user: driveUser, isSyncing, syncProgress, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
     const { user, signOut, canUseGoogleDrive, scansRemaining } = useAuth();
 
     const tierBadge = TIER_BADGES[user?.tier || 'free'];
@@ -257,11 +257,32 @@ const Settings = () => {
                                         <p className="font-semibold text-sm text-emerald-400">Connected</p>
                                         {driveUser && <p className="text-xs text-slate-500">{driveUser.email}</p>}
                                     </div>
-                                    {isSyncing && (
+                                    {isSyncing && !syncProgress && (
                                         <div className="animate-spin h-5 w-5 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
                                     )}
                                 </div>
-                                {lastSyncTime && (
+
+                                {/* Sync progress bar */}
+                                {syncProgress && (
+                                    <div className="mb-4">
+                                        <div className="flex justify-between text-xs mb-1.5">
+                                            <span className="text-slate-400">{syncProgress.label}</span>
+                                            <span className={syncProgress.step === 'done' ? 'text-emerald-400' : 'text-brand-400'}>
+                                                {syncProgress.percent}%
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-brand-700 rounded-full h-2 overflow-hidden">
+                                            <div
+                                                className={`h-2 rounded-full transition-all duration-500 ease-out ${
+                                                    syncProgress.step === 'done' ? 'bg-emerald-500' : 'bg-sky-500'
+                                                }`}
+                                                style={{ width: `${syncProgress.percent}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!syncProgress && lastSyncTime && (
                                     <p className="text-xs text-slate-500 mb-4 flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
                                         Last synced: {new Date(lastSyncTime).toLocaleString()}
@@ -273,12 +294,13 @@ const Settings = () => {
                                         disabled={isSyncing}
                                         className="flex-1 py-3 text-sm glass rounded-xl disabled:opacity-50 hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
                                     >
-                                        <RefreshCw className="w-4 h-4" />
-                                        Sync Now
+                                        <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                                        {isSyncing ? 'Syncing...' : 'Sync Now'}
                                     </button>
                                     <button
                                         onClick={disconnect}
-                                        className="py-3 px-4 text-sm bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20 transition-colors"
+                                        disabled={isSyncing}
+                                        className="py-3 px-4 text-sm bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20 transition-colors disabled:opacity-50"
                                     >
                                         <Unplug className="w-4 h-4" />
                                     </button>

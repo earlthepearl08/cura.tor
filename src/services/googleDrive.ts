@@ -128,6 +128,68 @@ class GoogleDriveService {
     }
   }
 
+  /** Set a token obtained externally (e.g. from Firebase Google sign-in) */
+  setExternalToken(token: string, userInfo?: { email: string; name: string }): void {
+    this.accessToken = token;
+    this.state.isSignedIn = true;
+    if (userInfo) {
+      this.state.user = userInfo;
+    }
+    this.persistSession();
+  }
+
+  /** Attempt to refresh the access token via GIS (may show brief popup) */
+  async refreshToken(): Promise<boolean> {
+    if (!this.gisLoaded || !this.tokenClient) {
+      try {
+        await this.init();
+      } catch {
+        return false;
+      }
+    }
+    if (!this.tokenClient) return false;
+
+    return new Promise((resolve) => {
+      this.tokenClient.callback = async (response: any) => {
+        if (response.error) {
+          resolve(false);
+          return;
+        }
+        this.accessToken = response.access_token;
+        this.state.isSignedIn = true;
+        await this.loadUserInfo();
+        this.persistSession();
+        resolve(true);
+      };
+      // Empty prompt: if user already consented, Google issues token quickly
+      this.tokenClient.requestAccessToken({ prompt: '' });
+    });
+  }
+
+  /** Fetch wrapper that auto-retries once on 401 by refreshing the token */
+  private async fetchWithAuth(url: string, options: RequestInit & { headers?: Record<string, string> } = {}): Promise<Response> {
+    const makeOpts = (): RequestInit => ({
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+    });
+
+    const response = await fetch(url, makeOpts());
+
+    if (response.status === 401) {
+      const refreshed = await this.refreshToken();
+      if (refreshed) {
+        return fetch(url, makeOpts());
+      }
+      this.signOut();
+      throw new Error('Google Drive session expired. Please sync again to reconnect.');
+    }
+
+    return response;
+  }
+
   async signIn(): Promise<void> {
     if (!this.tokenClient) {
       await this.init();
@@ -175,9 +237,8 @@ class GoogleDriveService {
 
       if (!fileId) {
         // Search for existing file
-        const searchResponse = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}'&spaces=appDataFolder`,
-          { headers: { Authorization: `Bearer ${this.accessToken}` } }
+        const searchResponse = await this.fetchWithAuth(
+          `https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}'&spaces=appDataFolder`
         );
         const searchData = await searchResponse.json();
         fileId = searchData.files?.[0]?.id || null;
@@ -199,10 +260,9 @@ class GoogleDriveService {
           content +
           closeDelim;
 
-        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`, {
+        await this.fetchWithAuth(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`, {
           method: 'PATCH',
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
             'Content-Type': `multipart/related; boundary=${boundary}`,
           },
           body: multipartRequestBody,
@@ -214,11 +274,10 @@ class GoogleDriveService {
         form.append('metadata', new Blob([JSON.stringify(createMetadata)], { type: 'application/json' }));
         form.append('file', new Blob([content], { type: 'application/json' }));
 
-        const response = await fetch(
+        const response = await this.fetchWithAuth(
           'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
           {
             method: 'POST',
-            headers: { Authorization: `Bearer ${this.accessToken}` },
             body: form,
           }
         );
@@ -241,9 +300,8 @@ class GoogleDriveService {
 
       if (!fileId) {
         // Search for file
-        const searchResponse = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}'&spaces=appDataFolder`,
-          { headers: { Authorization: `Bearer ${this.accessToken}` } }
+        const searchResponse = await this.fetchWithAuth(
+          `https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}'&spaces=appDataFolder`
         );
         const searchData = await searchResponse.json();
         fileId = searchData.files?.[0]?.id;
@@ -254,9 +312,8 @@ class GoogleDriveService {
         this.state.fileId = fileId;
       }
 
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-        { headers: { Authorization: `Bearer ${this.accessToken}` } }
+      const response = await this.fetchWithAuth(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
       );
 
       if (!response.ok) {

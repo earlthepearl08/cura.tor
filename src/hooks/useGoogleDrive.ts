@@ -40,21 +40,38 @@ const mergeContacts = (local: Contact[], drive: Contact[]): Contact[] => {
   return Array.from(merged.values());
 };
 
+export interface SyncProgress {
+  step: 'loading-local' | 'loading-cloud' | 'merging' | 'saving-local' | 'saving-cloud' | 'cleanup' | 'done';
+  percent: number;
+  label: string;
+}
+
 export const useGoogleDrive = () => {
   const { canUseGoogleDrive } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [user, setUser] = useState<{ email: string; name: string } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const initDrive = async () => {
       try {
-        await googleDrive.init();
+        // Check if Firebase sign-in already provided a Drive token
         const state = googleDrive.getState();
-        setIsConnected(state.isSignedIn);
-        setUser(state.user);
+        if (state.isSignedIn) {
+          setIsConnected(true);
+          setUser(state.user);
+        }
+
+        // Initialize GIS/GAPI in background (needed for token refresh)
+        await googleDrive.init();
+
+        // Re-check state after init (GIS may have updated it)
+        const updatedState = googleDrive.getState();
+        setIsConnected(updatedState.isSignedIn);
+        setUser(updatedState.user);
       } catch (err) {
         console.error('Failed to initialize Google Drive:', err);
       }
@@ -78,8 +95,12 @@ export const useGoogleDrive = () => {
       setIsSyncing(true);
       setError(null);
 
-      // Load both sides (including tombstones for proper sync)
+      // Step 1: Load local contacts
+      setSyncProgress({ step: 'loading-local', percent: 10, label: 'Loading local contacts...' });
       const localContacts = await storage.getAllContactsIncludingDeleted();
+
+      // Step 2: Load cloud contacts
+      setSyncProgress({ step: 'loading-cloud', percent: 30, label: 'Loading cloud contacts...' });
       let driveContacts: Contact[] = [];
       try {
         driveContacts = await googleDrive.loadContacts();
@@ -88,30 +109,45 @@ export const useGoogleDrive = () => {
         console.log('[Sync] No existing Drive data, will push local contacts');
       }
 
-      // Merge (includes tombstones)
+      // Step 3: Merge
+      setSyncProgress({ step: 'merging', percent: 50, label: 'Merging contacts...' });
       const merged = mergeContacts(localContacts, driveContacts);
 
-      // Save merged result to local (including tombstones)
+      // Step 4: Save locally
+      setSyncProgress({ step: 'saving-local', percent: 65, label: 'Saving locally...' });
       await storage.batchSave(merged);
 
-      // Save only non-deleted contacts to Drive (no need to store tombstones on Drive)
-      // But we DO save tombstones to Drive so other devices can pick up deletions
+      // Step 5: Save to cloud
+      setSyncProgress({ step: 'saving-cloud', percent: 80, label: 'Saving to cloud...' });
       await googleDrive.saveContacts(merged);
 
-      // Purge old tombstones (> 30 days) from local storage
+      // Step 6: Cleanup
+      setSyncProgress({ step: 'cleanup', percent: 92, label: 'Cleaning up...' });
       const purged = await storage.purgeTombstones();
       if (purged > 0) {
         console.log(`[Sync] Purged ${purged} old tombstones`);
       }
+
+      // Done
+      const activeCount = merged.filter(c => !c.isDeleted).length;
+      setSyncProgress({ step: 'done', percent: 100, label: `Synced ${activeCount} contacts` });
 
       // Update last sync time
       const now = Date.now();
       setLastSyncTime(now);
       localStorage.setItem('lastDriveSync', now.toString());
 
-      // Return count of active (non-deleted) contacts
-      return merged.filter(c => !c.isDeleted).length;
+      // Clear progress after a brief delay
+      setTimeout(() => setSyncProgress(null), 2500);
+
+      return activeCount;
     } catch (err: any) {
+      setSyncProgress(null);
+      // If session expired, mark as disconnected so UI updates
+      if (err.message?.includes('expired') || err.message?.includes('Not signed in')) {
+        setIsConnected(false);
+        setUser(null);
+      }
       setError(err.message || 'Failed to sync contacts');
       throw err;
     } finally {
@@ -144,6 +180,7 @@ export const useGoogleDrive = () => {
     setIsConnected(false);
     setUser(null);
     setLastSyncTime(null);
+    setSyncProgress(null);
     localStorage.removeItem('lastDriveSync');
   }, []);
 
@@ -151,6 +188,7 @@ export const useGoogleDrive = () => {
     isConnected,
     user,
     isSyncing,
+    syncProgress,
     lastSyncTime,
     error,
     connect,
