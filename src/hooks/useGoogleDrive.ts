@@ -104,9 +104,10 @@ export const useGoogleDrive = () => {
       let driveContacts: Contact[] = [];
       try {
         driveContacts = await googleDrive.loadContacts();
-      } catch (err) {
-        // First sync or no file on Drive yet — that's fine
-        console.log('[Sync] No existing Drive data, will push local contacts');
+      } catch (err: any) {
+        // First sync, no file on Drive, or download timed out (large legacy file)
+        const isTimeout = err?.name === 'AbortError';
+        console.log(`[Sync] ${isTimeout ? 'Download timed out — will overwrite with local data' : 'No existing Drive data, will push local contacts'}`);
       }
 
       // Step 3: Merge

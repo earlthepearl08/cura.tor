@@ -21,6 +21,12 @@ const docToProfile = (data: any): UserProfile => ({
     },
     contactLimit: data.contactLimit ?? TIER_LIMITS[(data.tier || 'free') as UserTier].contactStorage,
     accessCode: data.accessCode || null,
+    stripe: data.stripe ? {
+        customerId: data.stripe.customerId || '',
+        subscriptionId: data.stripe.subscriptionId || null,
+        subscriptionStatus: data.stripe.subscriptionStatus || null,
+        currentPeriodEnd: data.stripe.currentPeriodEnd || null,
+    } : undefined,
     createdAt: data.createdAt?.toMillis?.() || data.createdAt || Date.now(),
     updatedAt: data.updatedAt?.toMillis?.() || data.updatedAt || Date.now(),
 });

@@ -39,7 +39,7 @@ const Contacts: React.FC = () => {
     const { canExportCSV, canExportExcel, canExportBulkVCard, canExportVCard } = useAuth();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const [persistedFolders, setPersistedFolders] = useState<string[]>([]);
-    const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const [vcfPreview, setVcfPreview] = useState<ParsedVCard[] | null>(null);
     const [vcfFolder, setVcfFolder] = useState('Uncategorized');
     const [vcfImporting, setVcfImporting] = useState(false);
@@ -147,7 +147,7 @@ const Contacts: React.FC = () => {
     };
 
     const toggleFolderCollapse = (folder: string) => {
-        setCollapsedFolders(prev => {
+        setExpandedFolders(prev => {
             const next = new Set(prev);
             if (next.has(folder)) next.delete(folder);
             else next.add(folder);
@@ -728,13 +728,13 @@ const Contacts: React.FC = () => {
                                 <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider">{folder}</h3>
                                 <span className="text-xs text-brand-600">({folderContacts.length})</span>
                                 <div className="ml-auto">
-                                    {collapsedFolders.has(folder)
-                                        ? <ChevronDown size={16} className="text-brand-600" />
-                                        : <ChevronUp size={16} className="text-brand-600" />
+                                    {expandedFolders.has(folder)
+                                        ? <ChevronUp size={16} className="text-brand-600" />
+                                        : <ChevronDown size={16} className="text-brand-600" />
                                     }
                                 </div>
                             </button>
-                            {!collapsedFolders.has(folder) && (
+                            {expandedFolders.has(folder) && (
                                 <div className="space-y-4">
                                     {folderContacts.map((contact) => renderContactCard(contact))}
                                 </div>

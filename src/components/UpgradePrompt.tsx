@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, X, Settings, Ticket } from 'lucide-react';
+import { Lock, X, CreditCard, Ticket, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface UpgradePromptProps {
@@ -12,47 +12,54 @@ interface UpgradePromptProps {
     contactLimit?: number;
 }
 
-function getFeatureMessage(feature: string, tier: string): { title: string; message: string } {
+function getFeatureMessage(feature: string, tier: string): { title: string; message: string; upgradeTier: 'pioneer' | 'pro' } {
     if (feature === 'scan') {
         if (tier === 'early_access') {
             return {
                 title: 'All Scans Used',
-                message: 'You\'ve used all of your Pioneer scans. Stay tuned — premium upgrades are coming soon!',
+                message: 'You\'ve used all of your Pioneer scans. Upgrade to Pro for unlimited scans and bulk scanning.',
+                upgradeTier: 'pro',
             };
         }
         return {
             title: 'Scan Limit Reached',
-            message: 'You\'ve used all 5 free scans this month. Enter an access code to unlock more, or your scans will reset next month.',
+            message: 'You\'ve used all 5 free scans this month. Upgrade to Pioneer for unlimited scans, or wait for your monthly reset.',
+            upgradeTier: 'pioneer',
         };
     }
     if (feature === 'bulk-scan') {
         return {
-            title: 'Premium Feature',
-            message: 'Log Sheet Scan and Multi-Card Scan are premium features. Enter an access code to unlock them.',
+            title: 'Pro Feature',
+            message: 'Multi-Card Scan and Log Sheet Scan are exclusive to the Pro plan.',
+            upgradeTier: 'pro',
         };
     }
     if (feature === 'export') {
         return {
             title: 'Export Locked',
-            message: 'Export features (vCard, CSV, Excel) are unlocked with an access code.',
+            message: 'Export features (vCard, CSV, Excel) are available on the Pioneer plan and above.',
+            upgradeTier: 'pioneer',
         };
     }
     if (feature === 'drive') {
         return {
             title: 'Google Drive Locked',
-            message: 'Google Drive sync is unlocked with an access code.',
+            message: 'Google Drive sync is available on the Pioneer plan and above.',
+            upgradeTier: 'pioneer',
         };
     }
     // storage
     if (tier === 'early_access') {
         return {
             title: 'Storage Limit Reached',
-            message: 'You\'ve reached your Pioneer limit of 50 contacts. Premium upgrades with more storage are coming soon!',
+            message: 'You\'ve reached your Pioneer limit of 50 contacts. Upgrade to Pro for unlimited storage.',
+            upgradeTier: 'pro',
         };
     }
     return {
         title: 'Storage Limit Reached',
-        message: 'You\'ve reached the free limit of 25 contacts. Enter an access code to unlock more storage.',
+        message: 'You\'ve reached the free limit of 25 contacts. Upgrade to unlock more storage.',
+        upgradeTier: 'pioneer',
     };
 }
 
@@ -71,7 +78,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
     const [codeError, setCodeError] = useState('');
     const [isRedeeming, setIsRedeeming] = useState(false);
 
-    const { title, message } = getFeatureMessage(feature, user?.tier || 'free');
+    const { title, message, upgradeTier } = getFeatureMessage(feature, user?.tier || 'free');
 
     const handleRedeem = async () => {
         if (!code.trim()) return;
@@ -131,11 +138,22 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
                     </div>
                 )}
 
-                {/* Access code section */}
-                {user?.tier !== 'early_access' && user?.tier !== 'pro' && !showCodeInput && (
+                {/* Upgrade button */}
+                {user?.tier !== 'pro' && (
+                    <button
+                        onClick={() => { onDismiss(); navigate('/settings?upgrade=' + upgradeTier); }}
+                        className="w-full mb-3 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold text-sm hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
+                        <Sparkles size={16} />
+                        Upgrade to {upgradeTier === 'pro' ? 'Pro' : 'Pioneer'}
+                    </button>
+                )}
+
+                {/* Access code section (free users only) */}
+                {user?.tier === 'free' && !showCodeInput && (
                     <button
                         onClick={() => setShowCodeInput(true)}
-                        className="w-full mb-4 py-2.5 glass border border-brand-700 rounded-xl text-xs font-medium text-brand-400 hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
+                        className="w-full mb-3 py-2.5 glass border border-brand-700 rounded-xl text-xs font-medium text-brand-400 hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
                     >
                         <Ticket size={14} />
                         Have an access code?
@@ -143,7 +161,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
                 )}
 
                 {showCodeInput && (
-                    <div className="mb-4 space-y-2">
+                    <div className="mb-3 space-y-2">
                         <div className="flex gap-2">
                             <input
                                 type="text"
@@ -165,22 +183,13 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
                     </div>
                 )}
 
-                {/* Actions */}
-                <div className="flex gap-3">
-                    <button
-                        onClick={onDismiss}
-                        className="flex-1 py-3 glass rounded-xl font-medium hover:bg-white/5 transition-colors text-sm"
-                    >
-                        Dismiss
-                    </button>
-                    <button
-                        onClick={() => { onDismiss(); navigate('/settings'); }}
-                        className="flex-1 py-3 bg-gradient-to-r from-brand-500 to-brand-600 text-white rounded-xl font-bold text-sm hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                    >
-                        <Settings size={16} />
-                        Settings
-                    </button>
-                </div>
+                {/* Dismiss */}
+                <button
+                    onClick={onDismiss}
+                    className="w-full py-3 glass rounded-xl font-medium hover:bg-white/5 transition-colors text-sm"
+                >
+                    Dismiss
+                </button>
             </div>
         </div>
     );

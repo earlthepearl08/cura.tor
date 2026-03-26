@@ -226,7 +226,9 @@ class GoogleDriveService {
       throw new Error('Not signed in');
     }
 
-    const content = JSON.stringify(contacts, null, 2);
+    // Strip heavy base64 fields to keep the payload small (~1 KB/contact vs ~400 KB)
+    const lightweight = contacts.map(({ imageData, personPhoto, locationPhoto, rawText, ...rest }) => rest);
+    const content = JSON.stringify(lightweight, null, 2);
     const metadata = {
       name: FILE_NAME,
       mimeType: 'application/json',
@@ -312,15 +314,24 @@ class GoogleDriveService {
         this.state.fileId = fileId;
       }
 
-      const response = await this.fetchWithAuth(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
-      );
+      // Timeout after 30 seconds to avoid hanging on large legacy files
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
 
-      if (!response.ok) {
-        throw new Error('Failed to load from Drive');
+      try {
+        const response = await this.fetchWithAuth(
+          `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to load from Drive');
+        }
+
+        return await response.json();
+      } finally {
+        clearTimeout(timeout);
       }
-
-      return await response.json();
     } catch (error) {
       console.error('Failed to load from Drive:', error);
       throw error;

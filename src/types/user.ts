@@ -17,6 +17,12 @@ export interface UserProfile {
         code: string;
         redeemedAt: number;
     } | null;
+    stripe?: {
+        customerId: string;
+        subscriptionId: string | null;
+        subscriptionStatus: 'active' | 'canceled' | 'past_due' | 'unpaid' | null;
+        currentPeriodEnd: number | null;
+    };
     createdAt: number;
     updatedAt: number;
 }
@@ -51,7 +57,7 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         bulkVCardExport: true,
         googleDriveSync: true,
         individualVCard: true,
-        bulkScan: true,
+        bulkScan: false,               // Multi-Card & Log Sheet are Pro-only
     },
     pro: {
         scansPerMonth: null,
