@@ -1,8 +1,10 @@
 import * as XLSX from 'xlsx';
 import { Contact } from '@/types/contact';
 
+export type BatchMap = Record<string, string>;
+
 export const exportService = {
-    toExcel(contacts: Contact[]) {
+    toExcel(contacts: Contact[], batchMap?: BatchMap) {
         const data = contacts.map(c => ({
             Name: c.name,
             Position: c.position,
@@ -11,6 +13,8 @@ export const exportService = {
             Email: c.email.join('; '),
             Address: c.address,
             Notes: c.notes || '',
+            Folder: c.folder || 'Uncategorized',
+            Batch: (c.batchId && batchMap?.[c.batchId]) || '',
             ScannedAt: new Date(c.createdAt).toLocaleString(),
             UpdatedAt: c.updatedAt ? new Date(c.updatedAt).toLocaleString() : ''
         }));
@@ -21,8 +25,8 @@ export const exportService = {
         XLSX.writeFile(workbook, `contacts_export_${Date.now()}.xlsx`);
     },
 
-    toCSV(contacts: Contact[]) {
-        const headers = ['Name', 'Position', 'Company', 'Phone', 'Email', 'Address', 'Notes', 'ScannedAt', 'UpdatedAt'];
+    toCSV(contacts: Contact[], batchMap?: BatchMap) {
+        const headers = ['Name', 'Position', 'Company', 'Phone', 'Email', 'Address', 'Notes', 'Folder', 'Batch', 'ScannedAt', 'UpdatedAt'];
         const rows = contacts.map(c => [
             c.name,
             c.position,
@@ -31,6 +35,8 @@ export const exportService = {
             c.email.join('; '),
             c.address,
             c.notes || '',
+            c.folder || 'Uncategorized',
+            (c.batchId && batchMap?.[c.batchId]) || '',
             new Date(c.createdAt).toLocaleString(),
             c.updatedAt ? new Date(c.updatedAt).toLocaleString() : ''
         ]);

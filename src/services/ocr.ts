@@ -86,6 +86,73 @@ const ADDRESS_KEYWORDS = [
     'zip', 'postal'
 ];
 
+/**
+ * Smart title-case: handles ALL CAPS, all lower, and preserves
+ * mixed-case words like "McDonald", "O'Brien", "de la Cruz".
+ * Also preserves known prefixes (Dr., Engr.) and suffixes (MD, PhD, CPA, etc.).
+ */
+function smartCapitalize(name: string): string {
+    if (!name) return name;
+
+    const suffixes = new Set([
+        'MD', 'PhD', 'CPA', 'REE', 'PEE', 'PE', 'MBA', 'MSEE', 'RN', 'DDS',
+        'JD', 'LLB', 'LLM', 'BSN', 'MSN', 'DO', 'DVM', 'PharmD',
+        'II', 'III', 'IV', 'Jr', 'Sr',
+    ]);
+
+    const lowercaseWords = new Set(['de', 'del', 'dela', 'la', 'los', 'las', 'van', 'von', 'der', 'den', 'di', 'da', 'el', 'al', 'bin', 'binti']);
+
+    const words = name.split(/\s+/);
+    const result = words.map((word, idx) => {
+        // Strip trailing comma/period for comparison, re-add after
+        const trailingPunct = word.match(/[,.]$/)?.[0] || '';
+        const bare = trailingPunct ? word.slice(0, -1) : word;
+
+        // Preserve known suffixes (always uppercase)
+        if (suffixes.has(bare.toUpperCase())) {
+            return bare.toUpperCase() + trailingPunct;
+        }
+
+        // Preserve prefixes like "Dr.", "Engr.", "Atty.", "Arch.", "Jr.", "Sr.", "Esq."
+        const prefixMatch = bare.match(/^([A-Za-z]{2,5})\.$/);
+        if (prefixMatch) {
+            const p = prefixMatch[1];
+            return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() + '.' + trailingPunct;
+        }
+
+        // Lowercase particles (de, del, van, etc.) — but not at start of name
+        if (idx > 0 && lowercaseWords.has(bare.toLowerCase())) {
+            return bare.toLowerCase() + trailingPunct;
+        }
+
+        // If already mixed case (e.g., "McDonald", "O'Brien") and not ALL CAPS, preserve
+        const isAllCaps = bare === bare.toUpperCase() && bare.length > 1;
+        const isAllLower = bare === bare.toLowerCase();
+        if (!isAllCaps && !isAllLower) {
+            return word; // preserve original casing
+        }
+
+        // Handle hyphenated names (e.g., "O'BRIEN-CRUZ" → "O'Brien-Cruz")
+        if (bare.includes('-')) {
+            return bare.split('-').map(part =>
+                part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+            ).join('-') + trailingPunct;
+        }
+
+        // Handle apostrophe names (e.g., "O'BRIEN" → "O'Brien")
+        if (bare.includes("'")) {
+            return bare.split("'").map(part =>
+                part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+            ).join("'") + trailingPunct;
+        }
+
+        // Standard title case
+        return bare.charAt(0).toUpperCase() + bare.slice(1).toLowerCase() + trailingPunct;
+    });
+
+    return result.join(' ');
+}
+
 export class OCRService {
     private worker: any = null;
     private isInitializing: boolean = false;
@@ -340,7 +407,7 @@ Return ONLY the JSON object. No explanation, no markdown.`;
             }
 
             return {
-                name: parsed.name || '',
+                name: smartCapitalize(parsed.name || ''),
                 position: parsed.position || '',
                 company: parsed.company || '',
                 phone: Array.isArray(parsed.phone) ? parsed.phone : parsed.phone ? [parsed.phone] : [],
@@ -538,7 +605,7 @@ Return ONLY the JSON object. No explanation, no markdown.`;
         if (positionResult.lineIndex >= 0) usedLines.add(positionResult.lineIndex);
 
         // Step 6: Extract name (remaining prominent text, usually near the top)
-        result.name = this.extractName(lines, usedLines, result);
+        result.name = smartCapitalize(this.extractName(lines, usedLines, result));
 
         return result;
     }
@@ -1121,7 +1188,7 @@ Return ONLY a JSON array of objects with these fields:
             return parsed
                 .filter((e: any) => e.name?.trim() || e.company?.trim() || e.phone?.trim() || e.email?.trim())
                 .map((e: any) => ({
-                    name: e.name || '',
+                    name: smartCapitalize(e.name || ''),
                     company: e.company || '',
                     position: e.position || '',
                     phone: e.phone || '',
@@ -1239,7 +1306,7 @@ Return a JSON array where each object represents ONE business card with these fi
             return parsed
                 .filter((e: any) => e.name?.trim() || e.company?.trim() || e.phone?.trim() || e.email?.trim())
                 .map((e: any) => ({
-                    name: e.name || '',
+                    name: smartCapitalize(e.name || ''),
                     company: e.company || '',
                     position: e.position || '',
                     phone: e.phone || '',

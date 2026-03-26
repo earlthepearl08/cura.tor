@@ -223,8 +223,10 @@ const Contacts: React.FC = () => {
         const toExport = selectedIds.size > 0
             ? contacts.filter(c => selectedIds.has(c.id))
             : filteredContacts;
-        if (type === 'csv') exportService.toCSV(toExport);
-        else if (type === 'excel') exportService.toExcel(toExport);
+        const batchMap: Record<string, string> = {};
+        for (const b of batches) { batchMap[b.id] = b.name; }
+        if (type === 'csv') exportService.toCSV(toExport, batchMap);
+        else if (type === 'excel') exportService.toExcel(toExport, batchMap);
         else if (type === 'vcard') exportService.toVCardAll(toExport);
         setShowExportOptions(false);
         if (selectedIds.size > 0) {
