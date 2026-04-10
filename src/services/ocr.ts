@@ -395,90 +395,117 @@ ${rawText}
 
 Return ONLY the JSON object. No explanation, no markdown. Use the original card image to verify visually-stacked elements (especially company names) and to recover any text the OCR may have fragmented or missed.`;
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 60000);
-
-        try {
-            // Build multimodal content parts: text prompt + optional image
-            const parts: any[] = [{ text: prompt }];
-            if (base64Image) {
-                const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
-                parts.push({
-                    inline_data: {
-                        mime_type: 'image/jpeg',
-                        data: cleanBase64
-                    }
-                });
-            }
-
-            const response = await fetch('/api/gemini', {
-                method: 'POST',
-                headers: await authHeaders(),
-                body: JSON.stringify({
-                    contents: [{ parts }],
-                    model: 'gemini-2.5-flash',
-                    generationConfig: {
-                        temperature: 0.0,
-                        maxOutputTokens: 1024,
-                        responseMimeType: 'application/json',
-                        responseSchema: {
-                            type: 'OBJECT',
-                            properties: {
-                                name: { type: 'STRING' },
-                                position: { type: 'STRING' },
-                                company: { type: 'STRING' },
-                                phone: { type: 'ARRAY', items: { type: 'STRING' } },
-                                email: { type: 'ARRAY', items: { type: 'STRING' } },
-                                address: { type: 'STRING' },
-                                notes: { type: 'STRING' }
-                            },
-                            required: ['name', 'position', 'company', 'phone', 'email', 'address', 'notes']
-                        }
-                    }
-                }),
-                signal: controller.signal
+        // Build multimodal content parts: text prompt + optional image
+        const parts: any[] = [{ text: prompt }];
+        if (base64Image) {
+            const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
+            parts.push({
+                inline_data: {
+                    mime_type: 'image/jpeg',
+                    data: cleanBase64
+                }
             });
-
-            clearTimeout(timeout);
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
-                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
-                throw new Error(fullMsg);
-            }
-
-            const data = await response.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!text) throw new Error('No response from Gemini');
-
-            console.log('[Gemini] Raw response:', text);
-
-            // With responseMimeType: 'application/json', response is guaranteed valid JSON
-            // But keep fallback parsing just in case
-            let parsed;
-            try {
-                parsed = JSON.parse(text);
-            } catch {
-                const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-                const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) throw new Error('No JSON in Gemini response');
-                parsed = JSON.parse(jsonMatch[0]);
-            }
-
-            return {
-                name: smartCapitalize(parsed.name || ''),
-                position: parsed.position || '',
-                company: parsed.company || '',
-                phone: Array.isArray(parsed.phone) ? parsed.phone : parsed.phone ? [parsed.phone] : [],
-                email: Array.isArray(parsed.email) ? parsed.email : parsed.email ? [parsed.email] : [],
-                address: parsed.address || '',
-                notes: parsed.notes || ''
-            };
-        } catch (error) {
-            clearTimeout(timeout);
-            throw error;
         }
+
+        const requestBody = JSON.stringify({
+            contents: [{ parts }],
+            model: 'gemini-2.5-flash',
+            generationConfig: {
+                temperature: 0.0,
+                maxOutputTokens: 1024,
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: 'OBJECT',
+                    properties: {
+                        name: { type: 'STRING' },
+                        position: { type: 'STRING' },
+                        company: { type: 'STRING' },
+                        phone: { type: 'ARRAY', items: { type: 'STRING' } },
+                        email: { type: 'ARRAY', items: { type: 'STRING' } },
+                        address: { type: 'STRING' },
+                        notes: { type: 'STRING' }
+                    },
+                    required: ['name', 'position', 'company', 'phone', 'email', 'address', 'notes']
+                }
+            }
+        });
+        const headers = await authHeaders();
+
+        // Retry on transient failures (Gemini overload returns 503 / "high demand")
+        const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+        const RETRY_MESSAGE_RE = /high demand|overloaded|temporarily unavailable|try again later/i;
+        const MAX_ATTEMPTS = 3;
+        const BACKOFF_MS = [1000, 2000, 4000];
+
+        let lastError: Error | null = null;
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 60000);
+            try {
+                const response = await fetch('/api/gemini', {
+                    method: 'POST',
+                    headers,
+                    body: requestBody,
+                    signal: controller.signal
+                });
+                clearTimeout(timeout);
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
+                    const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
+                    const retryable = RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg);
+                    if (retryable && attempt < MAX_ATTEMPTS - 1) {
+                        console.log(`[Gemini] Transient error ${response.status}, retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+                        await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
+                        lastError = new Error(fullMsg);
+                        continue;
+                    }
+                    throw new Error(fullMsg);
+                }
+
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) throw new Error('No response from Gemini');
+
+                console.log('[Gemini] Raw response:', text);
+
+                let parsed;
+                try {
+                    parsed = JSON.parse(text);
+                } catch {
+                    const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) throw new Error('No JSON in Gemini response');
+                    parsed = JSON.parse(jsonMatch[0]);
+                }
+
+                return {
+                    name: smartCapitalize(parsed.name || ''),
+                    position: parsed.position || '',
+                    company: parsed.company || '',
+                    phone: Array.isArray(parsed.phone) ? parsed.phone : parsed.phone ? [parsed.phone] : [],
+                    email: Array.isArray(parsed.email) ? parsed.email : parsed.email ? [parsed.email] : [],
+                    address: parsed.address || '',
+                    notes: parsed.notes || ''
+                };
+            } catch (error: any) {
+                clearTimeout(timeout);
+                // Network errors / abort errors are also retryable
+                const msg = error?.message || String(error);
+                const isNetworkError = error?.name === 'AbortError' || /failed to fetch|network|timeout/i.test(msg);
+                const isMessageRetryable = RETRY_MESSAGE_RE.test(msg);
+                if ((isNetworkError || isMessageRetryable) && attempt < MAX_ATTEMPTS - 1) {
+                    console.log(`[Gemini] Transient error "${msg}", retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+                    await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
+                    lastError = error;
+                    continue;
+                }
+                throw error;
+            }
+        }
+        // Exhausted retries
+        throw lastError || new Error('Gemini parsing failed after retries');
     }
 
     private async getWorker(): Promise<any> {
