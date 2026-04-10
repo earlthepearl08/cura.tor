@@ -15,14 +15,14 @@ export function parseQRData(raw: string): OCRResult {
     }
     if (trimmed.startsWith('tel:')) {
         return {
-            name: '', position: '', company: '', address: '',
+            name: '', position: '', company: '', address: '', notes: '',
             phone: [trimmed.slice(4)], email: [],
             rawText: trimmed, confidence: 80,
         };
     }
     if (trimmed.startsWith('mailto:')) {
         return {
-            name: '', position: '', company: '', address: '',
+            name: '', position: '', company: '', address: '', notes: '',
             phone: [], email: [trimmed.slice(7).split('?')[0]],
             rawText: trimmed, confidence: 80,
         };
@@ -30,14 +30,14 @@ export function parseQRData(raw: string): OCRResult {
     if (/^https?:\/\//i.test(trimmed)) {
         return {
             name: '', position: '', company: '',
-            phone: [], email: [], address: '',
+            phone: [], email: [], address: '', notes: trimmed,
             rawText: trimmed, confidence: 30,
         };
     }
     // Plain text fallback
     return {
         name: '', position: '', company: '',
-        phone: [], email: [], address: '',
+        phone: [], email: [], address: '', notes: '',
         rawText: trimmed, confidence: 30,
     };
 }
@@ -107,7 +107,8 @@ function parseVCard(text: string): OCRResult {
         phone: phones,
         email: emails,
         address,
-        rawText: notes || text,
+        notes,
+        rawText: text,
         confidence: 100,
     };
 }
@@ -156,7 +157,8 @@ function parseMeCard(text: string): OCRResult {
         phone: phones,
         email: emails,
         address: '',
-        rawText: notes || text,
+        notes,
+        rawText: text,
         confidence: 100,
     };
 }

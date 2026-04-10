@@ -19,6 +19,7 @@ export interface OCRResult {
     phone: string[];
     email: string[];
     address: string;
+    notes: string;
     rawText: string;
     confidence: number;
 }
@@ -270,23 +271,74 @@ export class OCRService {
     async parseWithGemini(rawText: string, base64Image?: string): Promise<Omit<OCRResult, 'rawText' | 'confidence'>> {
         console.log('[Gemini] Parsing text with AI...');
 
-        const prompt = `You are an expert business card data extractor. Your task is to parse raw OCR text from a business card and extract structured contact information.
+        const prompt = `You are an expert business card data extractor. You are given the raw OCR text from a business card AND the original card image. Use the image as the source of truth when the OCR text is fragmented, ambiguous, or visually stacked across multiple lines. Extract structured contact information from both signals.
 
 ## Rules
 
-1. "name" MUST be the PERSON's full name (first name + last name), including any professional credentials/designations that appear with it (e.g., "Dr. John Smith, MD, PhD", "Jane Cruz, REE, PEE", "Engr. Maria Santos, MSEE"). Include prefixes (Dr., Engr., Atty., Arch.) and suffixes (MD, PhD, CPA, REE, PEE, PE, MBA, MSEE, RN, DDS, Esq., Jr., Sr., III) as part of the name. It is NEVER a company name, brand, tagline, website, or abbreviation.
-2. "company" is the registered business entity name. It often includes suffixes like Inc., Ltd., Corp., LLC, Pte Ltd, Co., etc. It is NOT a tagline or slogan.
-3. "position" is the person's job title or role (e.g., "Senior Sales Manager", "VP of Engineering"). Department names alone (e.g., "Marketing Department") are NOT positions unless combined with a title.
-4. Phone numbers must include country codes when visible. Prefix with "+" if a country code is present. Include ALL phone numbers (mobile, office, direct, fax). Label fax numbers with "(Fax)" suffix.
-5. Include ALL email addresses found.
-6. "address" is the full physical/mailing address. Combine multiple address lines into one string, separated by commas.
-7. If a field cannot be determined, use an empty string "" for strings or [] for arrays.
-8. Do NOT invent or guess information that is not present in the text.
-9. If professional credentials appear on a SEPARATE line from the name (e.g., name on one line, "PhD, REE, PEE" on the next), combine them into the name field.
+1. "name" MUST be the PERSON's full name (first name + last name), including any professional credentials/designations that appear with it (e.g., "Dr. John Smith, MD, PhD", "Jane Cruz, REE, PEE", "Engr. Maria Santos, MSEE"). Include prefixes (Dr., Engr., Atty., Arch.) and suffixes (MD, PhD, CPA, REE, PEE, PE, MBA, MSEE, RN, DDS, Esq., Jr., Sr., III) as part of the name. It is NEVER a company name, brand, tagline, website, or abbreviation. If credentials appear on a SEPARATE line from the name, combine them into the name field.
+
+2. "company" is the registered business entity name. It often includes suffixes like Inc., Ltd., Corp., LLC, Pte Ltd, Co., Corporation, etc. It is NOT a tagline or slogan.
+   - **Stacked logo names**: Company names are very commonly stylized as a stacked logo where the brand name is on one line and the entity suffix is on a separate line below it (e.g., "KINMO PW" on one line and "CORPORATION" beneath it, or "ACME" above "INDUSTRIES INC."). The OCR will return these as separate text lines. You MUST recombine them into the full company name. Look at the original image to confirm which adjacent lines belong together as one logo.
+   - Prefer the LONGEST complete form. Never return just the entity suffix alone (e.g., never return "Corporation", "Inc.", "Ltd." by itself — that means you missed the brand name above it).
+
+3. "position" is the person's job title or role (e.g., "Senior Sales Manager", "VP of Sales & Marketing"). Department names alone are NOT positions unless combined with a title.
+
+4. "phone" is an ARRAY of phone numbers. Each number is a SEPARATE entry.
+   - Phone numbers separated by "/", "|", spaces, or commas on the same OCR line are DIFFERENT numbers — split them. Never merge two numbers into one entry. For example, "8703-5284 / 8362-5820" is TWO numbers ["8703-5284", "8362-5820"], not one.
+   - Include country codes when visible. Prefix with "+" if a country code is present.
+   - Include ALL phone numbers (mobile, office, direct, landline, fax). Label fax numbers with "(Fax)" suffix.
+   - Preserve the original formatting (dots, dashes, spaces) within each number.
+
+5. "email" is an ARRAY of email addresses. Include ALL emails found, each as a separate entry.
+
+6. "address" is the full physical/mailing address as a single string.
+   - **Multiple addresses**: If the card shows MULTIPLE labeled addresses (e.g., "Main Office", "Branch", "Showroom", "BGC Office", "Head Office", "Warehouse", "Factory"), include ALL of them. Format as: \`Label: address content | Label: address content | Label: address content\`. Use \` | \` (space-pipe-space) as the separator between addresses, and \`: \` (colon-space) between the label and the address content. Preserve labels exactly as they appear on the card.
+   - For a single address with no label, output the address as-is with no label prefix.
+   - Within each individual address, combine multi-line content (street, city, zip, country) into one string using commas.
+
+7. "notes" is a STRING for any other useful information that does not fit the structured fields above. Include:
+   - Website URLs (e.g., "www.kinmo.com")
+   - Social media URLs (e.g., "facebook.com/kinmopwcorporation", "linkedin.com/in/...")
+   - Taglines or slogans visible on the card (e.g., "Satisfying the needs of today and tomorrow")
+   - Any other context worth keeping
+   - Separate multiple items with \` | \`. If there is nothing else worth noting, return an empty string "".
+
+8. If a field cannot be determined, use an empty string "" for strings or [] for arrays.
+
+9. Do NOT invent or guess information that is not present in the text or visible in the image.
 
 ## Examples
 
-Input:
+### Example 1: Stacked logo company name with multiple addresses and multiple phones
+
+Input OCR text:
+EARL BRYAN DY
+VP SALES & MARKETING
+KINMO PW
+CORPORATION
+"Satisfying the needs of today and tomorrow"
++63968.7269310 8703-5284 / 8362-5820
++63917.8878017 8251-0507 / 8251-0508
++63977.8407799
+earldy.kinmo@gmail.com
+www.kinmo.com
+www.facebook.com/kinmopwcorporation
+Main Office:
+1732 Jose Abad Santos
+St. Manila, Philippines
+ShowRoom:
+121 Scout Dr. Lazcano Street,
+Brgy. Sacred Heart Quezon City
+BGC Office:
+Unit 3C-1 Seibu Tower, 6th Ave.,
+24th St., BGC Taguig City
+
+Output:
+{"name": "Earl Bryan Dy", "position": "VP Sales & Marketing", "company": "KINMO PW Corporation", "phone": ["+63968.7269310", "+63917.8878017", "+63977.8407799", "8703-5284", "8362-5820", "8251-0507", "8251-0508"], "email": ["earldy.kinmo@gmail.com"], "address": "Main Office: 1732 Jose Abad Santos St., Manila, Philippines | ShowRoom: 121 Scout Dr. Lazcano Street, Brgy. Sacred Heart, Quezon City | BGC Office: Unit 3C-1 Seibu Tower, 6th Ave., 24th St., BGC, Taguig City", "notes": "www.kinmo.com | www.facebook.com/kinmopwcorporation | Satisfying the needs of today and tomorrow"}
+
+### Example 2: Brand mark above legal name, single address, fax line
+
+Input OCR text:
 CLEARPACK
 THE CLEAR CHOICE FOR PACKAGING
 John Michael Santos
@@ -301,34 +353,11 @@ john.santos@ph.clearpack.com
 www.clearpack.com
 
 Output:
-{"name": "John Michael Santos", "position": "Regional Sales Director", "company": "Clearpack Technology (Phils.) Inc.", "phone": ["+63 917 123 4567", "+63 2 8888 1234", "+63 2 8888 1235 (Fax)"], "email": ["john.santos@ph.clearpack.com"], "address": "Unit 5B Pacific Star Bldg., Makati Ave., Makati City 1226, Philippines"}
+{"name": "John Michael Santos", "position": "Regional Sales Director", "company": "Clearpack Technology (Phils.) Inc.", "phone": ["+63 917 123 4567", "+63 2 8888 1234", "+63 2 8888 1235 (Fax)"], "email": ["john.santos@ph.clearpack.com"], "address": "Unit 5B Pacific Star Bldg., Makati Ave., Makati City 1226, Philippines", "notes": "www.clearpack.com | The clear choice for packaging"}
 
-Input:
-SAMSUNG
-Maria Theresa O'Brien-Cruz, CPA
-Finance Manager
-Samsung Electronics Philippines Corp.
-tel (02) 7756-2000
-mob 0917-555-8888
-maria.cruz@samsung.com
-BGC, Taguig City
+### Example 3: Credentials on separate line, single address
 
-Output:
-{"name": "Maria Theresa O'Brien-Cruz, CPA", "position": "Finance Manager", "company": "Samsung Electronics Philippines Corp.", "phone": ["(02) 7756-2000", "0917-555-8888"], "email": ["maria.cruz@samsung.com"], "address": "BGC, Taguig City"}
-
-Input:
-Dr. Wei Lin Chen
-Associate Professor
-Department of Computer Science
-National University of Singapore
-13 Computing Drive, Singapore 117417
-+65 6516 1234
-weichen@comp.nus.edu.sg
-
-Output:
-{"name": "Dr. Wei Lin Chen", "position": "Associate Professor, Department of Computer Science", "company": "National University of Singapore", "phone": ["+65 6516 1234"], "email": ["weichen@comp.nus.edu.sg"], "address": "13 Computing Drive, Singapore 117417"}
-
-Input:
+Input OCR text:
 Engr. Roberto M. Dela Cruz
 REE, PEE, MSEE
 Vice President - Technical Operations
@@ -341,7 +370,22 @@ Makati City 1210, Philippines
 roberto.delacruz@philenergy.com.ph
 
 Output:
-{"name": "Engr. Roberto M. Dela Cruz, REE, PEE, MSEE", "position": "Vice President - Technical Operations", "company": "PhilEnergy Power Solutions Corp.", "phone": ["+63 917 888 9999", "+63 2 8812 3456", "+63 2 8812 3457 (Fax)"], "email": ["roberto.delacruz@philenergy.com.ph"], "address": "Unit 12F Rockwell Business Center, Makati City 1210, Philippines"}
+{"name": "Engr. Roberto M. Dela Cruz, REE, PEE, MSEE", "position": "Vice President - Technical Operations", "company": "PhilEnergy Power Solutions Corp.", "phone": ["+63 917 888 9999", "+63 2 8812 3456", "+63 2 8812 3457 (Fax)"], "email": ["roberto.delacruz@philenergy.com.ph"], "address": "Unit 12F Rockwell Business Center, Makati City 1210, Philippines", "notes": ""}
+
+### Example 4: Multiple emails
+
+Input OCR text:
+Dr. Wei Lin Chen
+Associate Professor
+Department of Computer Science
+National University of Singapore
+13 Computing Drive, Singapore 117417
++65 6516 1234
+weichen@comp.nus.edu.sg
+wlchen.research@nus.edu.sg
+
+Output:
+{"name": "Dr. Wei Lin Chen", "position": "Associate Professor, Department of Computer Science", "company": "National University of Singapore", "phone": ["+65 6516 1234"], "email": ["weichen@comp.nus.edu.sg", "wlchen.research@nus.edu.sg"], "address": "13 Computing Drive, Singapore 117417", "notes": ""}
 
 ## Business Card Text to Parse
 
@@ -349,7 +393,7 @@ Output:
 ${rawText}
 </card_text>
 
-Return ONLY the JSON object. No explanation, no markdown.`;
+Return ONLY the JSON object. No explanation, no markdown. Use the original card image to verify visually-stacked elements (especially company names) and to recover any text the OCR may have fragmented or missed.`;
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 60000);
@@ -385,9 +429,10 @@ Return ONLY the JSON object. No explanation, no markdown.`;
                                 company: { type: 'STRING' },
                                 phone: { type: 'ARRAY', items: { type: 'STRING' } },
                                 email: { type: 'ARRAY', items: { type: 'STRING' } },
-                                address: { type: 'STRING' }
+                                address: { type: 'STRING' },
+                                notes: { type: 'STRING' }
                             },
-                            required: ['name', 'position', 'company', 'phone', 'email', 'address']
+                            required: ['name', 'position', 'company', 'phone', 'email', 'address', 'notes']
                         }
                     }
                 }),
@@ -427,7 +472,8 @@ Return ONLY the JSON object. No explanation, no markdown.`;
                 company: parsed.company || '',
                 phone: Array.isArray(parsed.phone) ? parsed.phone : parsed.phone ? [parsed.phone] : [],
                 email: Array.isArray(parsed.email) ? parsed.email : parsed.email ? [parsed.email] : [],
-                address: parsed.address || ''
+                address: parsed.address || '',
+                notes: parsed.notes || ''
             };
         } catch (error) {
             clearTimeout(timeout);
@@ -578,7 +624,8 @@ Return ONLY the JSON object. No explanation, no markdown.`;
             company: '',
             phone: [] as string[],
             email: [] as string[],
-            address: ''
+            address: '',
+            notes: ''
         };
 
         // Normalize text
