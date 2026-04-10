@@ -1,20 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import * as admin from 'firebase-admin';
+import { jwtVerify, createRemoteJWKSet } from 'jose';
 
-// Inline Firebase Admin init using the namespace import — the modular subpath
-// `firebase-admin/auth` does not bundle correctly on this Vercel project and
-// produces FUNCTION_INVOCATION_FAILED at module load. The main package entry
-// works (see api/stripe-webhook.ts), so we go through `admin.auth()` instead
-// of `getAuth()`.
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
+// Verify Firebase ID tokens directly via Google's public JWKS rather than
+// firebase-admin. Multiple firebase-admin import patterns (modular subpath,
+// namespace, shared helper) all crashed this Vercel function at module load
+// with FUNCTION_INVOCATION_FAILED. jose is small, has no native deps, and
+// bundles cleanly. Firebase ID tokens are RS256 JWTs with public keys at
+// the well-known securetoken JWKS endpoint.
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
+const FIREBASE_JWKS = createRemoteJWKSet(
+  new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
+);
 
 async function verifyAuth(req: VercelRequest): Promise<boolean> {
   try {
@@ -22,7 +18,10 @@ async function verifyAuth(req: VercelRequest): Promise<boolean> {
     if (!authHeader?.startsWith('Bearer ')) return false;
     const token = authHeader.slice(7);
     if (!token) return false;
-    await admin.auth().verifyIdToken(token);
+    await jwtVerify(token, FIREBASE_JWKS, {
+      issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
+      audience: FIREBASE_PROJECT_ID,
+    });
     return true;
   } catch {
     return false;
