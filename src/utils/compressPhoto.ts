@@ -36,25 +36,36 @@ export function compressForOCR(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-            const img = new Image();
-            img.onload = () => {
-                const MAX = 2048;
-                let w = img.width, h = img.height;
-                if (w > MAX || h > MAX) {
-                    const ratio = Math.min(MAX / w, MAX / h);
-                    w = Math.round(w * ratio);
-                    h = Math.round(h * ratio);
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-                resolve(canvas.toDataURL('image/jpeg', 0.85));
-            };
-            img.onerror = reject;
-            img.src = reader.result as string;
+            compressBase64ForOCR(reader.result as string).then(resolve).catch(reject);
         };
         reader.onerror = reject;
         reader.readAsDataURL(file);
+    });
+}
+
+/**
+ * Compress a base64 image string for OCR / Gemini API calls.
+ * Same constraints as compressForOCR but accepts a base64 data URL directly
+ * (e.g. from a webcam screenshot).
+ */
+export function compressBase64ForOCR(base64: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const MAX = 2048;
+            let w = img.width, h = img.height;
+            if (w > MAX || h > MAX) {
+                const ratio = Math.min(MAX / w, MAX / h);
+                w = Math.round(w * ratio);
+                h = Math.round(h * ratio);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = reject;
+        img.src = base64;
     });
 }

@@ -1,9 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { verifyAuth } from '../lib/api-auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const authUser = await verifyAuth(req);
+  if (!authUser) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   // Get API key from environment variable (server-side only)

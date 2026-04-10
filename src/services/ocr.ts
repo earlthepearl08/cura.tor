@@ -1,5 +1,16 @@
 // @ts-ignore - Types available after npm install
 import { createWorker } from 'tesseract.js';
+import { auth } from '../config/firebase';
+
+async function authHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const user = auth.currentUser;
+    if (user) {
+        const token = await user.getIdToken();
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
 
 export interface OCRResult {
     name: string;
@@ -170,7 +181,7 @@ export class OCRService {
         try {
             const response = await fetch('/api/ocr', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await authHeaders(),
                 body: JSON.stringify({ imageData: imageSrc })
             });
 
@@ -356,7 +367,7 @@ Return ONLY the JSON object. No explanation, no markdown.`;
 
             const response = await fetch('/api/gemini', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await authHeaders(),
                 body: JSON.stringify({
                     contents: [{ parts }],
                     model: 'gemini-2.5-flash',
@@ -1126,7 +1137,7 @@ Return ONLY a JSON array of objects with these fields:
         try {
             const response = await fetch('/api/gemini', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await authHeaders(),
                 body: JSON.stringify({
                     contents: [{
                         parts: [
@@ -1244,7 +1255,7 @@ Return a JSON array where each object represents ONE business card with these fi
         try {
             const response = await fetch('/api/gemini', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await authHeaders(),
                 body: JSON.stringify({
                     contents: [{
                         parts: [

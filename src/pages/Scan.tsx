@@ -6,6 +6,7 @@ import { useOCR } from '@/hooks/useOCR';
 import ContactReview from '@/components/ContactReview';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
+import { compressBase64ForOCR } from '@/utils/compressPhoto';
 
 const Scanner: React.FC = () => {
     const webcamRef = useRef<Webcam>(null);
@@ -264,7 +265,9 @@ const Scanner: React.FC = () => {
                                             setShowUpgradePrompt(true);
                                             return;
                                         }
-                                        const ocrResult = await processImage(imgSrc);
+                                        // Compress before sending to API to stay under Vercel's 4.5MB body limit
+                                        const compressed = await compressBase64ForOCR(imgSrc);
+                                        const ocrResult = await processImage(compressed);
                                         if (ocrResult) {
                                             await incrementScanCount();
                                             setShowReview(true);
