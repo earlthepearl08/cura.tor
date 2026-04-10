@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus, MessageCircle, Download, Camera, Users, Lock, Trash2 } from 'lucide-react';
 import { OCRResult, ocrService } from '@/services/ocr';
 import { Contact } from '@/types/contact';
+import { storage } from '@/services/storage';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { exportService } from '@/services/export';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
 
@@ -28,7 +28,6 @@ const NOTE_CONTEXTS = [
 
 const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, onDelete, reviewOnly, initialNotes, initialFolder }) => {
     const { canExportVCard } = useAuth();
-    const { storage } = useWorkspace();
     const [formData, setFormData] = useState({
         name: ocrResult.name,
         position: ocrResult.position,
