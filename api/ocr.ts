@@ -1,14 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
+import * as admin from 'firebase-admin';
 
-// Inline Firebase Admin init — Vercel's serverless builder reliably bundles
-// firebase-admin only when imported directly inside the route file. Importing
-// from a shared helper file (api/_lib or /lib) produces module-load crashes
-// at runtime (FUNCTION_INVOCATION_FAILED).
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
+// Inline Firebase Admin init using the namespace import — the modular subpath
+// `firebase-admin/auth` does not bundle correctly on this Vercel project and
+// produces FUNCTION_INVOCATION_FAILED at module load. The main package entry
+// works (see api/stripe-webhook.ts), so we go through `admin.auth()` instead
+// of `getAuth()`.
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -22,7 +22,7 @@ async function verifyAuth(req: VercelRequest): Promise<boolean> {
     if (!authHeader?.startsWith('Bearer ')) return false;
     const token = authHeader.slice(7);
     if (!token) return false;
-    await getAuth().verifyIdToken(token);
+    await admin.auth().verifyIdToken(token);
     return true;
   } catch {
     return false;
