@@ -30,7 +30,7 @@ const LogScan: React.FC = () => {
     const [showExportOptions, setShowExportOptions] = useState(false);
     const [upgradeFeature, setUpgradeFeature] = useState<'bulk-scan' | 'scan' | 'export' | null>(null);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
-    const [editForm, setEditForm] = useState<LogSheetEntry>({ name: '', company: '', position: '', phone: '', email: '', address: '', notes: '' });
+    const [editForm, setEditForm] = useState<{ name: string; company: string; position: string; phone: string; email: string; address: string; notes: string }>({ name: '', company: '', position: '', phone: '', email: '', address: '', notes: '' });
     const [duplicateMap, setDuplicateMap] = useState<Map<number, DuplicateResult>>(new Map());
     const [selectedEntries, setSelectedEntries] = useState<Set<number>>(new Set());
     const [sheetCount, setSheetCount] = useState(0);
@@ -205,8 +205,8 @@ const LogScan: React.FC = () => {
             const result = checkDuplicate(
                 {
                     name: entry.name,
-                    email: entry.email ? [entry.email] : [],
-                    phone: entry.phone ? [entry.phone] : [],
+                    email: entry.email,
+                    phone: entry.phone,
                     company: entry.company,
                 },
                 existingContacts
@@ -320,14 +320,14 @@ const LogScan: React.FC = () => {
             name: e.name,
             position: e.position,
             company: e.company,
-            phone: e.phone ? [e.phone] : [],
-            email: e.email ? [e.email] : [],
+            phone: e.phone,
+            email: e.email,
             address: e.address,
             notes: e.notes,
             folder: importFolder || 'Uncategorized',
             rawText: '',
             imageData: '',
-            confidence: 85,
+            confidence: e.confidence,
             isVerified: false,
             createdAt: Date.now(),
             batchId: currentBatchId || undefined,
@@ -406,13 +406,34 @@ const LogScan: React.FC = () => {
 
     const openEntryEdit = (index: number) => {
         setEditingIndex(index);
-        setEditForm({ ...entries![index] });
+        const e = entries![index];
+        setEditForm({
+            name: e.name,
+            company: e.company,
+            position: e.position,
+            phone: e.phone.join(', '),
+            email: e.email.join(', '),
+            address: e.address,
+            notes: e.notes,
+        });
     };
+
+    const splitCsv = (s: string): string[] => s.split(',').map(p => p.trim()).filter(Boolean);
 
     const saveEntryEdit = () => {
         if (editingIndex === null || !entries) return;
         const updated = [...entries];
-        updated[editingIndex] = { ...editForm };
+        const original = entries[editingIndex];
+        updated[editingIndex] = {
+            ...original,
+            name: editForm.name,
+            company: editForm.company,
+            position: editForm.position,
+            phone: splitCsv(editForm.phone),
+            email: splitCsv(editForm.email),
+            address: editForm.address,
+            notes: editForm.notes,
+        };
         setEntries(updated);
         setEditingIndex(null);
     };
@@ -670,8 +691,8 @@ const LogScan: React.FC = () => {
                                                         )}
                                                         {e.company && <p className="text-xs text-brand-400 truncate">{e.company}</p>}
                                                         {e.position && <p className="text-xs text-slate-500 truncate">{e.position}</p>}
-                                                        {e.phone && <p className="text-xs text-slate-500 truncate">{e.phone}</p>}
-                                                        {e.email && <p className="text-xs text-slate-500 truncate">{e.email}</p>}
+                                                        {e.phone.length > 0 && <p className="text-xs text-slate-500 truncate">{e.phone.join(', ')}</p>}
+                                                        {e.email.length > 0 && <p className="text-xs text-slate-500 truncate">{e.email.join(', ')}</p>}
                                                         {e.notes && <p className="text-xs text-amber-400/70 truncate mt-1">{e.notes}</p>}
                                                     </div>
                                                     <div className="flex flex-col gap-1 flex-shrink-0">

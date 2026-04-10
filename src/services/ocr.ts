@@ -12,6 +12,137 @@ async function authHeaders(): Promise<Record<string, string>> {
     return headers;
 }
 
+// Shared parsing rules used by all Gemini flows (single card, multi-card, log sheet).
+// Keeps stacked logo / multi-address / phone-splitting / notes handling consistent
+// across entry points so no flow silently runs on stale prompt logic.
+const GEMINI_CORE_RULES = `## Extraction Rules
+
+1. "name" MUST be the PERSON's full name (first + last), including any professional credentials/designations (e.g., "Dr. John Smith, MD, PhD", "Engr. Maria Santos, REE, PEE, MSEE"). Include prefixes (Dr., Engr., Atty., Arch.) and suffixes (MD, PhD, CPA, REE, PEE, PE, MBA, MSEE, RN, DDS, Esq., Jr., Sr., III). If credentials appear on a SEPARATE line from the name, combine them into the name field. Never put a company name, brand, tagline, or abbreviation in the name field.
+
+2. "company" is the registered business entity name.
+   - **Stacked logo names**: Company names are often stylized as a stacked logo where the brand is on one line and the entity suffix is on a separate line below it (e.g., "KINMO PW" on one line and "CORPORATION" on the next, or "ACME" above "INDUSTRIES INC."). OCR will return these as separate text lines. You MUST recombine them into the full company name. Use the image to confirm which adjacent lines belong together as one logo.
+   - Prefer the LONGEST complete form. NEVER return just an entity suffix alone (never return "Corporation", "Inc.", "Ltd.", "Corp." by itself — if you're tempted to, you missed the brand name above or below).
+   - Entity suffixes to recognize: Inc., Ltd., Corp., Corporation, LLC, Pte Ltd, Co., Company, Holdings, Group, Enterprises, Industries, Solutions, Services, Technology, Technologies.
+
+3. "position" is the person's job title or role (e.g., "Senior Sales Manager", "VP of Sales & Marketing"). Department names alone are NOT positions unless combined with a title.
+
+4. "phone" is an ARRAY of phone number strings. Each number is a SEPARATE entry.
+   - Numbers separated by "/", "|", spaces, or commas on the same line are DIFFERENT numbers — split them. Never merge two numbers into one entry. "8703-5284 / 8362-5820" is TWO entries.
+   - Include country codes when visible, prefix with "+".
+   - Include ALL numbers (mobile, office, direct, landline, fax). Label fax with "(Fax)" suffix.
+   - Preserve the original formatting (dots, dashes, spaces) within each number.
+
+5. "email" is an ARRAY of email address strings. Include ALL emails found, each as a separate entry.
+
+6. "address" is a single string.
+   - **Multiple labeled addresses**: If multiple labeled addresses are visible (e.g., "Main Office", "Branch", "Showroom", "BGC Office", "Head Office", "Warehouse", "Factory"), include ALL of them. Format: \`Label: address content | Label: address content\`. Use \` | \` (space-pipe-space) between addresses and \`: \` between label and content. Preserve labels exactly as shown.
+   - For a single unlabeled address, output the address as-is with no label prefix.
+   - Within each address, combine multi-line content (street, city, zip, country) into one string using commas.
+
+7. "notes" is a single string for useful information that does not fit the other fields:
+   - Website URLs (www.example.com)
+   - Social media URLs (facebook.com/..., linkedin.com/in/...)
+   - Taglines or slogans visible on the card
+   - Any other context worth keeping
+   - Separate multiple items with \` | \`. Return empty string "" if nothing.
+
+8. If a field cannot be determined, use empty string "" for strings or [] for arrays.
+
+9. Do NOT invent or guess information that is not present in the text or visible in the image.`;
+
+// Compute a heuristic confidence score (0-95) based on how many fields were
+// successfully extracted. Replaces the old hardcoded 85% for flows that don't
+// have real word-level OCR confidence from Cloud Vision.
+function computeHeuristicConfidence(entry: {
+    name?: string;
+    company?: string;
+    position?: string;
+    phone?: string[] | string;
+    email?: string[] | string;
+    address?: string;
+    notes?: string;
+}): number {
+    let score = 55;
+    const has = (v: unknown): boolean => {
+        if (Array.isArray(v)) return v.length > 0 && v.some(x => typeof x === 'string' && x.trim().length > 0);
+        return typeof v === 'string' && v.trim().length > 0;
+    };
+    if (has(entry.name)) score += 12;
+    if (has(entry.company)) score += 10;
+    if (has(entry.phone)) score += 8;
+    if (has(entry.email)) score += 8;
+    if (has(entry.position)) score += 4;
+    if (has(entry.address)) score += 3;
+    if (has(entry.notes)) score += 2;
+    return Math.max(0, Math.min(95, score));
+}
+
+// Shared fetch + retry wrapper for all Gemini calls. Retries on transient
+// failures (429/500/502/503/504, "high demand" / "overloaded" messages,
+// network errors) with exponential backoff (1s, 2s, 4s — 3 attempts total).
+// Flows that don't use this helper (anything directly calling /api/gemini)
+// will fall back to the rule-based parser on the first failure.
+async function callGeminiWithRetry(opts: {
+    body: string;
+    flowName: string;
+    timeoutMs?: number;
+}): Promise<any> {
+    const timeoutMs = opts.timeoutMs ?? 90000;
+    const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+    const RETRY_MESSAGE_RE = /high demand|overloaded|temporarily unavailable|try again later/i;
+    const MAX_ATTEMPTS = 3;
+    const BACKOFF_MS = [1000, 2000, 4000];
+
+    const headers = await authHeaders();
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch('/api/gemini', {
+                method: 'POST',
+                headers,
+                body: opts.body,
+                signal: controller.signal,
+            });
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
+                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
+                const retryable = RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg);
+                if (retryable && attempt < MAX_ATTEMPTS - 1) {
+                    console.log(`[${opts.flowName}] Transient error ${response.status}, retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+                    await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
+                    lastError = new Error(fullMsg);
+                    continue;
+                }
+                throw new Error(fullMsg);
+            }
+
+            const data = await response.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error('No response from Gemini');
+            return text;
+        } catch (error: any) {
+            clearTimeout(timeout);
+            const msg = error?.message || String(error);
+            const isNetworkError = error?.name === 'AbortError' || /failed to fetch|network|timeout/i.test(msg);
+            const isMessageRetryable = RETRY_MESSAGE_RE.test(msg);
+            if ((isNetworkError || isMessageRetryable) && attempt < MAX_ATTEMPTS - 1) {
+                console.log(`[${opts.flowName}] Transient error "${msg}", retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+                await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
+                lastError = error;
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw lastError || new Error('Gemini call failed after retries');
+}
+
 export interface OCRResult {
     name: string;
     position: string;
@@ -269,43 +400,11 @@ export class OCRService {
      * Much more accurate than rule-based parsing for complex cards.
      */
     async parseWithGemini(rawText: string, base64Image?: string): Promise<Omit<OCRResult, 'rawText' | 'confidence'>> {
-        console.log('[Gemini] Parsing text with AI...');
+        console.log('[Gemini] Parsing single card with AI...');
 
         const prompt = `You are an expert business card data extractor. You are given the raw OCR text from a business card AND the original card image. Use the image as the source of truth when the OCR text is fragmented, ambiguous, or visually stacked across multiple lines. Extract structured contact information from both signals.
 
-## Rules
-
-1. "name" MUST be the PERSON's full name (first name + last name), including any professional credentials/designations that appear with it (e.g., "Dr. John Smith, MD, PhD", "Jane Cruz, REE, PEE", "Engr. Maria Santos, MSEE"). Include prefixes (Dr., Engr., Atty., Arch.) and suffixes (MD, PhD, CPA, REE, PEE, PE, MBA, MSEE, RN, DDS, Esq., Jr., Sr., III) as part of the name. It is NEVER a company name, brand, tagline, website, or abbreviation. If credentials appear on a SEPARATE line from the name, combine them into the name field.
-
-2. "company" is the registered business entity name. It often includes suffixes like Inc., Ltd., Corp., LLC, Pte Ltd, Co., Corporation, etc. It is NOT a tagline or slogan.
-   - **Stacked logo names**: Company names are very commonly stylized as a stacked logo where the brand name is on one line and the entity suffix is on a separate line below it (e.g., "KINMO PW" on one line and "CORPORATION" beneath it, or "ACME" above "INDUSTRIES INC."). The OCR will return these as separate text lines. You MUST recombine them into the full company name. Look at the original image to confirm which adjacent lines belong together as one logo.
-   - Prefer the LONGEST complete form. Never return just the entity suffix alone (e.g., never return "Corporation", "Inc.", "Ltd." by itself — that means you missed the brand name above it).
-
-3. "position" is the person's job title or role (e.g., "Senior Sales Manager", "VP of Sales & Marketing"). Department names alone are NOT positions unless combined with a title.
-
-4. "phone" is an ARRAY of phone numbers. Each number is a SEPARATE entry.
-   - Phone numbers separated by "/", "|", spaces, or commas on the same OCR line are DIFFERENT numbers — split them. Never merge two numbers into one entry. For example, "8703-5284 / 8362-5820" is TWO numbers ["8703-5284", "8362-5820"], not one.
-   - Include country codes when visible. Prefix with "+" if a country code is present.
-   - Include ALL phone numbers (mobile, office, direct, landline, fax). Label fax numbers with "(Fax)" suffix.
-   - Preserve the original formatting (dots, dashes, spaces) within each number.
-
-5. "email" is an ARRAY of email addresses. Include ALL emails found, each as a separate entry.
-
-6. "address" is the full physical/mailing address as a single string.
-   - **Multiple addresses**: If the card shows MULTIPLE labeled addresses (e.g., "Main Office", "Branch", "Showroom", "BGC Office", "Head Office", "Warehouse", "Factory"), include ALL of them. Format as: \`Label: address content | Label: address content | Label: address content\`. Use \` | \` (space-pipe-space) as the separator between addresses, and \`: \` (colon-space) between the label and the address content. Preserve labels exactly as they appear on the card.
-   - For a single address with no label, output the address as-is with no label prefix.
-   - Within each individual address, combine multi-line content (street, city, zip, country) into one string using commas.
-
-7. "notes" is a STRING for any other useful information that does not fit the structured fields above. Include:
-   - Website URLs (e.g., "www.kinmo.com")
-   - Social media URLs (e.g., "facebook.com/kinmopwcorporation", "linkedin.com/in/...")
-   - Taglines or slogans visible on the card (e.g., "Satisfying the needs of today and tomorrow")
-   - Any other context worth keeping
-   - Separate multiple items with \` | \`. If there is nothing else worth noting, return an empty string "".
-
-8. If a field cannot be determined, use an empty string "" for strings or [] for arrays.
-
-9. Do NOT invent or guess information that is not present in the text or visible in the image.
+${GEMINI_CORE_RULES}
 
 ## Examples
 
@@ -395,16 +494,10 @@ ${rawText}
 
 Return ONLY the JSON object. No explanation, no markdown. Use the original card image to verify visually-stacked elements (especially company names) and to recover any text the OCR may have fragmented or missed.`;
 
-        // Build multimodal content parts: text prompt + optional image
         const parts: any[] = [{ text: prompt }];
         if (base64Image) {
             const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
-            parts.push({
-                inline_data: {
-                    mime_type: 'image/jpeg',
-                    data: cleanBase64
-                }
-            });
+            parts.push({ inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } });
         }
 
         const requestBody = JSON.stringify({
@@ -429,83 +522,29 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
                 }
             }
         });
-        const headers = await authHeaders();
 
-        // Retry on transient failures (Gemini overload returns 503 / "high demand")
-        const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
-        const RETRY_MESSAGE_RE = /high demand|overloaded|temporarily unavailable|try again later/i;
-        const MAX_ATTEMPTS = 3;
-        const BACKOFF_MS = [1000, 2000, 4000];
+        const text = await callGeminiWithRetry({ body: requestBody, flowName: 'Gemini', timeoutMs: 60000 });
+        console.log('[Gemini] Raw response:', text);
 
-        let lastError: Error | null = null;
-        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 60000);
-            try {
-                const response = await fetch('/api/gemini', {
-                    method: 'POST',
-                    headers,
-                    body: requestBody,
-                    signal: controller.signal
-                });
-                clearTimeout(timeout);
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
-                    const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
-                    const retryable = RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg);
-                    if (retryable && attempt < MAX_ATTEMPTS - 1) {
-                        console.log(`[Gemini] Transient error ${response.status}, retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
-                        await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
-                        lastError = new Error(fullMsg);
-                        continue;
-                    }
-                    throw new Error(fullMsg);
-                }
-
-                const data = await response.json();
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!text) throw new Error('No response from Gemini');
-
-                console.log('[Gemini] Raw response:', text);
-
-                let parsed;
-                try {
-                    parsed = JSON.parse(text);
-                } catch {
-                    const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-                    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-                    if (!jsonMatch) throw new Error('No JSON in Gemini response');
-                    parsed = JSON.parse(jsonMatch[0]);
-                }
-
-                return {
-                    name: smartCapitalize(parsed.name || ''),
-                    position: parsed.position || '',
-                    company: parsed.company || '',
-                    phone: Array.isArray(parsed.phone) ? parsed.phone : parsed.phone ? [parsed.phone] : [],
-                    email: Array.isArray(parsed.email) ? parsed.email : parsed.email ? [parsed.email] : [],
-                    address: parsed.address || '',
-                    notes: parsed.notes || ''
-                };
-            } catch (error: any) {
-                clearTimeout(timeout);
-                // Network errors / abort errors are also retryable
-                const msg = error?.message || String(error);
-                const isNetworkError = error?.name === 'AbortError' || /failed to fetch|network|timeout/i.test(msg);
-                const isMessageRetryable = RETRY_MESSAGE_RE.test(msg);
-                if ((isNetworkError || isMessageRetryable) && attempt < MAX_ATTEMPTS - 1) {
-                    console.log(`[Gemini] Transient error "${msg}", retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
-                    await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
-                    lastError = error;
-                    continue;
-                }
-                throw error;
-            }
+        let parsed;
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+            const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error('No JSON in Gemini response');
+            parsed = JSON.parse(jsonMatch[0]);
         }
-        // Exhausted retries
-        throw lastError || new Error('Gemini parsing failed after retries');
+
+        return {
+            name: smartCapitalize(parsed.name || ''),
+            position: parsed.position || '',
+            company: parsed.company || '',
+            phone: Array.isArray(parsed.phone) ? parsed.phone : parsed.phone ? [parsed.phone] : [],
+            email: Array.isArray(parsed.email) ? parsed.email : parsed.email ? [parsed.email] : [],
+            address: parsed.address || '',
+            notes: parsed.notes || ''
+        };
     }
 
     private async getWorker(): Promise<any> {
@@ -1182,115 +1221,108 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
     async parseLogSheet(base64Image: string): Promise<LogSheetEntry[]> {
         console.log('[LogSheet] Parsing log sheet with Gemini...');
 
-        const prompt = `You are an expert data extractor specializing in event log sheets and sign-in sheets.
+        const prompt = `You are an expert data extractor specializing in event log sheets and sign-in sheets. This image is a log sheet / sign-in sheet from an event, conference, or trade show. Each ROW in the sheet represents a DIFFERENT person who signed in.
 
 ## Task
-Analyze this image of a log sheet / sign-in sheet from an event, conference, or trade show.
-Each ROW in the sheet represents a DIFFERENT person who signed in.
-
-## Instructions
 1. Identify the table/grid structure in the image.
-2. Identify column headers (they may be: Name, Company, Position/Title, Phone, Email, Address, Purpose/Notes, etc.)
+2. Identify column headers (they may be: Name, Company, Position/Title, Phone, Email, Address, Purpose/Notes, etc.).
 3. For EACH row (each person), extract the data into the corresponding fields.
-4. If a column doesn't exist in the sheet, leave that field as an empty string.
+4. If a column doesn't exist in the sheet, leave that field as an empty string or empty array.
 5. Skip any empty rows or header rows.
-6. Handle handwritten text as best you can - if unclear, make your best guess.
-7. Each row MUST be a separate entry in the array.
+6. Handle handwritten text as best you can — if unclear, make your best guess.
+7. Each row MUST be a separate entry in the output array.
+8. Do NOT merge data from different rows into one entry.
 
-## Output Format
-Return ONLY a JSON array of objects with these fields:
-- name: Person's full name
-- company: Company/organization name
-- position: Job title/role
-- phone: Phone number
-- email: Email address
-- address: Physical address
-- notes: Any other info (purpose of visit, booth interest, etc.)`;
+${GEMINI_CORE_RULES}
+
+## Examples
+
+### Example 1: Tabular sign-in sheet with handwritten entries
+
+Output:
+[
+  {"name": "Maria Santos", "company": "Acme Corp", "position": "Sales Manager", "phone": ["+63 917 555 1234"], "email": ["maria.santos@acme.com"], "address": "Makati City", "notes": "Booth interest"},
+  {"name": "Dr. John Lee, MD", "company": "Health First Inc.", "position": "Medical Director", "phone": ["+63 2 8888 9999", "0917-222-3333"], "email": ["jlee@healthfirst.ph"], "address": "Quezon City", "notes": ""}
+]
+
+### Example 2: Stacked logo company name in a row
+
+If a row contains a company written as "KINMO PW" on one visual line and "CORPORATION" on the next inside the same cell, return company as "KINMO PW Corporation" — never just "CORPORATION".
+
+### Example 3: Phone column with multiple numbers separated by "/"
+
+If a phone cell contains "8703-5284 / 8362-5820", split into the array ["8703-5284", "8362-5820"]. Never merge them.
+
+Return ONLY a JSON array of objects. No explanation, no markdown.`;
 
         const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 90000);
-
-        try {
-            const response = await fetch('/api/gemini', {
-                method: 'POST',
-                headers: await authHeaders(),
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } }
-                        ]
-                    }],
-                    model: 'gemini-2.5-flash',
-                    generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 8192,
-                        responseMimeType: 'application/json',
-                        responseSchema: {
-                            type: 'ARRAY',
-                            items: {
-                                type: 'OBJECT',
-                                properties: {
-                                    name: { type: 'STRING' },
-                                    company: { type: 'STRING' },
-                                    position: { type: 'STRING' },
-                                    phone: { type: 'STRING' },
-                                    email: { type: 'STRING' },
-                                    address: { type: 'STRING' },
-                                    notes: { type: 'STRING' }
-                                },
-                                required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
-                            }
-                        }
+        const requestBody = JSON.stringify({
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    { inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } }
+                ]
+            }],
+            model: 'gemini-2.5-flash',
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 8192,
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: 'ARRAY',
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            name: { type: 'STRING' },
+                            company: { type: 'STRING' },
+                            position: { type: 'STRING' },
+                            phone: { type: 'ARRAY', items: { type: 'STRING' } },
+                            email: { type: 'ARRAY', items: { type: 'STRING' } },
+                            address: { type: 'STRING' },
+                            notes: { type: 'STRING' }
+                        },
+                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
                     }
-                }),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeout);
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
-                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
-                throw new Error(fullMsg);
+                }
             }
+        });
 
-            const data = await response.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!text) throw new Error('No response from Gemini');
+        const text = await callGeminiWithRetry({ body: requestBody, flowName: 'LogSheet', timeoutMs: 90000 });
+        console.log('[LogSheet] Raw response:', text);
 
-            console.log('[LogSheet] Raw response:', text);
+        let parsed;
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+            const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) throw new Error('No JSON array in Gemini response');
+            parsed = JSON.parse(jsonMatch[0]);
+        }
 
-            let parsed;
-            try {
-                parsed = JSON.parse(text);
-            } catch {
-                const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-                const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
-                if (!jsonMatch) throw new Error('No JSON array in Gemini response');
-                parsed = JSON.parse(jsonMatch[0]);
-            }
+        if (!Array.isArray(parsed)) throw new Error('Gemini did not return an array');
 
-            if (!Array.isArray(parsed)) throw new Error('Gemini did not return an array');
-
-            return parsed
-                .filter((e: any) => e.name?.trim() || e.company?.trim() || e.phone?.trim() || e.email?.trim())
-                .map((e: any) => ({
+        return parsed
+            .filter((e: any) => {
+                const hasName = typeof e.name === 'string' && e.name.trim();
+                const hasCompany = typeof e.company === 'string' && e.company.trim();
+                const hasPhone = Array.isArray(e.phone) ? e.phone.some((p: string) => p?.trim()) : (typeof e.phone === 'string' && e.phone.trim());
+                const hasEmail = Array.isArray(e.email) ? e.email.some((p: string) => p?.trim()) : (typeof e.email === 'string' && e.email.trim());
+                return hasName || hasCompany || hasPhone || hasEmail;
+            })
+            .map((e: any) => {
+                const entry = {
                     name: smartCapitalize(e.name || ''),
                     company: e.company || '',
                     position: e.position || '',
-                    phone: e.phone || '',
-                    email: e.email || '',
+                    phone: Array.isArray(e.phone) ? e.phone.filter((p: string) => p?.trim()) : (e.phone ? [e.phone] : []),
+                    email: Array.isArray(e.email) ? e.email.filter((p: string) => p?.trim()) : (e.email ? [e.email] : []),
                     address: e.address || '',
-                    notes: e.notes || ''
-                }));
-        } catch (error) {
-            clearTimeout(timeout);
-            throw error;
-        }
+                    notes: e.notes || '',
+                };
+                return { ...entry, confidence: computeHeuristicConfidence(entry) };
+            });
     }
 
     /**
@@ -1303,114 +1335,94 @@ Return ONLY a JSON array of objects with these fields:
         const prompt = `You are an expert business card data extractor. This image contains MULTIPLE business cards laid out together (on a table, desk, or surface).
 
 ## Task
-Identify each SEPARATE business card in the image and extract contact information from each one independently.
-
-## Instructions
-1. Visually identify the boundaries of each business card in the image.
-2. For EACH card, extract the person's contact information.
+1. Visually identify the boundaries of each SEPARATE business card in the image.
+2. For EACH card, extract the person's contact information independently.
 3. Each card MUST be a separate entry in the output array.
-4. If a card is partially visible or too blurry, extract what you can.
-5. Include professional credentials/designations as part of the name (e.g., "Dr. John Smith, MD", "Engr. Maria Santos, REE").
-6. Phone numbers: include country codes when visible, prefix with "+".
-7. Combine multi-line addresses into one string separated by commas.
-8. If a field cannot be determined from a card, use an empty string.
-9. Do NOT invent or guess information not visible on the card.
-10. Do NOT merge data from different cards into one entry.
+4. If a card is partially visible or too blurry, extract what you can — do not invent missing data.
+5. Do NOT merge data from different cards into one entry.
 
-## Output Format
-Return a JSON array where each object represents ONE business card with these fields:
-- name: Person's full name (with credentials)
-- company: Company/organization name
-- position: Job title/role
-- phone: Primary phone number (string, not array)
-- email: Primary email address
-- address: Physical address
-- notes: Any other notable info (website, fax, etc.)`;
+${GEMINI_CORE_RULES}
+
+## Example
+
+If the photo shows three cards, return an array of three objects. Each object follows the same field rules as a single card scan.
+
+For example, if one of the cards shows "KINMO PW" stacked above "CORPORATION", return company as "KINMO PW Corporation" — never just "CORPORATION".
+
+If a card has multiple phone numbers separated by "/" or spaces, split them into separate array entries.
+
+If a card has multiple labeled addresses (Main Office / Branch / BGC Office), include all of them in the address field with the format \`Label: address | Label: address\`.
+
+Return ONLY a JSON array of objects. No explanation, no markdown.`;
 
         const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 90000);
-
-        try {
-            const response = await fetch('/api/gemini', {
-                method: 'POST',
-                headers: await authHeaders(),
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } }
-                        ]
-                    }],
-                    model: 'gemini-2.5-flash',
-                    generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 8192,
-                        responseMimeType: 'application/json',
-                        responseSchema: {
-                            type: 'ARRAY',
-                            items: {
-                                type: 'OBJECT',
-                                properties: {
-                                    name: { type: 'STRING' },
-                                    company: { type: 'STRING' },
-                                    position: { type: 'STRING' },
-                                    phone: { type: 'STRING' },
-                                    email: { type: 'STRING' },
-                                    address: { type: 'STRING' },
-                                    notes: { type: 'STRING' }
-                                },
-                                required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
-                            }
-                        }
+        const requestBody = JSON.stringify({
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    { inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } }
+                ]
+            }],
+            model: 'gemini-2.5-flash',
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 8192,
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: 'ARRAY',
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            name: { type: 'STRING' },
+                            company: { type: 'STRING' },
+                            position: { type: 'STRING' },
+                            phone: { type: 'ARRAY', items: { type: 'STRING' } },
+                            email: { type: 'ARRAY', items: { type: 'STRING' } },
+                            address: { type: 'STRING' },
+                            notes: { type: 'STRING' }
+                        },
+                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
                     }
-                }),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeout);
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
-                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
-                throw new Error(fullMsg);
+                }
             }
+        });
 
-            const data = await response.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!text) throw new Error('No response from Gemini');
+        const text = await callGeminiWithRetry({ body: requestBody, flowName: 'MultiCard', timeoutMs: 90000 });
+        console.log('[MultiCard] Raw response:', text);
 
-            console.log('[MultiCard] Raw response:', text);
+        let parsed;
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+            const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) throw new Error('No JSON array in Gemini response');
+            parsed = JSON.parse(jsonMatch[0]);
+        }
 
-            let parsed;
-            try {
-                parsed = JSON.parse(text);
-            } catch {
-                const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-                const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
-                if (!jsonMatch) throw new Error('No JSON array in Gemini response');
-                parsed = JSON.parse(jsonMatch[0]);
-            }
+        if (!Array.isArray(parsed)) throw new Error('Gemini did not return an array');
 
-            if (!Array.isArray(parsed)) throw new Error('Gemini did not return an array');
-
-            return parsed
-                .filter((e: any) => e.name?.trim() || e.company?.trim() || e.phone?.trim() || e.email?.trim())
-                .map((e: any) => ({
+        return parsed
+            .filter((e: any) => {
+                const hasName = typeof e.name === 'string' && e.name.trim();
+                const hasCompany = typeof e.company === 'string' && e.company.trim();
+                const hasPhone = Array.isArray(e.phone) ? e.phone.some((p: string) => p?.trim()) : (typeof e.phone === 'string' && e.phone.trim());
+                const hasEmail = Array.isArray(e.email) ? e.email.some((p: string) => p?.trim()) : (typeof e.email === 'string' && e.email.trim());
+                return hasName || hasCompany || hasPhone || hasEmail;
+            })
+            .map((e: any) => {
+                const entry = {
                     name: smartCapitalize(e.name || ''),
                     company: e.company || '',
                     position: e.position || '',
-                    phone: e.phone || '',
-                    email: e.email || '',
+                    phone: Array.isArray(e.phone) ? e.phone.filter((p: string) => p?.trim()) : (e.phone ? [e.phone] : []),
+                    email: Array.isArray(e.email) ? e.email.filter((p: string) => p?.trim()) : (e.email ? [e.email] : []),
                     address: e.address || '',
-                    notes: e.notes || ''
-                }));
-        } catch (error) {
-            clearTimeout(timeout);
-            throw error;
-        }
+                    notes: e.notes || '',
+                };
+                return { ...entry, confidence: computeHeuristicConfidence(entry) };
+            });
     }
 
     async terminate(): Promise<void> {
@@ -1425,10 +1437,11 @@ export interface LogSheetEntry {
     name: string;
     company: string;
     position: string;
-    phone: string;
-    email: string;
+    phone: string[];
+    email: string[];
     address: string;
     notes: string;
+    confidence: number;
 }
 
 export const ocrService = new OCRService();
