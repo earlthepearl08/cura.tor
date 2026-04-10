@@ -187,7 +187,9 @@ export class OCRService {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.details?.error?.message || errorData.error || `Cloud Vision API error: ${response.status}`);
+                const baseMsg = errorData.details?.error?.message || errorData.error || `Cloud Vision API error: ${response.status}`;
+                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
+                throw new Error(fullMsg);
             }
 
             const data = await response.json();
@@ -396,7 +398,9 @@ Return ONLY the JSON object. No explanation, no markdown.`;
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`);
+                const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
+                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
+                throw new Error(fullMsg);
             }
 
             const data = await response.json();
@@ -1175,7 +1179,9 @@ Return ONLY a JSON array of objects with these fields:
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`);
+                const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
+                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
+                throw new Error(fullMsg);
             }
 
             const data = await response.json();
@@ -1293,7 +1299,9 @@ Return a JSON array where each object represents ONE business card with these fi
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`);
+                const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
+                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
+                throw new Error(fullMsg);
             }
 
             const data = await response.json();
