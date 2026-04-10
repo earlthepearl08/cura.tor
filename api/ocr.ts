@@ -7,7 +7,7 @@ import { jwtVerify, createRemoteJWKSet } from 'jose';
 // with FUNCTION_INVOCATION_FAILED. jose is small, has no native deps, and
 // bundles cleanly. Firebase ID tokens are RS256 JWTs with public keys at
 // the well-known securetoken JWKS endpoint.
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '';
 const FIREBASE_JWKS = createRemoteJWKSet(
   new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
 );
