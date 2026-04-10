@@ -304,8 +304,45 @@ export class OCRService {
     // API calls are routed through backend serverless functions to keep keys secure
 
     /**
-     * Process image using Google Cloud Vision API for OCR,
-     * then Gemini AI for intelligent parsing (with rule-based fallback)
+     * Single card processing via direct Gemini (no Cloud Vision pre-step).
+     * Uses the same pipeline as Multi-Card scan because that path has been
+     * empirically shown to produce more accurate results: when Gemini is
+     * given both OCR-extracted text and the image, it over-anchors on the
+     * text and ignores contradictory visual cues (e.g. stacked logo company
+     * names), even with explicit instructions to prefer the image. Dropping
+     * the Cloud Vision pre-step eliminates that failure mode.
+     */
+    async processSingleCardDirect(imageSrc: string): Promise<OCRResult> {
+        console.log('[Single Card] Parsing directly with Gemini (no Cloud Vision)...');
+
+        const entries = await this.parseMultiCards(imageSrc);
+
+        if (entries.length === 0) {
+            throw new Error('No card detected in image');
+        }
+
+        // For single card scans we take the first (and usually only) entry.
+        // If the user accidentally photographed multiple cards here, they
+        // still get one — they can re-scan through Multi-Card if needed.
+        const first = entries[0];
+        return {
+            name: first.name,
+            position: first.position,
+            company: first.company,
+            phone: first.phone,
+            email: first.email,
+            address: first.address,
+            notes: first.notes,
+            rawText: '',
+            confidence: first.confidence,
+        };
+    }
+
+    /**
+     * Legacy path: Cloud Vision OCR → Gemini parse → rule-based fallback.
+     * No longer called by processImage() because the text-anchoring issue
+     * it introduced degraded single-card accuracy. Kept for reference and
+     * in case we need to restore it for debugging.
      */
     async processImageWithCloudVision(imageSrc: string): Promise<OCRResult> {
         console.log('[Cloud Vision] Starting image analysis...');
@@ -582,9 +619,11 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
         const selectedEngine = engine || getOCREngine();
         console.log(`[OCR] Starting image processing with engine: ${selectedEngine}`);
 
-        // Route to appropriate engine
+        // Route to appropriate engine.
+        // 'cloud-vision' label is kept for compatibility with stored prefs,
+        // but the actual path is now direct-Gemini (no Cloud Vision pre-OCR).
         if (selectedEngine === 'cloud-vision') {
-            return this.processImageWithCloudVision(imageSrc);
+            return this.processSingleCardDirect(imageSrc);
         }
 
         // Default: Tesseract OCR

@@ -10,6 +10,7 @@ import { checkDuplicate } from '@/services/duplicateDetection';
 import { tryDecodeQR } from '@/services/qrDetect';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
+import { compressForOCR } from '@/utils/compressPhoto';
 
 interface QueuedFile {
     id: string;
@@ -23,15 +24,6 @@ interface QueuedFile {
     editedFolder?: string;
 }
 
-/** Convert a File to a base64 data URL */
-const fileToDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-    });
-};
 
 const MAX_SILENT_RETRIES = 2;
 
@@ -61,7 +53,10 @@ const Uploader: React.FC = () => {
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const newFiles: QueuedFile[] = [];
         for (const file of acceptedFiles) {
-            const dataURL = await fileToDataURL(file);
+            // Compress before storing dataURL so OCR requests stay under
+            // Vercel's 4.5 MB body limit. Preview still uses the original
+            // file via URL.createObjectURL so the visible image is unchanged.
+            const dataURL = await compressForOCR(file);
             newFiles.push({
                 id: crypto.randomUUID(),
                 file,
