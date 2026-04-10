@@ -22,55 +22,23 @@ const Scanner: React.FC = () => {
     const { canPerformScan, incrementScanCount, user, scansRemaining } = useAuth();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
-    const cropToViewfinder = useCallback((imageSrc: string): Promise<string> => {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d')!;
-
-                const targetRatio = 1.586; // Business card aspect ratio (matches viewfinder)
-                const imgRatio = img.width / img.height;
-
-                let sx: number, sy: number, sw: number, sh: number;
-
-                if (imgRatio > targetRatio) {
-                    // Image is wider than target — crop sides
-                    sh = img.height;
-                    sw = sh * targetRatio;
-                    sx = (img.width - sw) / 2;
-                    sy = 0;
-                } else {
-                    // Image is taller than target — crop top/bottom
-                    sw = img.width;
-                    sh = sw / targetRatio;
-                    sx = 0;
-                    sy = (img.height - sh) / 2;
-                }
-
-                canvas.width = sw;
-                canvas.height = sh;
-                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-
-                resolve(canvas.toDataURL('image/jpeg', 0.95));
-            };
-            img.onerror = () => resolve(imageSrc); // Fallback to original
-            img.src = imageSrc;
-        });
-    }, []);
-
     const capture = useCallback(async () => {
-        // Capture at the camera's native resolution (not CSS size) for sharp images
+        // Send the full uncropped camera frame to OCR. Earlier versions cropped
+        // to a 1.586 viewfinder rectangle here, which silently chopped off card
+        // content (e.g. the right-edge "KINMO PW" stacked logo) BEFORE the image
+        // ever reached Gemini. Multi-Card and Upload don't crop and they parse
+        // correctly — Gemini 2.5 can find the card in the full frame on its own.
+        // The viewfinder UI overlay still helps the user aim, but it is not a
+        // hard crop boundary anymore.
         const video = webcamRef.current?.video;
         const screenshotDims = video
             ? { width: video.videoWidth, height: video.videoHeight }
             : undefined;
         const imageSrc = webcamRef.current?.getScreenshot(screenshotDims);
         if (imageSrc) {
-            const cropped = await cropToViewfinder(imageSrc);
-            setImgSrc(cropped);
+            setImgSrc(imageSrc);
         }
-    }, [webcamRef, cropToViewfinder]);
+    }, [webcamRef]);
 
     const retake = () => {
         setImgSrc(null);
