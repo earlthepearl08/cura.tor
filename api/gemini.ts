@@ -12,19 +12,21 @@ const FIREBASE_JWKS = createRemoteJWKSet(
   new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
 );
 
-async function verifyAuth(req: VercelRequest): Promise<boolean> {
+async function verifyAuth(req: VercelRequest): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return { ok: false, reason: 'no-header' };
+  if (!authHeader.startsWith('Bearer ')) return { ok: false, reason: 'wrong-scheme' };
+  const token = authHeader.slice(7);
+  if (!token) return { ok: false, reason: 'empty-token' };
+  if (!FIREBASE_PROJECT_ID) return { ok: false, reason: 'server-missing-project-id' };
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) return false;
-    const token = authHeader.slice(7);
-    if (!token) return false;
     await jwtVerify(token, FIREBASE_JWKS, {
       issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
       audience: FIREBASE_PROJECT_ID,
     });
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, reason: `jwt-${err?.code || err?.message || 'unknown'}` };
   }
 }
 
@@ -34,8 +36,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!(await verifyAuth(req))) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  const auth = await verifyAuth(req);
+  if (!auth.ok) {
+    return res.status(401).json({ error: 'Unauthorized', reason: auth.reason });
   }
 
   // Get API key from environment variable (server-side only)
