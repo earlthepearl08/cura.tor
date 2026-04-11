@@ -15,7 +15,6 @@ import { auth, googleProvider } from '@/config/firebase';
 import { UserProfile, TIER_LIMITS, TierLimits } from '@/types/user';
 import {
     getOrCreateUserDoc,
-    incrementScanCount as incrementScanCountService,
     canPerformScan as canPerformScanService,
     canSaveContact as canSaveContactService,
     getScansRemaining as getScansRemainingService,
@@ -203,16 +202,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [tierLimits]);
 
     // --- Scan tracking ---
+    //
+    // The actual scan increment is now performed server-side inside /api/ocr
+    // and /api/gemini. This client-side function is kept for backward
+    // compatibility with existing call sites in Scan.tsx, Upload.tsx,
+    // MultiCardScan.tsx, and LogScan.tsx. It refreshes the user profile from
+    // Firestore so the local cached count reflects the server-side increment,
+    // then returns true.
+    //
+    // The contract the callers expect: "did THIS scan count successfully?".
+    // By the time this function is called, the server has already returned
+    // 200 and charged the scan — if the server had rejected the scan
+    // (quota-exceeded 429, rate-limit 429, etc.) then ocrService.processImage
+    // would have thrown and we would never reach this point. So a successful
+    // refresh always means success. Returning false here would incorrectly
+    // discard the last scan in a batch (e.g. a free user's 5th scan: server
+    // charged it, refresh shows 5/5, but "can you do ANOTHER?" is false).
+    //
+    // The mid-batch "should we continue to the NEXT scan?" gate lives
+    // separately in each page's top-of-loop canPerformScan() check.
 
-    const incrementScanCount = useCallback(async (count: number = 1): Promise<boolean> => {
-        if (!user) return false;
-        const updated = await incrementScanCountService(user, count);
-        if (updated) {
-            setUser(updated);
+    const incrementScanCount = useCallback(async (_count: number = 1): Promise<boolean> => {
+        if (!firebaseUser) return false;
+        try {
+            const refreshed = await getOrCreateUserDoc(firebaseUser);
+            setUser(refreshed);
             return true;
+        } catch (err) {
+            console.error('Failed to refresh profile after scan:', err);
+            return false;
         }
-        return false;
-    }, [user]);
+    }, [firebaseUser]);
 
     // --- Access code ---
 
