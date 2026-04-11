@@ -16,16 +16,28 @@ const FIREBASE_JWKS = createRemoteJWKSet(
   new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
 );
 
-/** Lazily initialize Firebase Admin and return Firestore instance */
+/** Lazily initialize Firebase Admin and return Firestore instance.
+ * Trims all three env vars because past incidents on this Vercel project
+ * involved trailing newlines from `vercel env add` silently corrupting
+ * env var values (see memory file). The private key is unescaped first
+ * (Vercel stores it with literal backslash-n) then trimmed. */
 function getAdminDb() {
   if (!getApps().length) {
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-    if (!projectId || !clientEmail || !privateKey) {
-      throw new Error('Firebase Admin credentials not configured');
+    const projectId = (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID)?.trim();
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
+    const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
+    const privateKey = privateKeyRaw?.replace(/\\n/g, '\n').trim();
+    if (!projectId) throw new Error('FIREBASE_PROJECT_ID env var missing or empty');
+    if (!clientEmail) throw new Error('FIREBASE_CLIENT_EMAIL env var missing or empty');
+    if (!privateKey) throw new Error('FIREBASE_PRIVATE_KEY env var missing or empty');
+    if (!privateKey.includes('BEGIN PRIVATE KEY')) {
+      throw new Error('FIREBASE_PRIVATE_KEY env var does not look like a PEM key (missing BEGIN PRIVATE KEY marker)');
     }
-    initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+    try {
+      initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+    } catch (err: any) {
+      throw new Error(`Firebase Admin initializeApp failed: ${err?.message || err}`);
+    }
   }
   return getFirestore();
 }
@@ -215,8 +227,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
   } catch (err: any) {
-    console.error('[api/gemini] Rate limit check failed:', err?.message || err);
-    return res.status(500).json({ error: 'Rate limit check failed', details: err?.message || String(err) });
+    const errName = err?.name || 'Error';
+    const errCode = err?.code ? `[${err.code}]` : '';
+    const errMsg = err?.message || String(err);
+    const errStack = err?.stack?.split('\n').slice(0, 3).join(' | ') || '';
+    console.error('[api/gemini] Rate limit check failed:', errName, errCode, errMsg, errStack);
+    return res.status(500).json({
+      error: 'Rate limit check failed',
+      details: `${errName}${errCode}: ${errMsg}`,
+    });
   }
 
   // Tier quota enforcement + atomic scan count increment
@@ -233,8 +252,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Quota check failed', reason: quota.reason });
     }
   } catch (err: any) {
-    console.error('[api/gemini] Quota check failed:', err?.message || err);
-    return res.status(500).json({ error: 'Quota check failed', details: err?.message || String(err) });
+    const errName = err?.name || 'Error';
+    const errCode = err?.code ? `[${err.code}]` : '';
+    const errMsg = err?.message || String(err);
+    const errStack = err?.stack?.split('\n').slice(0, 3).join(' | ') || '';
+    console.error('[api/gemini] Quota check failed:', errName, errCode, errMsg, errStack);
+    return res.status(500).json({
+      error: 'Quota check failed',
+      details: `${errName}${errCode}: ${errMsg}`,
+    });
   }
 
   // Get API key from environment variable (server-side only)

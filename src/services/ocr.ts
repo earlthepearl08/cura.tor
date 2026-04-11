@@ -110,8 +110,11 @@ async function callGeminiWithRetry(opts: {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                const baseMsg = errorData.details?.error?.message || errorData.error || `Gemini API error: ${response.status}`;
-                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
+                const nestedMsg = errorData.details?.error?.message; // Google upstream error shape
+                const flatDetails = typeof errorData.details === 'string' ? errorData.details : null; // our own server error shape
+                const baseMsg = nestedMsg || errorData.error || `Gemini API error: ${response.status}`;
+                const parts = [baseMsg, flatDetails, errorData.reason ? `[${errorData.reason}]` : null].filter(Boolean);
+                const fullMsg = parts.join(' — ');
                 const retryable = RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg);
                 if (retryable && attempt < MAX_ATTEMPTS - 1) {
                     console.log(`[${opts.flowName}] Transient error ${response.status}, retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
@@ -356,9 +359,11 @@ export class OCRService {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                const baseMsg = errorData.details?.error?.message || errorData.error || `Cloud Vision API error: ${response.status}`;
-                const fullMsg = errorData.reason ? `${baseMsg} [${errorData.reason}]` : baseMsg;
-                throw new Error(fullMsg);
+                const nestedMsg = errorData.details?.error?.message;
+                const flatDetails = typeof errorData.details === 'string' ? errorData.details : null;
+                const baseMsg = nestedMsg || errorData.error || `Cloud Vision API error: ${response.status}`;
+                const parts = [baseMsg, flatDetails, errorData.reason ? `[${errorData.reason}]` : null].filter(Boolean);
+                throw new Error(parts.join(' — '));
             }
 
             const data = await response.json();
