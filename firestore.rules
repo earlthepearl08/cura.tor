@@ -52,6 +52,46 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // --- Organizations (Enterprise) ---
+    match /organizations/{orgId} {
+      // Helper: caller is a member of this org
+      function isMember() {
+        return request.auth != null
+               && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+      }
+
+      // Read org metadata if member; writes only via Admin SDK
+      allow read: if isMember();
+      allow write: if false;
+
+      // Members subcollection — read if member, writes only via Admin SDK
+      match /members/{uid} {
+        allow read: if isMember();
+        allow write: if false;
+      }
+
+      // Contacts subcollection — read/write if member (client SDK for performance)
+      match /contacts/{contactId} {
+        allow read, write: if isMember();
+      }
+
+      // Folders subcollection — read/write if member
+      match /folders/{folderId} {
+        allow read, write: if isMember();
+      }
+
+      // Batches subcollection — read/write if member
+      match /batches/{batchId} {
+        allow read, write: if isMember();
+      }
+
+      // Invites subcollection — read if member; writes only via Admin SDK
+      match /invites/{code} {
+        allow read: if isMember();
+        allow write: if false;
+      }
+    }
+
     // Deny everything else by default
     match /{document=**} {
       allow read, write: if false;
