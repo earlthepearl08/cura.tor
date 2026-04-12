@@ -1,4 +1,4 @@
-export type UserTier = 'free' | 'early_access' | 'pro';
+export type UserTier = 'free' | 'early_access' | 'pro' | 'enterprise';
 
 export interface UserProfile {
     uid: string;
@@ -23,6 +23,8 @@ export interface UserProfile {
         subscriptionStatus: 'active' | 'canceled' | 'past_due' | 'unpaid' | null;
         currentPeriodEnd: number | null;
     };
+    organizationId?: string;
+    orgRole?: 'admin' | 'member';
     createdAt: number;
     updatedAt: number;
 }
@@ -60,6 +62,16 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         bulkScan: false,               // Multi-Card & Log Sheet are Pro-only
     },
     pro: {
+        scansPerMonth: null,
+        contactStorage: null,
+        csvExport: true,
+        excelExport: true,
+        bulkVCardExport: true,
+        googleDriveSync: true,
+        individualVCard: true,
+        bulkScan: true,
+    },
+    enterprise: {
         scansPerMonth: null,
         contactStorage: null,
         csvExport: true,
