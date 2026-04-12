@@ -19,4 +19,8 @@ export interface Contact {
     batchId?: string;       // ID of the batch this contact belongs to
     isDeleted?: boolean;    // Soft-delete flag (tombstone for sync)
     deletedAt?: number;     // When the contact was deleted
+    createdBy?: string;
+    createdByName?: string;
+    lastEditedBy?: string;
+    lastEditedByName?: string;
 }
