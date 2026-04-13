@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, FileText, Shield, CreditCard, ExternalLink, X } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TIER_LIMITS } from '@/types/user';
 import { STRIPE_PRICES, createCheckoutSession, createPortalSession, PLAN_TO_TIER, type BillingInterval } from '@/services/stripe';
 import AccessCodeInput from '@/components/AccessCodeInput';
@@ -13,6 +14,7 @@ const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> 
     free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
     early_access: { label: 'Pioneer', color: 'text-amber-400', bg: 'bg-amber-500/20' },
     pro: { label: 'Pro', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+    enterprise: { label: 'Enterprise', color: 'text-sky-400', bg: 'bg-sky-500/20' },
 };
 
 const PIONEER_FEATURES = [
@@ -189,6 +191,26 @@ const Settings = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Team — only visible for enterprise users */}
+                {user?.organizationId && user?.orgRole === 'admin' && (
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Team</p>
+                        <button
+                            onClick={() => navigate('/team')}
+                            className="w-full card-elevated rounded-2xl p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
+                                <Users className="w-5 h-5 text-sky-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm">Team Admin</p>
+                                <p className="text-xs text-slate-500">Manage members, invites, and roles</p>
+                            </div>
+                            <ChevronRight size={16} className="text-slate-600" />
+                        </button>
+                    </div>
+                )}
 
                 {/* Plan & Usage */}
                 <div className="space-y-3">

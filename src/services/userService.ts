@@ -27,6 +27,8 @@ const docToProfile = (data: any): UserProfile => ({
         subscriptionStatus: data.stripe.subscriptionStatus || null,
         currentPeriodEnd: data.stripe.currentPeriodEnd || null,
     } : undefined,
+    organizationId: data.organizationId || undefined,
+    orgRole: data.orgRole || undefined,
     createdAt: data.createdAt?.toMillis?.() || data.createdAt || Date.now(),
     updatedAt: data.updatedAt?.toMillis?.() || data.updatedAt || Date.now(),
 });

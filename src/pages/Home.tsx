@@ -4,7 +4,9 @@ import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, Fi
 import { storage } from '@/services/storage';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TIER_LIMITS } from '@/types/user';
+import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
 import { Contact } from '@/types/contact';
 import UpgradePrompt from '@/components/UpgradePrompt';
 
@@ -19,10 +21,13 @@ const Home = () => {
     const [upgradeFeature, setUpgradeFeature] = useState<'bulk-scan' | null>(null);
     const isBulkLocked = !canUseBulkScan();
 
+    const { canSwitchWorkspace } = useWorkspace();
+
     const tierBadge: Record<string, { label: string; color: string; bg: string }> = {
         free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
         early_access: { label: 'Pioneer', color: 'text-amber-400', bg: 'bg-amber-500/20' },
         pro: { label: 'Pro', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+        enterprise: { label: 'Enterprise', color: 'text-sky-400', bg: 'bg-sky-500/20' },
     };
     const badge = tierBadge[user?.tier || 'free'];
 
@@ -110,6 +115,13 @@ const Home = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Workspace Switcher — only visible for enterprise users */}
+            {canSwitchWorkspace && (
+                <div className="w-full max-w-md mb-4">
+                    <WorkspaceSwitcher />
+                </div>
+            )}
 
             {/* Primary Actions */}
             <div className="w-full max-w-md mb-6">
