@@ -12,8 +12,11 @@ import MultiCardScan from '@/pages/MultiCardScan';
 import BatchHistory from '@/pages/BatchHistory';
 import Legal from '@/pages/Legal';
 import Auth from '@/pages/Auth';
+import TeamAdmin from '@/pages/TeamAdmin';
+import AcceptInvite from '@/pages/AcceptInvite';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { getTheme } from '@/hooks/useTheme';
 
 function App() {
@@ -24,23 +27,27 @@ function App() {
     return (
         <Router>
             <AuthProvider>
-                <div className="min-height-screen bg-brand-950">
-                    <Routes>
-                        <Route path="/auth" element={<Auth />} />
-                        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-                        <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
-                        <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
-                        <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
-                        <Route path="/manual" element={<ProtectedRoute><ManualInput /></ProtectedRoute>} />
-                        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                        <Route path="/qr-scan" element={<ProtectedRoute><QRScan /></ProtectedRoute>} />
-                        <Route path="/log-scan" element={<ProtectedRoute><LogScan /></ProtectedRoute>} />
-                        <Route path="/multi-card" element={<ProtectedRoute><MultiCardScan /></ProtectedRoute>} />
-                        <Route path="/batch-history" element={<ProtectedRoute><BatchHistory /></ProtectedRoute>} />
-                        <Route path="/legal" element={<Legal />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                </div>
+                <WorkspaceProvider>
+                    <div className="min-height-screen bg-brand-950">
+                        <Routes>
+                            <Route path="/auth" element={<Auth />} />
+                            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                            <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
+                            <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+                            <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
+                            <Route path="/manual" element={<ProtectedRoute><ManualInput /></ProtectedRoute>} />
+                            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                            <Route path="/qr-scan" element={<ProtectedRoute><QRScan /></ProtectedRoute>} />
+                            <Route path="/log-scan" element={<ProtectedRoute><LogScan /></ProtectedRoute>} />
+                            <Route path="/multi-card" element={<ProtectedRoute><MultiCardScan /></ProtectedRoute>} />
+                            <Route path="/batch-history" element={<ProtectedRoute><BatchHistory /></ProtectedRoute>} />
+                            <Route path="/team" element={<ProtectedRoute><TeamAdmin /></ProtectedRoute>} />
+                            <Route path="/invite/:code" element={<ProtectedRoute><AcceptInvite /></ProtectedRoute>} />
+                            <Route path="/legal" element={<Legal />} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </div>
+                </WorkspaceProvider>
             </AuthProvider>
         </Router>
     );
