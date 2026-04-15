@@ -11,6 +11,7 @@ import {
 import { db, auth } from '@/config/firebase';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
+import { storage as personalStorage } from './storage';
 
 /**
  * Firestore-backed storage for team/organization workspaces.
@@ -117,6 +118,21 @@ export class TeamStorageService {
         Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
 
         await setDoc(doc(db, 'organizations', orgId, 'contacts', contact.id), data);
+
+        // Dual-write: keep the full contact (with images) in the scanner's personal IndexedDB
+        // so they retain the original photo even though the shared org copy is stripped.
+        try {
+            await personalStorage.saveContact({
+                ...contact,
+                createdBy: data.createdBy ?? contact.createdBy,
+                createdByName: data.createdByName ?? contact.createdByName,
+                lastEditedBy: data.lastEditedBy ?? contact.lastEditedBy,
+                lastEditedByName: data.lastEditedByName ?? contact.lastEditedByName,
+                updatedAt: data.updatedAt,
+            });
+        } catch (err) {
+            console.warn('Personal archive write failed (org save succeeded):', err);
+        }
     }
 
     /** Hard-delete a contact from the team workspace */
