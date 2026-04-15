@@ -92,6 +92,38 @@ service cloud.firestore {
       }
     }
 
+    // --- Enterprise Requests ---
+    match /enterpriseRequests/{requestId} {
+      // Any signed-in user can create a request for themselves.
+      // Locked down: exact allowed fields, status must be 'pending', size caps
+      // to prevent DoS via huge strings or unexpected fields.
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasOnly([
+                      'uid', 'email', 'displayName', 'orgName',
+                      'teamSize', 'contactEmail', 'notes',
+                      'status', 'createdAt'
+                    ])
+                    && request.resource.data.orgName is string
+                    && request.resource.data.orgName.size() > 0
+                    && request.resource.data.orgName.size() <= 200
+                    && request.resource.data.contactEmail is string
+                    && request.resource.data.contactEmail.size() <= 200
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() <= 200
+                    && request.resource.data.displayName is string
+                    && request.resource.data.displayName.size() <= 200
+                    && request.resource.data.notes is string
+                    && request.resource.data.notes.size() <= 2000
+                    && request.resource.data.teamSize is int
+                    && request.resource.data.teamSize >= 1
+                    && request.resource.data.teamSize <= 100000;
+
+      // No reads/updates/deletes from the client — admin list/approve/reject go through the API
+      allow read, update, delete: if false;
+    }
+
     // Deny everything else by default
     match /{document=**} {
       allow read, write: if false;

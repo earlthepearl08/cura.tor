@@ -14,6 +14,7 @@ import Legal from '@/pages/Legal';
 import Auth from '@/pages/Auth';
 import TeamAdmin from '@/pages/TeamAdmin';
 import AcceptInvite from '@/pages/AcceptInvite';
+import Admin from '@/pages/Admin';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
@@ -43,6 +44,7 @@ function App() {
                             <Route path="/batch-history" element={<ProtectedRoute><BatchHistory /></ProtectedRoute>} />
                             <Route path="/team" element={<ProtectedRoute><TeamAdmin /></ProtectedRoute>} />
                             <Route path="/invite/:code" element={<ProtectedRoute><AcceptInvite /></ProtectedRoute>} />
+                            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
                             <Route path="/legal" element={<Legal />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>

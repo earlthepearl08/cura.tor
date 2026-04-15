@@ -9,6 +9,8 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TIER_LIMITS } from '@/types/user';
 import { STRIPE_PRICES, createCheckoutSession, createPortalSession, PLAN_TO_TIER, type BillingInterval } from '@/services/stripe';
 import AccessCodeInput from '@/components/AccessCodeInput';
+import RequestTeamAccessCard from '@/components/RequestTeamAccessCard';
+import { OWNER_EMAILS } from '@/config/firebase';
 
 const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> = {
     free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
@@ -206,6 +208,31 @@ const Settings = () => {
                             <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-sm">Team Admin</p>
                                 <p className="text-xs text-slate-500">Manage members, invites, and roles</p>
+                            </div>
+                            <ChevronRight size={16} className="text-slate-600" />
+                        </button>
+                    </div>
+                )}
+
+                {/* Request Team Access — for non-enterprise users */}
+                {!user?.organizationId && (
+                    <RequestTeamAccessCard />
+                )}
+
+                {/* Admin panel — owner-only */}
+                {user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase()) && (
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Admin</p>
+                        <button
+                            onClick={() => navigate('/admin')}
+                            className="w-full card-elevated rounded-2xl p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                                <Shield className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm">Admin Panel</p>
+                                <p className="text-xs text-slate-500">Review and provision enterprise requests</p>
                             </div>
                             <ChevronRight size={16} className="text-slate-600" />
                         </button>
