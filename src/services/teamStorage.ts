@@ -60,19 +60,26 @@ export class TeamStorageService {
             notes: data.notes || '',
             folder: data.folder,
             rawText: data.rawText || '',
-            imageData: data.imageData || '',
+            imageData: '',
             confidence: data.confidence || 0,
             isVerified: data.isVerified || false,
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : (data.createdAt || Date.now()),
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : data.updatedAt,
-            personPhoto: data.personPhoto,
-            locationPhoto: data.locationPhoto,
             batchId: data.batchId,
             createdBy: data.createdBy,
             createdByName: data.createdByName,
             lastEditedBy: data.lastEditedBy,
             lastEditedByName: data.lastEditedByName,
         };
+    }
+
+    /** Remove base64 image fields — team workspace stores parsed data only to keep docs small and reduce legal surface */
+    private stripImages<T extends Record<string, any>>(data: T): T {
+        const clone: any = { ...data };
+        delete clone.imageData;
+        delete clone.personPhoto;
+        delete clone.locationPhoto;
+        return clone;
     }
 
     /** Get all contacts in active org */
@@ -94,10 +101,10 @@ export class TeamStorageService {
 
         // Stamp createdBy on first save, lastEditedBy on subsequent saves
         const isNew = !contact.createdBy;
-        const data: any = {
+        const data: any = this.stripImages({
             ...contact,
             updatedAt: Date.now(),
-        };
+        });
         if (isNew) {
             data.createdBy = uid;
             data.createdByName = displayName;
@@ -182,13 +189,13 @@ export class TeamStorageService {
             const ref = doc(db, 'organizations', orgId, 'contacts', id);
             const snap = await getDoc(ref);
             if (snap.exists()) {
-                await setDoc(ref, {
+                await setDoc(ref, this.stripImages({
                     ...snap.data(),
                     folder,
                     updatedAt: Date.now(),
                     lastEditedBy: uid,
                     lastEditedByName: displayName,
-                });
+                }));
             }
         }
     }
@@ -229,6 +236,7 @@ export class TeamStorageService {
     async saveBatch(batch: Batch): Promise<void> {
         const orgId = this.requireOrg();
         const data: any = { ...batch };
+        delete data.thumbnailData;
         Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
         await setDoc(doc(db, 'organizations', orgId, 'batches', batch.id), data);
     }
