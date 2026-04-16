@@ -93,6 +93,26 @@ const TeamAdmin: React.FC = () => {
         }
     };
 
+    const handleCreateOpenCode = async () => {
+        if (!orgId) return;
+        setIsCreatingInvite(true);
+        setError(null);
+        try {
+            // Open invite: any signed-in user can redeem by typing the code
+            const result = await createInvite(orgId, null, inviteRole);
+            if (result.success && result.code && result.inviteUrl) {
+                setGeneratedInvite({ code: result.code, url: result.inviteUrl });
+                await loadData();
+            } else {
+                setError(result.message);
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to create open code');
+        } finally {
+            setIsCreatingInvite(false);
+        }
+    };
+
     const handleCopyLink = async (url: string, code: string) => {
         try {
             await navigator.clipboard.writeText(url);
@@ -248,6 +268,24 @@ const TeamAdmin: React.FC = () => {
                         {isCreatingInvite ? <Loader2 className="animate-spin" size={18} /> : 'Generate Link'}
                     </button>
                 </div>
+
+                {/* Open code — shareable code anyone can redeem (no email required) */}
+                <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                    <div className="flex-1 h-px bg-brand-800" />
+                    <span>or</span>
+                    <div className="flex-1 h-px bg-brand-800" />
+                </div>
+                <button
+                    onClick={handleCreateOpenCode}
+                    disabled={isCreatingInvite || seatsRemaining <= 0}
+                    className="mt-3 w-full py-2.5 glass border border-brand-800 hover:bg-white/5 rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                    <UserPlus size={16} className="text-brand-400" />
+                    Generate open code (anyone can redeem)
+                </button>
+                <p className="text-[10px] text-slate-500 mt-2 text-center">
+                    Share the code in person. Still counts toward your seat limit until someone joins or you revoke it.
+                </p>
 
                 {generatedInvite && (
                     <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">

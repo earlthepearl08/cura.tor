@@ -64,23 +64,24 @@ export async function getInvites(orgId: string): Promise<OrgInvite[]> {
         .sort((a, b) => b.invitedAt - a.invitedAt);
 }
 
-/** Generate a new invite code (admin only) */
+/** Generate a new invite code (admin only). Pass null/empty email for an "open" invite
+ *  that any signed-in user can redeem without an email match. */
 export async function createInvite(
     orgId: string,
-    email: string,
+    email: string | null,
     role: OrgRole
-): Promise<{ success: boolean; code?: string; inviteUrl?: string; message: string }> {
+): Promise<{ success: boolean; code?: string; inviteUrl?: string; isOpen?: boolean; message: string }> {
     try {
         const res = await authFetch('/api/org', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'invite', orgId, email, role }),
+            body: JSON.stringify({ action: 'invite', orgId, email: email || '', role }),
         });
         const data = await res.json();
         if (!res.ok) {
             return { success: false, message: data.error || 'Failed to create invite' };
         }
-        return { success: true, code: data.code, inviteUrl: data.inviteUrl, message: 'Invite created' };
+        return { success: true, code: data.code, inviteUrl: data.inviteUrl, isOpen: data.isOpen, message: 'Invite created' };
     } catch (err: any) {
         return { success: false, message: err.message || 'Failed to create invite' };
     }

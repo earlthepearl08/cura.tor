@@ -10,7 +10,10 @@ import { TIER_LIMITS } from '@/types/user';
 import { STRIPE_PRICES, createCheckoutSession, createPortalSession, PLAN_TO_TIER, type BillingInterval } from '@/services/stripe';
 import AccessCodeInput from '@/components/AccessCodeInput';
 import RequestTeamAccessCard from '@/components/RequestTeamAccessCard';
+import RedeemTeamCodeCard from '@/components/RedeemTeamCodeCard';
+import DeleteAccountModal from '@/components/DeleteAccountModal';
 import { OWNER_EMAILS } from '@/config/firebase';
+import { Trash2 } from 'lucide-react';
 
 const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> = {
     free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
@@ -46,6 +49,8 @@ const Settings = () => {
     const [isUpgrading, setIsUpgrading] = useState(false);
     const [upgradeError, setUpgradeError] = useState('');
     const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled'; text: string } | null>(null);
+    const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+    const isOwnerAccount = !!user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
 
     const tierBadge = TIER_BADGES[user?.tier || 'free'];
     const limits = TIER_LIMITS[user?.tier || 'free'];
@@ -217,6 +222,11 @@ const Settings = () => {
                 {/* Request Team Access — for non-enterprise users */}
                 {!user?.organizationId && (
                     <RequestTeamAccessCard />
+                )}
+
+                {/* Redeem team code — for users not yet in an org */}
+                {!user?.organizationId && (
+                    <RedeemTeamCodeCard />
                 )}
 
                 {/* Admin panel — owner-only */}
@@ -675,6 +685,26 @@ const Settings = () => {
                     </div>
                 </div>
 
+                {/* Danger Zone — hidden for owner accounts */}
+                {!isOwnerAccount && (
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-bold text-red-500/70 uppercase tracking-wider px-1">Danger Zone</p>
+                        <button
+                            onClick={() => setShowDeleteAccount(true)}
+                            className="w-full card-elevated rounded-2xl p-4 flex items-center gap-3 border border-red-500/30 hover:bg-red-500/5 transition-colors text-left"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                                <Trash2 className="w-5 h-5 text-red-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm text-red-400">Delete account</p>
+                                <p className="text-xs text-slate-500">Permanently remove your profile, scans, and team memberships</p>
+                            </div>
+                            <ChevronRight size={16} className="text-red-400/60" />
+                        </button>
+                    </div>
+                )}
+
                 {/* About */}
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">About</p>
@@ -683,6 +713,8 @@ const Settings = () => {
                     </div>
                 </div>
             </div>
+
+            {showDeleteAccount && <DeleteAccountModal onClose={() => setShowDeleteAccount(false)} />}
         </div>
     );
 };

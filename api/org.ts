@@ -119,7 +119,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'invite': {
         const { orgId, email, role } = req.body;
         if (!orgId || typeof orgId !== 'string') return res.status(400).json({ error: 'Missing orgId' });
-        if (!email || typeof email !== 'string') return res.status(400).json({ error: 'Missing email' });
+        // Email is optional — when empty/null, we generate an "open" invite
+        // that anyone with the code can redeem. Useful for in-person handoffs.
+        if (email !== undefined && email !== null && email !== '' && typeof email !== 'string') {
+          return res.status(400).json({ error: 'Invalid email' });
+        }
         if (role !== 'admin' && role !== 'member') return res.status(400).json({ error: 'Invalid role' });
 
         const membership = await getOrgMembership(adminDb, orgId, auth.uid);
@@ -141,10 +145,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const code = generateInviteCode();
         const callerName = auth.name || (auth.email || '').split('@')[0] || 'Admin';
+        const normalizedEmail = typeof email === 'string' ? email.toLowerCase().trim() : '';
+        const isOpen = !normalizedEmail;
 
         await adminDb.collection('organizations').doc(orgId).collection('invites').doc(code).set({
           code,
-          email: email.toLowerCase().trim(),
+          email: normalizedEmail,
+          isOpen,
           role,
           invitedBy: auth.uid,
           invitedByName: callerName,
@@ -153,7 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         const origin = (req.headers.origin as string) || process.env.APP_URL || '';
-        return res.status(200).json({ code, inviteUrl: `${origin}/invite/${code}` });
+        return res.status(200).json({ code, inviteUrl: `${origin}/invite/${code}`, isOpen });
       }
 
       case 'accept-invite': {
