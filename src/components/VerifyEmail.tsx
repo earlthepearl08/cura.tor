@@ -63,6 +63,9 @@ export default function VerifyEmail() {
                     <p className="text-xs text-slate-500 pt-2">
                         Click the link in the email to finish setting up your account. This page will unlock automatically once verified.
                     </p>
+                    <p className="text-xs text-amber-400/80 pt-2">
+                        Don't see it? Check your spam or promotions folder.
+                    </p>
                 </div>
 
                 {error && (
