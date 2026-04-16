@@ -71,7 +71,48 @@ export class TeamStorageService {
             createdByName: data.createdByName,
             lastEditedBy: data.lastEditedBy,
             lastEditedByName: data.lastEditedByName,
+            claimedBy: data.claimedBy,
+            claimedByName: data.claimedByName,
+            claimedAt: data.claimedAt instanceof Timestamp ? data.claimedAt.toMillis() : data.claimedAt,
         };
+    }
+
+    /** Claim a contact as "mine to follow up on". Respects Firestore rules
+     *  so only unclaimed contacts can be claimed. */
+    async claimContact(contactId: string): Promise<void> {
+        const orgId = this.requireOrg();
+        const { uid, displayName } = this.getCurrentUserInfo();
+        const ref = doc(db, 'organizations', orgId, 'contacts', contactId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error('Contact not found');
+        const data = snap.data();
+        if (data.claimedBy && data.claimedBy !== uid) {
+            throw new Error(`Already claimed by ${data.claimedByName || 'another member'}`);
+        }
+        await setDoc(ref, {
+            ...data,
+            claimedBy: uid,
+            claimedByName: displayName,
+            claimedAt: Date.now(),
+        });
+    }
+
+    /** Release your own claim on a contact so someone else can pick it up. */
+    async releaseClaim(contactId: string): Promise<void> {
+        const orgId = this.requireOrg();
+        const { uid } = this.getCurrentUserInfo();
+        const ref = doc(db, 'organizations', orgId, 'contacts', contactId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error('Contact not found');
+        const data = snap.data();
+        if (data.claimedBy !== uid) {
+            throw new Error('Only the person who claimed this contact can release it');
+        }
+        const updated = { ...data };
+        delete updated.claimedBy;
+        delete updated.claimedByName;
+        delete updated.claimedAt;
+        await setDoc(ref, updated);
     }
 
     /** Remove base64 image fields — team workspace stores parsed data only to keep docs small and reduce legal surface */

@@ -5,6 +5,9 @@ export interface Organization {
     name: string;
     ownerId: string;
     seatLimit: number;
+    // If true, team members can "claim" shared contacts so teammates know
+    // who's following up. If false, attribution is shown but no claim button.
+    claimsEnabled?: boolean;
     createdAt: number;
     updatedAt: number;
 }

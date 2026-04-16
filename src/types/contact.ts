@@ -23,4 +23,8 @@ export interface Contact {
     createdByName?: string;
     lastEditedBy?: string;
     lastEditedByName?: string;
+    // Dibs/claim — set when a team member claims a shared contact as "theirs to follow up on"
+    claimedBy?: string;
+    claimedByName?: string;
+    claimedAt?: number;
 }

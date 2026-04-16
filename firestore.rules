@@ -70,9 +70,26 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Contacts subcollection — read/write if member (client SDK for performance)
+      // Contacts subcollection — read/write if member (client SDK for performance).
+      // Claim enforcement: when claimedBy is being set, it must equal the caller's
+      // uid; when clearing, the caller must be the current claimer. Prevents
+      // members from stealing claims via the UI. (Admins can override via a
+      // separate admin-only path; not implemented in v1.)
       match /contacts/{contactId} {
-        allow read, write: if isMember();
+        allow read: if isMember();
+        allow create: if isMember();
+        allow delete: if isMember();
+        allow update: if isMember()
+                      && (
+                        // Claim unchanged
+                        request.resource.data.get('claimedBy', null) == resource.data.get('claimedBy', null)
+                        // Setting claim to self (was unclaimed)
+                        || (resource.data.get('claimedBy', null) == null
+                            && request.resource.data.claimedBy == request.auth.uid)
+                        // Releasing own claim
+                        || (resource.data.get('claimedBy', null) == request.auth.uid
+                            && request.resource.data.get('claimedBy', null) == null)
+                      );
       }
 
       // Folders subcollection — read/write if member
