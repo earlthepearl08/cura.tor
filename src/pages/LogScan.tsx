@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus, Lock } from 'lucide-react';
 import { ocrService, LogSheetEntry } from '@/services/ocr';
-import { storage } from '@/services/storage';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
@@ -19,6 +19,7 @@ const LogScan: React.FC = () => {
     const addMoreCamRef = useRef<HTMLInputElement>(null);
     const addMoreGalRef = useRef<HTMLInputElement>(null);
     const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canUseBulkScan } = useAuth();
+    const { storage } = useWorkspace();
 
     const [imageData, setImageData] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);

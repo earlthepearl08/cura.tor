@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Layers, Calendar, Users, CheckCircle, AlertCircle, Image as ImageIcon } from 'lucide-react';
-import { storage } from '@/services/storage';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Batch } from '@/types/batch';
 
 const BatchHistory: React.FC = () => {
     const navigate = useNavigate();
+    const { storage, mode: workspaceMode } = useWorkspace();
     const [batches, setBatches] = useState<Batch[]>([]);
     const [batchStats, setBatchStats] = useState<Map<string, { total: number; verified: number }>>(new Map());
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         loadBatches();
-    }, []);
+    }, [workspaceMode]);
 
     const loadBatches = async () => {
         setIsLoading(true);

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Trash2, ArrowLeft, Play, CheckCircle, AlertCircle, Loader2, Edit3, Save, Users, Square, CheckSquare, AlertTriangle, QrCode } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { storage } from '@/services/storage';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ocrService, OCRResult } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import ContactReview from '@/components/ContactReview';
@@ -49,6 +49,7 @@ const Uploader: React.FC = () => {
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const navigate = useNavigate();
     const { canPerformScan, canSaveContact, incrementScanCount, user, scansRemaining } = useAuth();
+    const { storage } = useWorkspace();
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const newFiles: QueuedFile[] = [];

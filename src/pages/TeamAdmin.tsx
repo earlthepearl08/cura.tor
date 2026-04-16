@@ -11,6 +11,7 @@ import {
     removeMember,
     updateMemberRole,
     revokeInvite,
+    updateOrgSettings,
 } from '@/services/organizationService';
 
 const TeamAdmin: React.FC = () => {
@@ -179,6 +180,40 @@ const TeamAdmin: React.FC = () => {
                     <button onClick={() => setError(null)} className="ml-auto"><X size={14} /></button>
                 </div>
             )}
+
+            {/* Team settings */}
+            <div className="mb-6 p-5 glass border border-brand-800 rounded-2xl">
+                <h2 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                    <Shield size={18} className="text-brand-400" />
+                    Team Settings
+                </h2>
+                <p className="text-xs text-slate-500 mb-4">
+                    Control how members interact with shared contacts.
+                </p>
+
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                    <input
+                        type="checkbox"
+                        checked={organization.claimsEnabled !== false}
+                        onChange={async (e) => {
+                            const result = await updateOrgSettings(organization.id, { claimsEnabled: e.target.checked });
+                            if (result.success) {
+                                await refreshOrganization();
+                            } else {
+                                setError(result.message);
+                            }
+                        }}
+                        className="mt-0.5 w-4 h-4 rounded border-brand-700 bg-brand-900 text-sky-500 focus:ring-sky-500 focus:ring-offset-0 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                        <p className="text-sm font-medium text-white">Enable claims</p>
+                        <p className="text-xs text-slate-500">
+                            Members can "claim" contacts they'll follow up on, so teammates don't double-contact the same lead.
+                            Teammates always see all contacts either way.
+                        </p>
+                    </div>
+                </label>
+            </div>
 
             {/* Invite section */}
             <div className="mb-8 p-5 glass border border-brand-800 rounded-2xl">

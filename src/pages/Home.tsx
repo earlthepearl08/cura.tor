@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers, Lock } from 'lucide-react';
-import { storage } from '@/services/storage';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -22,7 +21,7 @@ const Home = () => {
     const [upgradeFeature, setUpgradeFeature] = useState<'bulk-scan' | null>(null);
     const isBulkLocked = !canUseBulkScan();
 
-    const { canSwitchWorkspace } = useWorkspace();
+    const { canSwitchWorkspace, storage, mode: workspaceMode } = useWorkspace();
 
     const tierBadge: Record<string, { label: string; color: string; bg: string }> = {
         free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
@@ -41,7 +40,7 @@ const Home = () => {
             const sorted = [...contacts].sort((a, b) => b.createdAt - a.createdAt);
             setRecentContacts(sorted.slice(0, 3));
         });
-    }, []);
+    }, [workspaceMode]);
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen p-6 page-enter">

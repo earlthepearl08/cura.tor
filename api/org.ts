@@ -281,6 +281,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ success: true });
       }
 
+      case 'update-settings': {
+        const { orgId, claimsEnabled } = req.body;
+        if (!orgId || typeof orgId !== 'string') return res.status(400).json({ error: 'Missing orgId' });
+        if (typeof claimsEnabled !== 'boolean') return res.status(400).json({ error: 'claimsEnabled must be a boolean' });
+
+        const membership = await getOrgMembership(adminDb, orgId, auth.uid);
+        if (!membership || membership.role !== 'admin') {
+          return res.status(403).json({ error: 'You must be an admin to change team settings' });
+        }
+        await adminDb.collection('organizations').doc(orgId).update({
+          claimsEnabled,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return res.status(200).json({ success: true });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }

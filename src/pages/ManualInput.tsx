@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Building2, Briefcase, Phone, Mail, MapPin, StickyNote, Save, AlertTriangle } from 'lucide-react';
-import { storage } from '@/services/storage';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { Contact } from '@/types/contact';
 import UpgradePrompt from '@/components/UpgradePrompt';
@@ -24,6 +24,7 @@ const ManualInput: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const { canSaveContact, user } = useAuth();
+    const { storage } = useWorkspace();
 
     // Check for duplicates when form data changes
     useEffect(() => {

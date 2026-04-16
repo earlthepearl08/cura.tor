@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers } from 'lucide-react';
-import { storage } from '@/services/storage';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
 
 const Contacts: React.FC = () => {
+    const { storage, mode: workspaceMode, organization } = useWorkspace();
+    const isTeamMode = workspaceMode === 'team';
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +38,7 @@ const Contacts: React.FC = () => {
     });
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { canExportCSV, canExportExcel, canExportBulkVCard, canExportVCard } = useAuth();
+    const { canExportCSV, canExportExcel, canExportBulkVCard, canExportVCard, user } = useAuth();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const [persistedFolders, setPersistedFolders] = useState<string[]>([]);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -52,6 +54,10 @@ const Contacts: React.FC = () => {
     const [batches, setBatches] = useState<Batch[]>([]);
     const [selectedBatch, setSelectedBatch] = useState<string>('all'); // 'all' or batch ID
     const [showBatchDropdown, setShowBatchDropdown] = useState(false);
+    // Team filters
+    const [selectedScanner, setSelectedScanner] = useState<string>('all'); // 'all' or uid
+    const [claimFilter, setClaimFilter] = useState<'all' | 'mine' | 'unclaimed' | 'theirs'>('all');
+    const [claimActionId, setClaimActionId] = useState<string | null>(null); // contact id currently being claimed/released
     const [moveTargetFolder, setMoveTargetFolder] = useState('Uncategorized');
     const [moveNewFolder, setMoveNewFolder] = useState('');
     const [editPersonPhoto, setEditPersonPhoto] = useState<string | null>(null);
@@ -85,7 +91,7 @@ const Contacts: React.FC = () => {
         loadFolders();
         loadDeletedContacts();
         loadBatches();
-    }, []);
+    }, [workspaceMode]);
 
     // Handle batch query parameter from URL
     useEffect(() => {
@@ -340,6 +346,35 @@ const Contacts: React.FC = () => {
     const folders = Array.from(new Set([...contactFolders, ...persistedFolders])).sort();
 
     // Filter contacts by search, folder, and batch
+    const currentUid = user?.uid;
+
+    // Claim / release — team-only, calls TeamStorageService methods
+    const handleClaim = async (contact: Contact) => {
+        if (!isTeamMode || !('claimContact' in storage)) return;
+        setClaimActionId(contact.id);
+        try {
+            await storage.claimContact(contact.id);
+            await loadContacts();
+        } catch (err: any) {
+            alert(err.message || 'Failed to claim contact');
+        } finally {
+            setClaimActionId(null);
+        }
+    };
+
+    const handleReleaseClaim = async (contact: Contact) => {
+        if (!isTeamMode || !('releaseClaim' in storage)) return;
+        setClaimActionId(contact.id);
+        try {
+            await storage.releaseClaim(contact.id);
+            await loadContacts();
+        } catch (err: any) {
+            alert(err.message || 'Failed to release claim');
+        } finally {
+            setClaimActionId(null);
+        }
+    };
+
     const filteredContacts = contacts.filter(c => {
         const q = searchQuery.toLowerCase();
         const matchesSearch = !q ||
@@ -352,8 +387,21 @@ const Contacts: React.FC = () => {
             c.email.some(e => e.toLowerCase().includes(q));
         const matchesFolder = selectedFolder === 'all' || (c.folder || 'Uncategorized') === selectedFolder;
         const matchesBatch = selectedBatch === 'all' || c.batchId === selectedBatch;
-        return matchesSearch && matchesFolder && matchesBatch;
+        const matchesScanner = !isTeamMode || selectedScanner === 'all' || c.createdBy === selectedScanner;
+        const matchesClaim = !isTeamMode || claimFilter === 'all'
+            || (claimFilter === 'mine' && c.claimedBy === currentUid)
+            || (claimFilter === 'unclaimed' && !c.claimedBy)
+            || (claimFilter === 'theirs' && !!c.claimedBy && c.claimedBy !== currentUid);
+        return matchesSearch && matchesFolder && matchesBatch && matchesScanner && matchesClaim;
     });
+
+    // Collect unique scanners from current contact list for the filter dropdown
+    const uniqueScanners = Array.from(
+        contacts.reduce((m, c) => {
+            if (c.createdBy && c.createdByName) m.set(c.createdBy, c.createdByName);
+            return m;
+        }, new Map<string, string>())
+    ).map(([uid, name]) => ({ uid, name }));
 
     const renderContactCard = (contact: Contact) => {
         const isSelected = selectedIds.has(contact.id);
@@ -421,6 +469,28 @@ const Contacts: React.FC = () => {
                         )}
                     </div>
 
+                    {/* Team attribution + claim pills (team mode only) */}
+                    {isTeamMode && (contact.createdByName || contact.claimedByName) && (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                            {contact.createdByName && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                                    <User size={10} />
+                                    Scanned by {contact.createdBy === currentUid ? 'you' : contact.createdByName}
+                                </span>
+                            )}
+                            {contact.claimedByName && (
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                                    contact.claimedBy === currentUid
+                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                }`}>
+                                    <CheckSquare size={10} />
+                                    Claimed by {contact.claimedBy === currentUid ? 'you' : contact.claimedByName}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
                     {/* Action Buttons */}
                     {!selectMode && (
                     <div className="grid grid-cols-3 gap-2">
@@ -473,6 +543,28 @@ const Contacts: React.FC = () => {
                             <Trash2 size={14} className="text-red-400" />
                             <span className="text-xs font-medium text-red-400">Delete</span>
                         </button>
+                        {/* Claim / Release — only in team mode, only if org has claims enabled */}
+                        {isTeamMode && organization?.claimsEnabled !== false && (
+                            contact.claimedBy === currentUid ? (
+                                <button
+                                    onClick={() => handleReleaseClaim(contact)}
+                                    disabled={claimActionId === contact.id}
+                                    className="flex items-center justify-center gap-1.5 px-2 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-colors active:scale-95 disabled:opacity-50"
+                                >
+                                    <XCircle size={14} className="text-amber-400" />
+                                    <span className="text-xs font-medium text-amber-400">Release</span>
+                                </button>
+                            ) : !contact.claimedBy ? (
+                                <button
+                                    onClick={() => handleClaim(contact)}
+                                    disabled={claimActionId === contact.id}
+                                    className="flex items-center justify-center gap-1.5 px-2 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg transition-colors active:scale-95 disabled:opacity-50"
+                                >
+                                    <CheckSquare size={14} className="text-emerald-400" />
+                                    <span className="text-xs font-medium text-emerald-400">Claim</span>
+                                </button>
+                            ) : null
+                        )}
                     </div>
                     )}
                 </div>
@@ -497,7 +589,14 @@ const Contacts: React.FC = () => {
                     <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                         <ArrowLeft size={24} />
                     </button>
-                    <h1 className="text-lg font-semibold gradient-text">My Contacts</h1>
+                    <div className="text-center">
+                        <h1 className="text-lg font-semibold gradient-text">
+                            {isTeamMode ? 'Team Contacts' : 'My Contacts'}
+                        </h1>
+                        {isTeamMode && organization && (
+                            <p className="text-[10px] text-sky-400/70 mt-0.5">{organization.name}</p>
+                        )}
+                    </div>
                     <div className="flex items-center gap-1">
                         {/* VCF Import */}
                         <input ref={vcfFileRef} type="file" accept=".vcf" className="hidden" onChange={handleVcfFile} />
@@ -699,6 +798,38 @@ const Contacts: React.FC = () => {
                                     );
                                 })}
                             </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Team filters: Scanner + Claim status (team mode only) */}
+                {isTeamMode && (
+                    <div className="flex gap-2 flex-wrap">
+                        {uniqueScanners.length > 0 && (
+                            <select
+                                value={selectedScanner}
+                                onChange={(e) => setSelectedScanner(e.target.value)}
+                                className="flex-1 min-w-[140px] bg-brand-900/50 border border-brand-800 rounded-xl py-2 px-3 text-sm hover:bg-brand-900/70 transition-all outline-none focus:border-sky-500"
+                            >
+                                <option value="all">All scanners</option>
+                                {uniqueScanners.map(s => (
+                                    <option key={s.uid} value={s.uid}>
+                                        {s.uid === currentUid ? `${s.name} (you)` : s.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                        {organization?.claimsEnabled !== false && (
+                            <select
+                                value={claimFilter}
+                                onChange={(e) => setClaimFilter(e.target.value as typeof claimFilter)}
+                                className="flex-1 min-w-[140px] bg-brand-900/50 border border-brand-800 rounded-xl py-2 px-3 text-sm hover:bg-brand-900/70 transition-all outline-none focus:border-sky-500"
+                            >
+                                <option value="all">All claims</option>
+                                <option value="mine">Claimed by me</option>
+                                <option value="unclaimed">Unclaimed</option>
+                                <option value="theirs">Claimed by others</option>
+                            </select>
                         )}
                     </div>
                 )}

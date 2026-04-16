@@ -149,6 +149,27 @@ export async function updateMemberRole(
     }
 }
 
+/** Update organization settings (admin only) */
+export async function updateOrgSettings(
+    orgId: string,
+    settings: { claimsEnabled?: boolean }
+): Promise<{ success: boolean; message: string }> {
+    try {
+        const res = await authFetch('/api/org', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update-settings', orgId, ...settings }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            return { success: false, message: data.error || 'Failed to update settings' };
+        }
+        return { success: true, message: 'Settings updated' };
+    } catch (err: any) {
+        return { success: false, message: err.message || 'Failed to update settings' };
+    }
+}
+
 /** Revoke a pending invite (admin only) */
 export async function revokeInvite(
     orgId: string,
