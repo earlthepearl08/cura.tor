@@ -78,8 +78,10 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         bulkScan: true,
     },
     enterprise: {
+        // Enterprise personal workspace: unlimited scans but capped contacts,
+        // since their team workspace is the primary place for shared storage.
         scansPerMonth: null,
-        contactStorage: null,
+        contactStorage: 30,
         csvExport: true,
         excelExport: true,
         bulkVCardExport: true,

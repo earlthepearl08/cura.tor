@@ -147,7 +147,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         await userRef.update({
             tier: 'enterprise',
-            contactLimit: null,
+            // Personal workspace cap: 30 contacts (team workspace is unlimited)
+            contactLimit: 30,
             'scanUsage.lifetimeLimit': null,
             organizationId: orgId,
             orgRole: 'admin',

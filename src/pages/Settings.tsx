@@ -134,7 +134,7 @@ const Settings = () => {
     };
 
     const hasStripeSubscription = !!user?.stripe?.subscriptionId;
-    const showPricing = user?.tier !== 'pro' && !hasStripeSubscription;
+    const showPricing = user?.tier !== 'pro' && user?.tier !== 'enterprise' && !hasStripeSubscription;
     // Pioneer (access code) users can only upgrade to Pro
     const showPioneerCard = user?.tier === 'free';
 
