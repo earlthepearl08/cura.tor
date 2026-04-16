@@ -65,8 +65,8 @@ export default function RequestTeamAccessCard() {
             </button>
 
             {isOpen && (
-                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 p-6" onClick={reset}>
-                    <div className="bg-brand-900 rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onClick={reset}>
+                    <div className="bg-brand-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold">Request Team Access</h2>
                             <button onClick={reset} className="p-1 hover:bg-white/10 rounded-lg">
