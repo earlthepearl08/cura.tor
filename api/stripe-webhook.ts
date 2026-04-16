@@ -34,7 +34,7 @@ async function getRawBody(req: VercelRequest): Promise<string> {
     for await (const chunk of req) {
         chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
     }
-    return Buffer.concat(chunks).toString('utf8');
+    return Buffer.concat(chunks as unknown as Uint8Array[]).toString('utf8');
 }
 
 /** Determine tier from a Stripe price ID using server-side env vars */
