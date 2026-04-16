@@ -5,6 +5,18 @@ import {
 import { User } from 'firebase/auth';
 import { db, OWNER_EMAILS } from '@/config/firebase';
 import { UserProfile, UserTier, TIER_LIMITS } from '@/types/user';
+import { authFetch } from '@/utils/authFetch';
+
+/** Tracks the last trial-expiry downgrade within the current session so the UI can show a one-time toast. */
+let lastTrialExpiry: { previousTier: string; uid: string } | null = null;
+/** Returns the pending trial-expiry toast for the given uid (and clears it). Returns null on uid mismatch
+ *  so that signing out and signing in as a different user on the same device doesn't show the wrong toast. */
+export function consumeLastTrialExpiry(currentUid: string | undefined): { previousTier: string } | null {
+    if (!lastTrialExpiry || !currentUid || lastTrialExpiry.uid !== currentUid) return null;
+    const val = { previousTier: lastTrialExpiry.previousTier };
+    lastTrialExpiry = null;
+    return val;
+}
 
 /** Convert Firestore doc data to UserProfile */
 const docToProfile = (data: any): UserProfile => ({
@@ -29,6 +41,8 @@ const docToProfile = (data: any): UserProfile => ({
     } : undefined,
     organizationId: data.organizationId || undefined,
     orgRole: data.orgRole || undefined,
+    expiresAt: data.expiresAt?.toMillis?.() ?? data.expiresAt ?? null,
+    trialSourceTier: data.trialSourceTier ?? null,
     createdAt: data.createdAt?.toMillis?.() || data.createdAt || Date.now(),
     updatedAt: data.updatedAt?.toMillis?.() || data.updatedAt || Date.now(),
 });
@@ -39,7 +53,26 @@ export async function getOrCreateUserDoc(firebaseUser: User): Promise<UserProfil
     const snap = await getDoc(userRef);
 
     if (snap.exists()) {
-        const profile = docToProfile(snap.data());
+        let profile = docToProfile(snap.data());
+
+        // Trial expiry: if past expiresAt, ask the server to downgrade (admin SDK bypasses
+        // the rule that forbids tier downgrades). On success, re-fetch the profile.
+        if (profile.expiresAt && Date.now() >= profile.expiresAt && profile.tier !== 'enterprise') {
+            try {
+                const res = await authFetch('/api/check-tier-expiry', { method: 'POST' });
+                if (res.ok) {
+                    const body = await res.json();
+                    if (body.downgraded) {
+                        lastTrialExpiry = { previousTier: body.previousTier, uid: firebaseUser.uid };
+                        const refreshed = await getDoc(userRef);
+                        if (refreshed.exists()) profile = docToProfile(refreshed.data());
+                    }
+                }
+            } catch (err) {
+                console.warn('Trial expiry check failed (non-fatal):', err);
+            }
+        }
+
         // Check if owner and upgrade if needed
         if (OWNER_EMAILS.includes(firebaseUser.email || '') && profile.tier !== 'pro') {
             await updateDoc(userRef, { tier: 'pro', contactLimit: null, updatedAt: serverTimestamp() });

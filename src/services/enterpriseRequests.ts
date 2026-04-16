@@ -78,3 +78,21 @@ export async function rejectEnterpriseRequest(requestId: string, reason: string)
         throw new Error(body.error || 'Rejection failed');
     }
 }
+
+export async function grantTrial(input: {
+    targetUid: string;
+    tier: 'early_access' | 'pro';
+    scanLimit: number | null;
+    contactLimit: number | null;
+    expiresAt: number;
+}): Promise<void> {
+    const res = await authFetch('/api/admin/grant-trial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Grant failed');
+    }
+}

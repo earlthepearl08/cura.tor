@@ -25,6 +25,12 @@ export interface UserProfile {
     };
     organizationId?: string;
     orgRole?: 'admin' | 'member';
+    // Trial/grant expiry. When set and elapsed, the user is auto-downgraded to
+    // 'free' on next sign-in (see api/check-tier-expiry). null = no expiry.
+    expiresAt?: number | null;
+    // Label for the tier the user had before expiry (for the post-expiry toast).
+    // Set alongside expiresAt when granting a trial; cleared on downgrade.
+    trialSourceTier?: 'early_access' | 'pro' | null;
     createdAt: number;
     updatedAt: number;
 }

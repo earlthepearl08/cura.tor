@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TIER_LIMITS } from '@/types/user';
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
+import TrialExpiryBanner from '@/components/TrialExpiryBanner';
 import { Contact } from '@/types/contact';
 import UpgradePrompt from '@/components/UpgradePrompt';
 
@@ -114,6 +115,11 @@ const Home = () => {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Trial expiry warning / post-expiry toast (self-gated) */}
+            <div className="w-full max-w-md">
+                <TrialExpiryBanner />
             </div>
 
             {/* Workspace Switcher — only visible for enterprise users */}
