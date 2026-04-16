@@ -1,13 +1,14 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import VerifyEmail from '@/components/VerifyEmail';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-    const { user, isLoading } = useAuth();
+    const { user, isLoading, needsEmailVerification } = useAuth();
 
     if (isLoading) {
         return (
@@ -22,6 +23,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
     if (!user) {
         return <Navigate to="/auth" replace />;
+    }
+
+    // Gate unverified email/password signups behind a verification screen.
+    // Google sign-ins are already verified (emailVerified=true at sign-in).
+    if (needsEmailVerification) {
+        return <VerifyEmail />;
     }
 
     return <>{children}</>;

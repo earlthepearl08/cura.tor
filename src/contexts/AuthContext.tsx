@@ -8,6 +8,7 @@ import {
     createUserWithEmailAndPassword,
     updateProfile,
     signOut as firebaseSignOut,
+    sendEmailVerification,
     GoogleAuthProvider,
     User
 } from 'firebase/auth';
@@ -51,6 +52,11 @@ interface AuthContextType {
     // Access code
     redeemAccessCode: (code: string) => Promise<{ success: boolean; message: string }>;
 
+    // Email verification
+    needsEmailVerification: boolean;
+    resendVerificationEmail: () => Promise<void>;
+    reloadFirebaseUser: () => Promise<void>;
+
     // Refresh
     refreshUserProfile: () => Promise<void>;
 }
@@ -69,6 +75,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [user, setUser] = useState<UserProfile | null>(null);
     const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    // Explicit React state for emailVerified. Firebase's User.reload() mutates
+    // the user object in place without changing its reference, so setFirebaseUser
+    // alone won't trigger a re-render after verification. We mirror it here.
+    const [emailVerified, setEmailVerified] = useState(true);
 
     const tierLimits = user ? TIER_LIMITS[user.tier] : DEFAULT_LIMITS;
     const scansRemaining = user ? getScansRemainingService(user) : 0;
@@ -93,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             setFirebaseUser(fbUser);
+            setEmailVerified(fbUser?.emailVerified ?? true);
             if (fbUser) {
                 try {
                     storage.switchUser(fbUser.uid);
@@ -153,6 +164,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const signUpWithEmail = useCallback(async (email: string, password: string, displayName: string) => {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(credential.user, { displayName });
+        // Fire-and-forget — if the email fails to send, the user can hit "Resend" from the gate screen.
+        try {
+            await sendEmailVerification(credential.user, {
+                url: window.location.origin,
+            });
+        } catch (err) {
+            console.warn('Failed to send initial verification email:', err);
+        }
+    }, []);
+
+    const resendVerificationEmail = useCallback(async () => {
+        if (!auth.currentUser) throw new Error('Not signed in');
+        await sendEmailVerification(auth.currentUser, {
+            url: window.location.origin,
+        });
+    }, []);
+
+    const reloadFirebaseUser = useCallback(async () => {
+        if (!auth.currentUser) return;
+        await auth.currentUser.reload();
+        // Read the updated emailVerified into explicit React state so the gate
+        // re-evaluates. (User.reload() mutates in place; same reference.)
+        setEmailVerified(auth.currentUser.emailVerified);
     }, []);
 
     const signOut = useCallback(async () => {
@@ -245,6 +279,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return result;
     }, [user]);
 
+    // Unverified email/password users must verify before using the app.
+    // Google sign-ins set emailVerified=true automatically, so this only blocks
+    // password-provider accounts that haven't clicked the link yet.
+    const needsEmailVerification = !!firebaseUser && !emailVerified;
+
     return (
         <AuthContext.Provider value={{
             user,
@@ -266,6 +305,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             canUseBulkScan,
             incrementScanCount,
             redeemAccessCode,
+            needsEmailVerification,
+            resendVerificationEmail,
+            reloadFirebaseUser,
             refreshUserProfile,
         }}>
             {children}
