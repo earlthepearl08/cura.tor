@@ -21,7 +21,7 @@ const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> 
 
 const PIONEER_FEATURES = [
     'Unlimited scans',
-    'Up to 150 contacts',
+    'Up to 50 contacts',
     'vCard, CSV & Excel export',
     'Google Drive sync',
 ];

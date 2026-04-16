@@ -113,7 +113,7 @@ const TermsOfService = () => (
         <P>The Service is offered in multiple tiers:</P>
         <ul>
             <Li><strong className="text-slate-300">Free:</strong> Limited to 5 scans per month, 25 contact storage, and basic features.</Li>
-            <Li><strong className="text-slate-300">Pioneer:</strong> Unlimited scans, 150 contact storage, and access to export and cloud sync features.</Li>
+            <Li><strong className="text-slate-300">Pioneer:</strong> Unlimited scans, 50 contact storage, and access to export and cloud sync features.</Li>
             <Li><strong className="text-slate-300">Pro:</strong> Unlimited scans and storage with access to all features.</Li>
         </ul>
         <P>

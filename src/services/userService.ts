@@ -327,7 +327,7 @@ export async function redeemAccessCode(
                 success: true,
                 message: codeData.scanLimit
                     ? `Access code redeemed! You now have ${codeData.scanLimit} scans.`
-                    : 'Access code redeemed! Pioneer features unlocked — unlimited scans and up to 150 contacts.',
+                    : 'Access code redeemed! Pioneer features unlocked — unlimited scans and up to 50 contacts.',
             };
         });
 

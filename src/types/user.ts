@@ -12,7 +12,7 @@ export interface UserProfile {
         lifetimeCount: number;   // total scans ever
         lifetimeLimit: number | null; // null = unlimited, number = early access cap
     };
-    contactLimit: number | null; // null = unlimited, 25 = free, 150 = early_access
+    contactLimit: number | null; // null = unlimited, 25 = free, 50 = early_access
     accessCode: {
         code: string;
         redeemedAt: number;
@@ -59,7 +59,7 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
     },
     early_access: {
         scansPerMonth: null,           // unlimited; lifetimeLimit only applies to explicit trial grants
-        contactStorage: 150,
+        contactStorage: 50,
         csvExport: true,
         excelExport: true,
         bulkVCardExport: true,
