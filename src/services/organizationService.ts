@@ -71,10 +71,10 @@ export async function createInvite(
     role: OrgRole
 ): Promise<{ success: boolean; code?: string; inviteUrl?: string; message: string }> {
     try {
-        const res = await authFetch('/api/org/invite', {
+        const res = await authFetch('/api/org', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orgId, email, role }),
+            body: JSON.stringify({ action: 'invite', orgId, email, role }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -91,10 +91,10 @@ export async function acceptInvite(
     code: string
 ): Promise<{ success: boolean; orgId?: string; orgName?: string; message: string }> {
     try {
-        const res = await authFetch('/api/org/accept-invite', {
+        const res = await authFetch('/api/org', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code }),
+            body: JSON.stringify({ action: 'accept-invite', code }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -112,10 +112,10 @@ export async function removeMember(
     uid: string
 ): Promise<{ success: boolean; message: string }> {
     try {
-        const res = await authFetch('/api/org/remove-member', {
+        const res = await authFetch('/api/org', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orgId, uid }),
+            body: JSON.stringify({ action: 'remove-member', orgId, uid }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -134,10 +134,10 @@ export async function updateMemberRole(
     role: OrgRole
 ): Promise<{ success: boolean; message: string }> {
     try {
-        const res = await authFetch('/api/org/update-role', {
+        const res = await authFetch('/api/org', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orgId, uid, role }),
+            body: JSON.stringify({ action: 'update-role', orgId, uid, role }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -155,10 +155,10 @@ export async function revokeInvite(
     code: string
 ): Promise<{ success: boolean; message: string }> {
     try {
-        const res = await authFetch('/api/org/revoke-invite', {
+        const res = await authFetch('/api/org', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orgId, code }),
+            body: JSON.stringify({ action: 'revoke-invite', orgId, code }),
         });
         const data = await res.json();
         if (!res.ok) {
