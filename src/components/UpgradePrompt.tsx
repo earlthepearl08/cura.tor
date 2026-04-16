@@ -52,7 +52,7 @@ function getFeatureMessage(feature: string, tier: string): { title: string; mess
     if (tier === 'early_access') {
         return {
             title: 'Storage Limit Reached',
-            message: 'You\'ve reached your Pioneer limit of 50 contacts. Upgrade to Pro for unlimited storage.',
+            message: 'You\'ve reached your Pioneer limit of 150 contacts. Upgrade to Pro for unlimited storage.',
             upgradeTier: 'pro',
         };
     }

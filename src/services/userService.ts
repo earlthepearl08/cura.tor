@@ -307,10 +307,11 @@ export async function redeemAccessCode(
                 return { success: false, message: 'You already have Pro access' };
             }
 
-            // Upgrade user
+            // Upgrade user. Pioneer is now unlimited scans (null = unlimited), capped only on contact storage.
+            // codeData.scanLimit is still honored if explicitly set on the access code doc (for legacy limited codes).
             transaction.update(userRef, {
                 tier: codeData.tier || 'early_access',
-                'scanUsage.lifetimeLimit': codeData.scanLimit || 30,
+                'scanUsage.lifetimeLimit': codeData.scanLimit ?? null,
                 contactLimit: TIER_LIMITS[(codeData.tier || 'early_access') as UserTier].contactStorage,
                 accessCode: { code: code.toUpperCase(), redeemedAt: Date.now() },
                 updatedAt: serverTimestamp(),
@@ -324,7 +325,9 @@ export async function redeemAccessCode(
 
             return {
                 success: true,
-                message: `Access code redeemed! You now have ${codeData.scanLimit || 30} scans.`,
+                message: codeData.scanLimit
+                    ? `Access code redeemed! You now have ${codeData.scanLimit} scans.`
+                    : 'Access code redeemed! Pioneer features unlocked — unlimited scans and up to 150 contacts.',
             };
         });
 
