@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, X, Loader2 } from 'lucide-react';
+import { AlertTriangle, X, Loader2, Check } from 'lucide-react';
 import {
     deleteUser,
     reauthenticateWithCredential,
@@ -8,7 +8,8 @@ import {
     EmailAuthProvider,
     GoogleAuthProvider,
 } from 'firebase/auth';
-import { auth } from '@/config/firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '@/config/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/utils/authFetch';
 import { storage as personalStorage } from '@/services/storage';
@@ -23,12 +24,42 @@ export default function DeleteAccountModal({ onClose }: Props) {
     const [step, setStep] = useState<1 | 2>(1);
     const [confirmText, setConfirmText] = useState('');
     const [password, setPassword] = useState('');
+    const [reason, setReason] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [requestSubmitted, setRequestSubmitted] = useState(false);
 
     const expected = user?.email || '';
     const canProceed = confirmText.trim().toLowerCase() === expected.toLowerCase();
     const needsPasswordReauth = auth.currentUser?.providerData[0]?.providerId === 'password';
+    const isTeamAdmin = user?.orgRole === 'admin' && !!user?.organizationId;
+
+    // Team admins can't self-delete — they submit a request for the platform owner to process.
+    const submitDeletionRequest = async () => {
+        setError('');
+        setSubmitting(true);
+        try {
+            const current = auth.currentUser;
+            if (!current) throw new Error('Not signed in');
+            await addDoc(collection(db, 'enterpriseRequests'), {
+                uid: current.uid,
+                email: current.email || '',
+                displayName: current.displayName || current.email?.split('@')[0] || 'User',
+                orgName: 'Account Deletion Request',
+                teamSize: 0,
+                contactEmail: current.email || '',
+                notes: reason.trim() || 'No reason provided.',
+                status: 'pending',
+                type: 'account-deletion',
+                createdAt: serverTimestamp(),
+            });
+            setRequestSubmitted(true);
+        } catch (err: any) {
+            setError(err?.message || 'Failed to submit request.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     const runDeletion = async () => {
         setError('');
@@ -104,7 +135,58 @@ export default function DeleteAccountModal({ onClose }: Props) {
                     </button>
                 </div>
 
-                {step === 1 ? (
+                {/* Team admin path: request deletion instead of self-delete */}
+                {isTeamAdmin ? (
+                    requestSubmitted ? (
+                        <div className="py-6 text-center space-y-3">
+                            <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                <Check className="w-6 h-6 text-emerald-400" />
+                            </div>
+                            <p className="font-semibold">Deletion request submitted</p>
+                            <p className="text-sm text-slate-400">
+                                We'll review your request and process it within a few business days. You'll be notified at {expected}.
+                            </p>
+                            <button onClick={onClose} className="mt-2 px-4 py-2 bg-sky-500 rounded-xl text-sm font-semibold">
+                                Close
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <p className="text-sm text-slate-300">
+                                As a team admin, your account can't be deleted instantly — your team depends on it.
+                            </p>
+                            <p className="text-sm text-slate-400">
+                                Submit a deletion request and we'll process it after verifying your team's data is safe. This usually takes a few business days.
+                            </p>
+                            <div>
+                                <label className="text-xs text-slate-400 block mb-1">Reason (optional)</label>
+                                <textarea
+                                    value={reason}
+                                    onChange={e => setReason(e.target.value)}
+                                    rows={3}
+                                    placeholder="Why are you leaving?"
+                                    className="w-full px-3 py-2 bg-brand-800 rounded-xl text-sm border border-brand-700 focus:border-red-500 outline-none resize-none"
+                                />
+                            </div>
+                            {error && (
+                                <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm">{error}</div>
+                            )}
+                            <div className="flex gap-2">
+                                <button onClick={onClose} disabled={submitting} className="flex-1 py-2.5 bg-brand-800 hover:bg-brand-700 rounded-xl text-sm font-semibold disabled:opacity-50">
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={submitDeletionRequest}
+                                    disabled={submitting}
+                                    className="flex-1 py-2.5 bg-red-500/80 hover:bg-red-500 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+                                    {submitting ? 'Submitting…' : 'Request deletion'}
+                                </button>
+                            </div>
+                        </div>
+                    )
+                ) : step === 1 ? (
                     <div className="space-y-4">
                         <p className="text-sm text-slate-300">
                             This will permanently:

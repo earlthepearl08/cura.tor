@@ -221,11 +221,15 @@ export default function Admin() {
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {filtered.map(r => (
-                            <div key={r.id} className="card-elevated rounded-2xl p-4 space-y-3">
+                        {filtered.map(r => {
+                            const isDeletionRequest = r.orgName === 'Account Deletion Request';
+                            return (
+                            <div key={r.id} className={`card-elevated rounded-2xl p-4 space-y-3 ${isDeletionRequest ? 'border border-red-500/30' : ''}`}>
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-sm">{r.orgName}</p>
+                                        <p className={`font-semibold text-sm ${isDeletionRequest ? 'text-red-400' : ''}`}>
+                                            {isDeletionRequest ? 'Account Deletion Request' : r.orgName}
+                                        </p>
                                         <p className="text-xs text-slate-500">
                                             {r.displayName} · {r.email}
                                         </p>
@@ -233,6 +237,7 @@ export default function Admin() {
                                     <StatusBadge status={r.status} />
                                 </div>
 
+                                {!isDeletionRequest && (
                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                     <div>
                                         <p className="text-slate-500">Team size</p>
@@ -243,19 +248,26 @@ export default function Admin() {
                                         <p className="text-slate-300 truncate">{r.contactEmail}</p>
                                     </div>
                                 </div>
+                                )}
 
                                 {r.notes && (
                                     <div className="text-xs">
-                                        <p className="text-slate-500 mb-1">Notes</p>
+                                        <p className="text-slate-500 mb-1">{isDeletionRequest ? 'Reason' : 'Notes'}</p>
                                         <p className="text-slate-300 whitespace-pre-wrap">{r.notes}</p>
                                     </div>
+                                )}
+
+                                {isDeletionRequest && (
+                                    <p className="text-xs text-slate-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                                        After processing: delete user from Firebase Console → Authentication → Users, then delete their doc from Firestore → users. Come back here and mark as handled.
+                                    </p>
                                 )}
 
                                 <p className="text-[10px] text-slate-600">
                                     Submitted {new Date(r.createdAt).toLocaleString()}
                                 </p>
 
-                                {r.status === 'pending' && (
+                                {r.status === 'pending' && !isDeletionRequest && (
                                     <div className="flex gap-2 pt-1">
                                         <button
                                             onClick={() => setApproveModal(r)}
@@ -276,6 +288,27 @@ export default function Admin() {
                                     </div>
                                 )}
 
+                                {r.status === 'pending' && isDeletionRequest && (
+                                    <div className="flex gap-2 pt-1">
+                                        <button
+                                            onClick={() => { setRejectModal(r); setRejectReason('Handled — account deleted manually via Firebase Console'); }}
+                                            disabled={actioning === r.id}
+                                            className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                                        >
+                                            <Check size={14} />
+                                            Mark as handled
+                                        </button>
+                                        <button
+                                            onClick={() => setRejectModal(r)}
+                                            disabled={actioning === r.id}
+                                            className="flex-1 py-2 bg-brand-800 hover:bg-brand-700 disabled:opacity-50 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                                        >
+                                            <X size={14} />
+                                            Dismiss
+                                        </button>
+                                    </div>
+                                )}
+
                                 {r.status === 'approved' && r.orgId && (
                                     <p className="text-[10px] text-emerald-400/70">Org ID: {r.orgId}</p>
                                 )}
@@ -283,7 +316,7 @@ export default function Admin() {
                                     <p className="text-[10px] text-red-400/70">Reason: {r.rejectionReason}</p>
                                 )}
                             </div>
-                        ))}
+                        );})}
                     </div>
                 )}
             </div>

@@ -120,7 +120,7 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly([
                       'uid', 'email', 'displayName', 'orgName',
                       'teamSize', 'contactEmail', 'notes',
-                      'status', 'createdAt'
+                      'status', 'createdAt', 'type'
                     ])
                     && request.resource.data.orgName is string
                     && request.resource.data.orgName.size() > 0
