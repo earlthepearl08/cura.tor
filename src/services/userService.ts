@@ -162,8 +162,8 @@ export async function resetMonthlyScansIfNeeded(profile: UserProfile): Promise<U
 
 /** Increment scan count. Returns updated profile or null if limit reached. */
 export async function incrementScanCount(profile: UserProfile, count: number = 1): Promise<UserProfile | null> {
-    // Pro — always allowed
-    if (profile.tier === 'pro') {
+    // Pro / Enterprise — always allowed
+    if (profile.tier === 'pro' || profile.tier === 'enterprise') {
         const userRef = doc(db, 'users', profile.uid);
         await updateDoc(userRef, {
             'scanUsage.count': increment(count),
@@ -227,7 +227,7 @@ export async function incrementScanCount(profile: UserProfile, count: number = 1
 
 /** Check if user can perform a scan */
 export function canPerformScan(profile: UserProfile, count: number = 1): boolean {
-    if (profile.tier === 'pro') return true;
+    if (profile.tier === 'pro' || profile.tier === 'enterprise') return true;
     if (profile.tier === 'free') {
         const limit = TIER_LIMITS.free.scansPerMonth!;
         return profile.scanUsage.count + count <= limit;
@@ -255,7 +255,7 @@ export function getNextScanReset(profile: UserProfile): Date | null {
 
 /** Get scans remaining for display */
 export function getScansRemaining(profile: UserProfile): number | null {
-    if (profile.tier === 'pro') return null; // unlimited
+    if (profile.tier === 'pro' || profile.tier === 'enterprise') return null; // unlimited
     if (profile.tier === 'free') {
         return Math.max(0, TIER_LIMITS.free.scansPerMonth! - profile.scanUsage.count);
     }

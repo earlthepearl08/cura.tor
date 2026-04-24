@@ -102,7 +102,7 @@ const Home = () => {
                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${badge.bg} ${badge.color}`}>
                                 {badge.label}
                             </span>
-                            {user?.tier !== 'pro' && (
+                            {user?.tier !== 'pro' && user?.tier !== 'enterprise' && (
                                 <span className="text-[10px] text-slate-500 flex items-center gap-1">
                                     <Zap size={10} className="text-sky-400" />
                                     {user?.tier === 'early_access'

@@ -261,7 +261,7 @@ const Settings = () => {
                                     Scans
                                 </span>
                                 <span className="text-xs text-slate-500">
-                                    {user?.tier === 'pro'
+                                    {user?.tier === 'pro' || user?.tier === 'enterprise'
                                         ? 'Unlimited'
                                         : user?.tier === 'early_access'
                                             ? (user.scanUsage.lifetimeLimit !== null
