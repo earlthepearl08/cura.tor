@@ -16,7 +16,8 @@ export const exportService = {
             Folder: c.folder || 'Uncategorized',
             Batch: (c.batchId && batchMap?.[c.batchId]) || '',
             ScannedAt: new Date(c.createdAt).toLocaleString(),
-            UpdatedAt: c.updatedAt ? new Date(c.updatedAt).toLocaleString() : ''
+            UpdatedAt: c.updatedAt ? new Date(c.updatedAt).toLocaleString() : '',
+            ...(c.customFields || {}),
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(data);
@@ -26,7 +27,14 @@ export const exportService = {
     },
 
     toCSV(contacts: Contact[], batchMap?: BatchMap) {
-        const headers = ['Name', 'Position', 'Company', 'Phone', 'Email', 'Address', 'Notes', 'Folder', 'Batch', 'ScannedAt', 'UpdatedAt'];
+        const customKeys = Array.from(
+            new Set(contacts.flatMap(c => Object.keys(c.customFields || {}))),
+        ).sort();
+        const headers = [
+            'Name', 'Position', 'Company', 'Phone', 'Email', 'Address', 'Notes',
+            ...customKeys,
+            'Folder', 'Batch', 'ScannedAt', 'UpdatedAt',
+        ];
         const rows = contacts.map(c => [
             c.name,
             c.position,
@@ -35,10 +43,11 @@ export const exportService = {
             c.email.join('; '),
             c.address,
             c.notes || '',
+            ...customKeys.map(k => c.customFields?.[k] || ''),
             c.folder || 'Uncategorized',
             (c.batchId && batchMap?.[c.batchId]) || '',
             new Date(c.createdAt).toLocaleString(),
-            c.updatedAt ? new Date(c.updatedAt).toLocaleString() : ''
+            c.updatedAt ? new Date(c.updatedAt).toLocaleString() : '',
         ]);
 
         const csvContent = [
@@ -77,6 +86,12 @@ export const exportService = {
         }
         if (contact.notes) {
             vcard += `NOTE:${contact.notes.replace(/\n/g, '\\n')}\r\n`;
+        }
+        if (contact.customFields && Object.keys(contact.customFields).length > 0) {
+            const extras = Object.entries(contact.customFields)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join(' | ');
+            vcard += `X-ABNOTE:${extras.replace(/\n/g, '\\n')}\r\n`;
         }
 
         vcard += 'END:VCARD\r\n';

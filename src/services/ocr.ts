@@ -1299,20 +1299,24 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
         return isProperCase || hasNamePattern;
     }
 
-    async parseLogSheet(base64Image: string): Promise<LogSheetEntry[]> {
+    async parseLogSheet(base64Image: string, options?: { templateHint?: string }): Promise<LogSheetEntry[]> {
         console.log('[LogSheet] Parsing log sheet with Gemini...');
+
+        const templateHint = options?.templateHint?.trim() || '';
 
         const prompt = `You are an expert data extractor specializing in event log sheets and sign-in sheets. This image is a log sheet / sign-in sheet from an event, conference, or trade show. Each ROW in the sheet represents a DIFFERENT person who signed in.
 
 ## Task
 1. Identify the table/grid structure in the image.
-2. Identify column headers (they may be: Name, Company, Position/Title, Phone, Email, Address, Purpose/Notes, etc.).
-3. For EACH row (each person), extract the data into the corresponding fields.
-4. If a column doesn't exist in the sheet, leave that field as an empty string or empty array.
-5. Skip any empty rows or header rows.
-6. Handle handwritten text as best you can — if unclear, make your best guess.
-7. Each row MUST be a separate entry in the output array.
-8. Do NOT merge data from different rows into one entry.
+2. Identify column headers (they may be: Name, Company, Position/Title, Phone, Email, Address, Purpose/Notes, Booth #, Interest, Budget, etc.).
+3. For EACH row (each person), extract the data into the corresponding standard fields (name, company, position, phone, email, address, notes).
+4. ALSO return rawColumns: an array of {header, value} for EVERY non-empty cell in that row, using the exact header text from the sheet (including non-standard columns like Booth #, Interest, Budget).
+5. If a standard field column doesn't exist in the sheet, leave that field as an empty string or empty array.
+6. Skip any empty rows or header rows.
+7. Handle handwritten text as best you can — if unclear, make your best guess.
+8. Each row MUST be a separate entry in the output array.
+9. Do NOT merge data from different rows into one entry.
+${templateHint}
 
 ${GEMINI_CORE_RULES}
 
@@ -1322,8 +1326,8 @@ ${GEMINI_CORE_RULES}
 
 Output:
 [
-  {"name": "Maria Santos", "company": "Acme Corp", "position": "Sales Manager", "phone": ["+63 917 555 1234"], "email": ["maria.santos@acme.com"], "address": "Makati City", "notes": "Booth interest"},
-  {"name": "Dr. John Lee, MD", "company": "Health First Inc.", "position": "Medical Director", "phone": ["+63 2 8888 9999", "0917-222-3333"], "email": ["jlee@healthfirst.ph"], "address": "Quezon City", "notes": ""}
+  {"name": "Maria Santos", "company": "Acme Corp", "position": "Sales Manager", "phone": ["+63 917 555 1234"], "email": ["maria.santos@acme.com"], "address": "Makati City", "notes": "Booth interest", "rawColumns": [{"header": "Name", "value": "Maria Santos"}, {"header": "Company", "value": "Acme Corp"}, {"header": "Title", "value": "Sales Manager"}, {"header": "Phone", "value": "+63 917 555 1234"}, {"header": "Email", "value": "maria.santos@acme.com"}, {"header": "City", "value": "Makati City"}, {"header": "Interest", "value": "Booth interest"}]},
+  {"name": "Dr. John Lee, MD", "company": "Health First Inc.", "position": "Medical Director", "phone": ["+63 2 8888 9999", "0917-222-3333"], "email": ["jlee@healthfirst.ph"], "address": "Quezon City", "notes": "", "rawColumns": [{"header": "Name", "value": "Dr. John Lee, MD"}, {"header": "Company", "value": "Health First Inc."}, {"header": "Title", "value": "Medical Director"}, {"header": "Phone", "value": "+63 2 8888 9999 / 0917-222-3333"}, {"header": "Email", "value": "jlee@healthfirst.ph"}, {"header": "City", "value": "Quezon City"}]}
 ]
 
 ### Example 2: Stacked logo company name in a row
@@ -1361,9 +1365,20 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                             phone: { type: 'ARRAY', items: { type: 'STRING' } },
                             email: { type: 'ARRAY', items: { type: 'STRING' } },
                             address: { type: 'STRING' },
-                            notes: { type: 'STRING' }
+                            notes: { type: 'STRING' },
+                            rawColumns: {
+                                type: 'ARRAY',
+                                items: {
+                                    type: 'OBJECT',
+                                    properties: {
+                                        header: { type: 'STRING' },
+                                        value: { type: 'STRING' },
+                                    },
+                                    required: ['header', 'value'],
+                                },
+                            },
                         },
-                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
+                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes', 'rawColumns']
                     }
                 }
             }
@@ -1393,6 +1408,20 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                 return hasName || hasCompany || hasPhone || hasEmail;
             })
             .map((e: any) => {
+                const rawColumns: Record<string, string> = {};
+                if (Array.isArray(e.rawColumns)) {
+                    for (const col of e.rawColumns) {
+                        const header = typeof col?.header === 'string' ? col.header.trim() : '';
+                        const value = typeof col?.value === 'string' ? col.value.trim() : '';
+                        if (header && value) rawColumns[header] = value;
+                    }
+                } else if (e.rawColumns && typeof e.rawColumns === 'object') {
+                    for (const [header, value] of Object.entries(e.rawColumns)) {
+                        if (header.trim() && value != null && String(value).trim()) {
+                            rawColumns[header.trim()] = String(value).trim();
+                        }
+                    }
+                }
                 const entry = {
                     name: smartCapitalize(e.name || ''),
                     company: e.company || '',
@@ -1401,6 +1430,7 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                     email: Array.isArray(e.email) ? e.email.filter((p: string) => p?.trim()) : (e.email ? [e.email] : []),
                     address: e.address || '',
                     notes: e.notes || '',
+                    ...(Object.keys(rawColumns).length > 0 ? { rawColumns } : {}),
                 };
                 return { ...entry, confidence: computeHeuristicConfidence(entry) };
             });
@@ -1523,6 +1553,10 @@ export interface LogSheetEntry {
     address: string;
     notes: string;
     confidence: number;
+    /** Original sheet header → cell value (for event column mapping). Optional — happy path ignores it. */
+    rawColumns?: Record<string, string>;
+    /** Custom fields already resolved from a template mapping */
+    customFields?: Record<string, string>;
 }
 
 export const ocrService = new OCRService();
