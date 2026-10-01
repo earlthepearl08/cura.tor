@@ -9,6 +9,8 @@ npm install
 npm test
 ```
 
+**GitHub Actions:** `.github/workflows/vitest.yml` runs `npm ci` → `npm test` on every PR (complements the Playwright e2e workflow).
+
 Watch mode:
 
 ```bash
