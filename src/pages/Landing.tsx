@@ -6,8 +6,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import PageMeta, { LANDING_META } from '@/components/PageMeta';
+import { ACCURACY_GALLERY_SAMPLES } from '@/data/accuracyGallery';
 import { STRIPE_PRICES } from '@/services/stripe';
 import { TIER_LIMITS } from '@/types/user';
+
+/** Featured static demo — log sheet differentiator; no live OCR */
+const SAMPLE_DEMO = ACCURACY_GALLERY_SAMPLES.find((s) => s.id === 'sheet-001-ph-signin')
+    ?? ACCURACY_GALLERY_SAMPLES[0];
+const SAMPLE_DEMO_HREF = `/accuracy#${SAMPLE_DEMO.id}`;
 
 type BillingInterval = 'monthly' | 'yearly';
 
@@ -208,16 +214,24 @@ const Landing: React.FC = () => {
                                         Start free
                                         <ArrowRight size={16} />
                                     </Link>
-                                    <a
-                                        href="#pricing"
+                                    <Link
+                                        to={SAMPLE_DEMO_HREF}
                                         className="inline-flex items-center gap-1.5 px-5 py-3 rounded-xl glass text-sm font-medium text-slate-300 hover:text-white transition-colors"
                                     >
-                                        See pricing
+                                        See sample results
                                         <ChevronRight size={14} />
-                                    </a>
+                                    </Link>
                                 </>
                             )}
                         </div>
+                        {!isSignedIn && (
+                            <p className="mt-3 text-xs text-slate-600">
+                                No account needed for samples ·{' '}
+                                <a href="#pricing" className="text-slate-500 hover:text-slate-300 transition-colors underline-offset-2 hover:underline">
+                                    See pricing
+                                </a>
+                            </p>
+                        )}
                     </div>
 
                     {/* Dominant visual: stylized scan frame */}
@@ -433,6 +447,98 @@ const Landing: React.FC = () => {
                         CamCard and ABBYY remain strong choices for classic card CRM capture and heavyweight document OCR.
                         If your bottleneck is guest lists and multi-card booth hauls, that is where Cura.tor is built to win.
                     </p>
+                </div>
+            </section>
+
+            {/* No-auth sample demo — static before/after + gallery deep-link */}
+            <section id="sample-demo" className="border-b border-brand-800/40">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+                    <div className="max-w-2xl mb-10">
+                        <div className="inline-flex items-center gap-2 text-sky-400 mb-4">
+                            <FileSpreadsheet size={18} />
+                            <span className="text-xs font-bold uppercase tracking-wider">Sample results · no signup</span>
+                        </div>
+                        <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                            See a log sheet become contacts
+                        </h2>
+                        <p className="mt-3 text-slate-400 text-sm sm:text-base leading-relaxed">
+                            Static before/after from our public accuracy gallery — not a live OCR run.
+                            Browse more cards and sheets without creating an account.
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-brand-700/60 bg-brand-900/40 overflow-hidden">
+                        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-brand-800/80">
+                            <div>
+                                <p className="text-sm font-semibold text-white">{SAMPLE_DEMO.title}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">{SAMPLE_DEMO.subtitle}</p>
+                            </div>
+                            <Link
+                                to={SAMPLE_DEMO_HREF}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-400 hover:text-sky-300 transition-colors"
+                            >
+                                Open full sample
+                                <ArrowRight size={14} />
+                            </Link>
+                        </div>
+                        <div className="grid lg:grid-cols-2">
+                            <div className="p-4 sm:p-5 border-b lg:border-b-0 lg:border-r border-brand-800/80 space-y-3">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Before · capture</p>
+                                <div className="rounded-xl overflow-hidden border border-brand-700 bg-black/40">
+                                    <img
+                                        src={SAMPLE_DEMO.imageSrc}
+                                        alt={`${SAMPLE_DEMO.title} sample capture`}
+                                        className="w-full h-auto object-cover"
+                                        loading="lazy"
+                                    />
+                                </div>
+                            </div>
+                            <div className="p-4 sm:p-5 space-y-3 bg-brand-950/40">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">After · structured fields</p>
+                                <div className="space-y-2">
+                                    {(Array.isArray(SAMPLE_DEMO.extracted)
+                                        ? SAMPLE_DEMO.extracted.slice(0, 2)
+                                        : [SAMPLE_DEMO.extracted]
+                                    ).map((row, i) => (
+                                        <div
+                                            key={`${SAMPLE_DEMO.id}-preview-${i}`}
+                                            className="rounded-xl border border-brand-700/80 bg-brand-900/50 p-3 space-y-1"
+                                        >
+                                            {Array.isArray(SAMPLE_DEMO.extracted) && (
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-brand-400 mb-1">
+                                                    Row {i + 1}
+                                                </p>
+                                            )}
+                                            <p className="text-sm text-slate-200 font-medium">{row.name || '—'}</p>
+                                            <p className="text-xs text-slate-500">{row.company}</p>
+                                            <p className="text-xs text-slate-400 truncate">
+                                                {[row.phone[0], row.email[0]].filter(Boolean).join(' · ')}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <ul className="space-y-1.5 pt-1">
+                                    {SAMPLE_DEMO.highlights.slice(0, 2).map((h) => (
+                                        <li key={h} className="flex gap-2 text-xs text-slate-400">
+                                            <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                                            <span>{h}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 flex flex-wrap items-center gap-3">
+                        <Link
+                            to="/accuracy"
+                            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-brand-950 font-bold text-sm transition-colors"
+                        >
+                            Browse all sample results
+                            <ArrowRight size={16} />
+                        </Link>
+                        <p className="text-xs text-slate-600">Public gallery · no account required</p>
+                    </div>
                 </div>
             </section>
 

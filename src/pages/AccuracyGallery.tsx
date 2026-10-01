@@ -124,8 +124,8 @@ function SampleBlock({ sample }: { sample: GallerySample }) {
 }
 
 const AccuracyGallery: React.FC = () => {
+    const { hash, pathname } = useLocation();
     const [filter, setFilter] = useState<Filter>('all');
-    const location = useLocation();
 
     const samples = useMemo(() => {
         if (filter === 'all') return ACCURACY_GALLERY_SAMPLES;
@@ -135,14 +135,19 @@ const AccuracyGallery: React.FC = () => {
     const cardCount = ACCURACY_GALLERY_SAMPLES.filter(s => s.type === 'card').length;
     const sheetCount = ACCURACY_GALLERY_SAMPLES.filter(s => s.type === 'log-sheet').length;
 
+    // Deep-link from Landing CTAs (e.g. /accuracy#sheet-001-ph-signin or #report)
     useEffect(() => {
-        const id = location.hash.replace(/^#/, '');
+        const id = hash.replace(/^#/, '');
         if (!id) return;
-        const el = document.getElementById(id);
-        if (el) {
-            requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        const target = ACCURACY_GALLERY_SAMPLES.find((s) => s.id === id);
+        if (target && filter !== 'all' && filter !== target.type) {
+            setFilter('all');
+            return;
         }
-    }, [location.hash, location.pathname]);
+        requestAnimationFrame(() => {
+            document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }, [hash, pathname, filter]);
 
     return (
         <div className="min-h-screen bg-brand-950 text-slate-200">
@@ -188,7 +193,8 @@ const AccuracyGallery: React.FC = () => {
                     </h1>
                     <p className="text-sm sm:text-base text-brand-300 max-w-xl leading-relaxed">
                         Published primary-field scores from the synthetic golden set (clearly labeled demo — not
-                        live Gemini F1), plus illustrative before/after extractions. Swap in real photos when ready.
+                        live Gemini F1), plus illustrative before/after extractions you can browse without signup.
+                        Swap in real photos when ready.
                     </p>
                     <div className="flex flex-wrap gap-3 text-xs text-slate-500">
                         <a
