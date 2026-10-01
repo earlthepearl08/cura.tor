@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus, Lock } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus, Lock, HelpCircle } from 'lucide-react';
 import { ocrService, LogSheetEntry } from '@/services/ocr';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { exportService } from '@/services/export';
@@ -473,7 +473,13 @@ const LogScan: React.FC = () => {
                         <ArrowLeft size={24} />
                     </button>
                     <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
-                    <div className="w-10" />
+                    <button
+                        onClick={() => navigate('/help?clip=log-sheet')}
+                        className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-500 hover:text-brand-300"
+                        aria-label="Help"
+                    >
+                        <HelpCircle size={20} />
+                    </button>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                     <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mb-4">
@@ -500,7 +506,14 @@ const LogScan: React.FC = () => {
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
-                <div className="w-10" />
+                <button
+                    onClick={() => navigate('/help?clip=log-sheet')}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-500 hover:text-brand-300"
+                    title="Help: log sheet scan"
+                    aria-label="Help"
+                >
+                    <HelpCircle size={20} />
+                </button>
             </div>
 
             <div className="flex-1 p-4">
@@ -512,6 +525,13 @@ const LogScan: React.FC = () => {
                             <p className="text-sm text-brand-400 max-w-xs mx-auto">
                                 Take a photo of an event sign-in sheet. Each row will be parsed into a separate contact.
                             </p>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/help?clip=log-sheet')}
+                                className="text-xs text-brand-500 hover:text-brand-300 underline-offset-2 hover:underline"
+                            >
+                                Watch log sheet tip
+                            </button>
                         </div>
 
                         <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelect} />

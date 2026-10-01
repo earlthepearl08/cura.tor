@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff, Layers } from 'lucide-react';
+import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff, Layers, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useOCR } from '@/hooks/useOCR';
 import ContactReview from '@/components/ContactReview';
@@ -114,13 +114,23 @@ const Scanner: React.FC = () => {
                 <h1 className="text-lg font-semibold gradient-text">
                     {batchMode ? `Batch Scan${batchCount > 0 ? ` (${batchCount})` : ''}` : 'Scan Card'}
                 </h1>
-                <button
-                    onClick={() => { setBatchMode(!batchMode); setBatchCount(0); }}
-                    className={`p-2 rounded-full transition-colors ${batchMode ? 'bg-sky-500/20 text-sky-400' : 'hover:bg-white/10 text-slate-500'}`}
-                    title={batchMode ? 'Exit batch mode' : 'Batch scan mode'}
-                >
-                    <Layers size={20} />
-                </button>
+                <div className="flex items-center gap-0.5">
+                    <button
+                        onClick={() => navigate('/help?clip=single-card')}
+                        className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-500 hover:text-brand-300"
+                        title="Help: single card scan"
+                        aria-label="Help"
+                    >
+                        <HelpCircle size={20} />
+                    </button>
+                    <button
+                        onClick={() => { setBatchMode(!batchMode); setBatchCount(0); }}
+                        className={`p-2 rounded-full transition-colors ${batchMode ? 'bg-sky-500/20 text-sky-400' : 'hover:bg-white/10 text-slate-500'}`}
+                        title={batchMode ? 'Exit batch mode' : 'Batch scan mode'}
+                    >
+                        <Layers size={20} />
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">

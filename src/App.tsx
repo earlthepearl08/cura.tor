@@ -6,6 +6,7 @@ import Upload from '@/pages/Upload';
 import Contacts from '@/pages/Contacts';
 import ManualInput from '@/pages/ManualInput';
 import Settings from '@/pages/Settings';
+import Help from '@/pages/Help';
 import QRScan from '@/pages/QRScan';
 import LogScan from '@/pages/LogScan';
 import MultiCardScan from '@/pages/MultiCardScan';
@@ -38,6 +39,7 @@ function App() {
                             <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
                             <Route path="/manual" element={<ProtectedRoute><ManualInput /></ProtectedRoute>} />
                             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                            <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
                             <Route path="/qr-scan" element={<ProtectedRoute><QRScan /></ProtectedRoute>} />
                             <Route path="/log-scan" element={<ProtectedRoute><LogScan /></ProtectedRoute>} />
                             <Route path="/multi-card" element={<ProtectedRoute><MultiCardScan /></ProtectedRoute>} />
