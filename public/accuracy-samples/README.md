@@ -23,13 +23,5 @@ Files ending in `.svg` are **placeholders** (labeled in-image). Structured “af
 ## Landing / help links
 
 - Public route: **`/accuracy`**
-- Already linked from Auth + Legal footers on this branch.
-- When the marketing Landing PR merges, add a footer (or nav) link:
-
-```tsx
-<Link to="/accuracy" className="hover:text-slate-300 transition-colors">
-  Accuracy samples
-</Link>
-```
-
-No landing redesign required — one link is enough.
+- Linked from Auth + Legal footers, Settings → Legal & trust, and the public Landing header/footer (`Landing.tsx`).
+- With the marketing landing routes, signed-in Home lives at **`/app`** (not `/`). Auth redirect and Settings back-nav already use `/app`; gallery brand mark points at `/` (landing).
