@@ -109,6 +109,64 @@ service cloud.firestore {
       }
     }
 
+    // --- Event workspaces (lightweight trade-show packs) ---
+    // Short-lived shared spaces (2–10 seats). Metadata create/join/end via Admin SDK
+    // (api/events.ts). Members read/write contacts with claim rules similar to orgs.
+    match /eventWorkspaces/{eventId} {
+      function isEventMember() {
+        return request.auth != null
+               && exists(/databases/$(database)/documents/eventWorkspaces/$(eventId)/members/$(request.auth.uid));
+      }
+
+      function isEventHost() {
+        return isEventMember()
+               && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)/members/$(request.auth.uid)).data.role == 'host';
+      }
+
+      allow read: if isEventMember();
+      allow write: if false;
+
+      match /members/{uid} {
+        allow read: if isEventMember();
+        allow write: if false;
+      }
+
+      match /contacts/{contactId} {
+        allow read: if isEventMember();
+        allow create: if isEventMember()
+                      && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.status == 'active'
+                      && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.expiresAt > request.time.toMillis();
+        allow delete: if isEventMember()
+                      && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.status == 'active'
+                      && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.expiresAt > request.time.toMillis();
+        allow update: if isEventMember()
+                      && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.status == 'active'
+                      && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.expiresAt > request.time.toMillis()
+                      && (
+                        request.resource.data.get('claimedBy', null) == resource.data.get('claimedBy', null)
+                        || (resource.data.get('claimedBy', null) == null
+                            && request.resource.data.claimedBy == request.auth.uid)
+                        || (resource.data.get('claimedBy', null) == request.auth.uid
+                            && request.resource.data.get('claimedBy', null) == null)
+                        || isEventHost()
+                      );
+      }
+
+      match /folders/{folderId} {
+        allow read: if isEventMember();
+        allow write: if isEventMember()
+                     && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.status == 'active'
+                     && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.expiresAt > request.time.toMillis();
+      }
+
+      match /batches/{batchId} {
+        allow read: if isEventMember();
+        allow write: if isEventMember()
+                     && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.status == 'active'
+                     && get(/databases/$(database)/documents/eventWorkspaces/$(eventId)).data.expiresAt > request.time.toMillis();
+      }
+    }
+
     // --- Enterprise Requests ---
     match /enterpriseRequests/{requestId} {
       // Any signed-in user can create a request for themselves.

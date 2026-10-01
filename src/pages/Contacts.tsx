@@ -13,8 +13,15 @@ import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
 
 const Contacts: React.FC = () => {
-    const { storage, mode: workspaceMode, organization } = useWorkspace();
-    const isTeamMode = workspaceMode === 'team';
+    const { storage, mode: workspaceMode, organization, event, isSharedMode } = useWorkspace();
+    /** Shared enterprise team OR lightweight event workspace */
+    const isTeamMode = isSharedMode;
+    const claimsEnabled = workspaceMode === 'event'
+        ? event?.claimsEnabled !== false
+        : organization?.claimsEnabled !== false;
+    const sharedLabel = workspaceMode === 'event'
+        ? (event?.name || 'Event')
+        : (organization?.name || 'Team');
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -544,7 +551,7 @@ const Contacts: React.FC = () => {
                             <span className="text-xs font-medium text-red-400">Delete</span>
                         </button>
                         {/* Claim / Release — only in team mode, only if org has claims enabled */}
-                        {isTeamMode && organization?.claimsEnabled !== false && (
+                        {isTeamMode && claimsEnabled && (
                             contact.claimedBy === currentUid ? (
                                 <button
                                     onClick={() => handleReleaseClaim(contact)}
@@ -591,10 +598,14 @@ const Contacts: React.FC = () => {
                     </button>
                     <div className="text-center">
                         <h1 className="text-lg font-semibold gradient-text">
-                            {isTeamMode ? 'Team Contacts' : 'My Contacts'}
+                            {isTeamMode
+                                ? (workspaceMode === 'event' ? 'Event Contacts' : 'Team Contacts')
+                                : 'My Contacts'}
                         </h1>
-                        {isTeamMode && organization && (
-                            <p className="text-[10px] text-sky-400/70 mt-0.5">{organization.name}</p>
+                        {isTeamMode && (
+                            <p className={`text-[10px] mt-0.5 ${workspaceMode === 'event' ? 'text-amber-400/70' : 'text-sky-400/70'}`}>
+                                {sharedLabel}
+                            </p>
                         )}
                     </div>
                     <div className="flex items-center gap-1">
@@ -819,7 +830,7 @@ const Contacts: React.FC = () => {
                                 ))}
                             </select>
                         )}
-                        {organization?.claimsEnabled !== false && (
+                        {claimsEnabled && (
                             <select
                                 value={claimFilter}
                                 onChange={(e) => setClaimFilter(e.target.value as typeof claimFilter)}

@@ -13,6 +13,7 @@ import BatchHistory from '@/pages/BatchHistory';
 import Legal from '@/pages/Legal';
 import Auth from '@/pages/Auth';
 import TeamAdmin from '@/pages/TeamAdmin';
+import Events from '@/pages/Events';
 import AcceptInvite from '@/pages/AcceptInvite';
 import Admin from '@/pages/Admin';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -43,6 +44,7 @@ function App() {
                             <Route path="/multi-card" element={<ProtectedRoute><MultiCardScan /></ProtectedRoute>} />
                             <Route path="/batch-history" element={<ProtectedRoute><BatchHistory /></ProtectedRoute>} />
                             <Route path="/team" element={<ProtectedRoute><TeamAdmin /></ProtectedRoute>} />
+                            <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
                             <Route path="/invite/:code" element={<ProtectedRoute><AcceptInvite /></ProtectedRoute>} />
                             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
                             <Route path="/legal" element={<Legal />} />
