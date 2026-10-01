@@ -15,10 +15,11 @@ Merge **one at a time**, then smoke the critical path before the next:
 | 1 | **#1** Operator runbook | Ops docs / TECHNICAL_SPEC correction |
 | 2 | **#4** Stripe lifecycle | Webhook → `users.tier` + secured checkout/portal |
 | 3 | **#5** Trust / Auth / Home | Offline honesty, Legal, password reset, support email text |
-| 4 | **#3** Public landing | Marketing + pricing matrix |
-| 5 | **#24** Accuracy nav | Landing → `/accuracy` link (after #3; best after #21 if gallery already in) |
-| 6 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
-| 7 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
+| 4 | **#24** Landing + accuracy gallery + nav | Public landing, `/accuracy`, nav/footer links — **includes #3 + #21** |
+| 5 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
+| 6 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
+
+**Accuracy stack:** Prefer merging **#24** only. It already contains landing (**#3**) and the gallery (**#21**). **Close #21** (and skip standalone **#3**) when #24 lands — do **not** merge #3+#21+#24 as three separate feature merges. Details: `docs/pr-merge-order.md`.
 
 **Stop after Phase A** until Stripe webhook + smoke test (below) pass. Then continue P1 (#7–#11 are already ready for review).
 
@@ -111,7 +112,7 @@ Trust PR (**#5**) publishes **`support@curator-app.com`** in Legal (TODO wording
 
 ## 7. Accuracy sample photo drop-in
 
-Gallery (**#21**) ships SVG placeholders. Before promoting accuracy publicly:
+After **#24** (gallery + landing stack) is on `main`, SVG placeholders ship under `public/accuracy-samples/`. Before promoting accuracy publicly:
 
 1. Drop real photos into `public/accuracy-samples/` next to placeholders, e.g.  
    `card-001-stacked-logo.jpg`, `card-002-multi-phone.jpg`,  
@@ -121,9 +122,9 @@ Gallery (**#21**) ships SVG placeholders. Before promoting accuracy publicly:
 4. Keep files small (~≤500KB); only publish images you have rights to use
 
 - [ ] `/accuracy` shows real photos, not “placeholder” art
-- [ ] Landing/nav link works after **#24** (and #3)
+- [ ] Landing nav/footer → Accuracy samples works (comes with **#24**)
 
-Details: `public/accuracy-samples/README.md` on the gallery branch.
+Details: `public/accuracy-samples/README.md` (on the #24 stack).
 
 ---
 
