@@ -1,6 +1,8 @@
 // @ts-ignore - Types available after npm install
 import { createWorker } from 'tesseract.js';
 import { auth } from '../config/firebase';
+import { mappingToPromptHint, normalizeParseMeta } from './logSheetMapping';
+import type { LogSheetParseMeta, LogSheetParseOptions } from '../types/logSheet';
 
 async function authHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1262,42 +1264,64 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
         return isProperCase || hasNamePattern;
     }
 
-    async parseLogSheet(base64Image: string): Promise<LogSheetEntry[]> {
+    /**
+     * Parse a log / sign-in sheet. Returns entries plus header metadata so the UI
+     * can confirm column mapping when headers are ambiguous. Optional
+     * `columnMapping` from a prior confirm step steers Gemini on later pages.
+     */
+    async parseLogSheet(
+        base64Image: string,
+        options?: LogSheetParseOptions,
+    ): Promise<LogSheetParseResult> {
         console.log('[LogSheet] Parsing log sheet with Gemini...');
+
+        const mappingHint = options?.columnMapping
+            ? `\n\n${mappingToPromptHint(options.columnMapping)}\n`
+            : '';
 
         const prompt = `You are an expert data extractor specializing in event log sheets and sign-in sheets. This image is a log sheet / sign-in sheet from an event, conference, or trade show. Each ROW in the sheet represents a DIFFERENT person who signed in.
 
 ## Task
 1. Identify the table/grid structure in the image.
-2. Identify column headers (they may be: Name, Company, Position/Title, Phone, Email, Address, Purpose/Notes, etc.).
-3. For EACH row (each person), extract the data into the corresponding fields.
-4. If a column doesn't exist in the sheet, leave that field as an empty string or empty array.
-5. Skip any empty rows or header rows.
-6. Handle handwritten text as best you can — if unclear, make your best guess.
-7. Each row MUST be a separate entry in the output array.
-8. Do NOT merge data from different rows into one entry.
-
+2. Identify column headers (they may be: Name, Company, Position/Title, Phone, Email, Address, Purpose/Notes, Interest, Booth #, etc.).
+3. Propose a mapping from each standard field (name, company, position, phone, email, address, notes) to the detected header label. Use "" if that field has no column.
+4. Set headersAmbiguous to true when headers are unclear, nonstandard, possibly swapped, or when you guessed the mapping. List short ambiguityReasons.
+5. For EACH data row (each person), extract values using your mapping into the standard fields.
+6. If a column doesn't exist in the sheet, leave that field as an empty string or empty array.
+7. Skip any empty rows or header rows.
+8. Handle handwritten text as best you can — if unclear, make your best guess.
+9. Each row MUST be a separate entry in the entries array.
+10. Do NOT merge data from different rows into one entry.
+${mappingHint}
 ${GEMINI_CORE_RULES}
 
-## Examples
+## Output shape (single JSON object)
 
-### Example 1: Tabular sign-in sheet with handwritten entries
+{
+  "detectedHeaders": ["Name", "Organization", "Mobile", "Purpose"],
+  "suggestedMapping": {
+    "name": "Name",
+    "company": "Organization",
+    "position": "",
+    "phone": "Mobile",
+    "email": "",
+    "address": "",
+    "notes": "Purpose"
+  },
+  "headersAmbiguous": false,
+  "ambiguityReasons": [],
+  "entries": [
+    {"name": "Maria Santos", "company": "Acme Corp", "position": "", "phone": ["+63 917 555 1234"], "email": [], "address": "", "notes": "Booth interest"}
+  ]
+}
 
-Output:
-[
-  {"name": "Maria Santos", "company": "Acme Corp", "position": "Sales Manager", "phone": ["+63 917 555 1234"], "email": ["maria.santos@acme.com"], "address": "Makati City", "notes": "Booth interest"},
-  {"name": "Dr. John Lee, MD", "company": "Health First Inc.", "position": "Medical Director", "phone": ["+63 2 8888 9999", "0917-222-3333"], "email": ["jlee@healthfirst.ph"], "address": "Quezon City", "notes": ""}
-]
+### Ambiguous example
+If a header is "Contact" (could be phone or email) or "Affiliation" (company vs school), set headersAmbiguous true and explain in ambiguityReasons.
 
-### Example 2: Stacked logo company name in a row
+### Phone cells
+If a phone cell contains "8703-5284 / 8362-5820", split into ["8703-5284", "8362-5820"].
 
-If a row contains a company written as "KINMO PW" on one visual line and "CORPORATION" on the next inside the same cell, return company as "KINMO PW Corporation" — never just "CORPORATION".
-
-### Example 3: Phone column with multiple numbers separated by "/"
-
-If a phone cell contains "8703-5284 / 8362-5820", split into the array ["8703-5284", "8362-5820"]. Never merge them.
-
-Return ONLY a JSON array of objects. No explanation, no markdown.`;
+Return ONLY the JSON object. No explanation, no markdown.`;
 
         const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
@@ -1314,40 +1338,74 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                 maxOutputTokens: 8192,
                 responseMimeType: 'application/json',
                 responseSchema: {
-                    type: 'ARRAY',
-                    items: {
-                        type: 'OBJECT',
-                        properties: {
-                            name: { type: 'STRING' },
-                            company: { type: 'STRING' },
-                            position: { type: 'STRING' },
-                            phone: { type: 'ARRAY', items: { type: 'STRING' } },
-                            email: { type: 'ARRAY', items: { type: 'STRING' } },
-                            address: { type: 'STRING' },
-                            notes: { type: 'STRING' }
+                    type: 'OBJECT',
+                    properties: {
+                        detectedHeaders: { type: 'ARRAY', items: { type: 'STRING' } },
+                        suggestedMapping: {
+                            type: 'OBJECT',
+                            properties: {
+                                name: { type: 'STRING' },
+                                company: { type: 'STRING' },
+                                position: { type: 'STRING' },
+                                phone: { type: 'STRING' },
+                                email: { type: 'STRING' },
+                                address: { type: 'STRING' },
+                                notes: { type: 'STRING' },
+                            },
+                            required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes'],
                         },
-                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
-                    }
-                }
-            }
+                        headersAmbiguous: { type: 'BOOLEAN' },
+                        ambiguityReasons: { type: 'ARRAY', items: { type: 'STRING' } },
+                        entries: {
+                            type: 'ARRAY',
+                            items: {
+                                type: 'OBJECT',
+                                properties: {
+                                    name: { type: 'STRING' },
+                                    company: { type: 'STRING' },
+                                    position: { type: 'STRING' },
+                                    phone: { type: 'ARRAY', items: { type: 'STRING' } },
+                                    email: { type: 'ARRAY', items: { type: 'STRING' } },
+                                    address: { type: 'STRING' },
+                                    notes: { type: 'STRING' },
+                                },
+                                required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes'],
+                            },
+                        },
+                    },
+                    required: ['detectedHeaders', 'suggestedMapping', 'headersAmbiguous', 'ambiguityReasons', 'entries'],
+                },
+            },
         });
 
         const text = await callGeminiWithRetry({ body: requestBody, flowName: 'LogSheet', timeoutMs: 90000 });
         console.log('[LogSheet] Raw response:', text);
 
-        let parsed;
+        let parsed: any;
         try {
             parsed = JSON.parse(text);
         } catch {
             const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-            const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
-            if (!jsonMatch) throw new Error('No JSON array in Gemini response');
-            parsed = JSON.parse(jsonMatch[0]);
+            // Prefer object wrapper; fall back to legacy bare array
+            const objMatch = jsonStr.match(/\{[\s\S]*\}/);
+            const arrMatch = jsonStr.match(/\[[\s\S]*\]/);
+            if (objMatch) {
+                parsed = JSON.parse(objMatch[0]);
+            } else if (arrMatch) {
+                parsed = { entries: JSON.parse(arrMatch[0]) };
+            } else {
+                throw new Error('No JSON in Gemini response');
+            }
         }
 
-        if (!Array.isArray(parsed)) throw new Error('Gemini did not return an array');
+        // Legacy: model returned a bare array
+        const rawEntries: any[] = Array.isArray(parsed)
+            ? parsed
+            : (Array.isArray(parsed?.entries) ? parsed.entries : []);
 
-        return parsed
+        if (!Array.isArray(rawEntries)) throw new Error('Gemini did not return entries');
+
+        const entries = rawEntries
             .filter((e: any) => {
                 const hasName = typeof e.name === 'string' && e.name.trim();
                 const hasCompany = typeof e.company === 'string' && e.company.trim();
@@ -1367,6 +1425,10 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                 };
                 return { ...entry, confidence: computeHeuristicConfidence(entry) };
             });
+
+        const meta = normalizeParseMeta(Array.isArray(parsed) ? {} : parsed, entries);
+
+        return { entries, meta };
     }
 
     /**
@@ -1486,6 +1548,11 @@ export interface LogSheetEntry {
     address: string;
     notes: string;
     confidence: number;
+}
+
+export interface LogSheetParseResult {
+    entries: LogSheetEntry[];
+    meta: LogSheetParseMeta;
 }
 
 export const ocrService = new OCRService();
