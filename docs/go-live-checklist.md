@@ -17,11 +17,12 @@ Merge **one at a time**, then smoke the critical path before the next:
 | 3 | **#5** Trust / Auth / Home | Offline honesty, Legal baseline, support email text |
 | 4 | **#35** Password reset | Auth forgot-password via `sendPasswordResetEmail` |
 | 5 | **#33** Legal subprocessors | Privacy AI path + Gemini/Vision/Stripe/Firebase/Vercel |
-| 6 | **#24** Landing + accuracy gallery + nav | Public landing, `/accuracy`, nav/footer links — **includes #3 + #21** |
-| 7 | **#38** Landing SEO meta | Title/description/OG for Landing + Accuracy — **after #24** (PR base is #24 branch) |
-| 8 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
-| 9 | **#32** Webhook fixture tests | Vitest coverage for Stripe lifecycle events (after #4/#2) |
-| 10 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
+| 6 | **#40** B2B DPA stub | DPA template + Legal links — after #33 |
+| 7 | **#24** Landing + accuracy gallery + nav | Public landing, `/accuracy`, nav/footer links — **includes #3 + #21** |
+| 8 | **#38** Landing SEO meta | Title/description/OG for Landing + Accuracy — **after #24** (PR base is #24 branch) |
+| 9 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
+| 10 | **#32** Webhook fixture tests | Vitest coverage for Stripe lifecycle events (after #4/#2) |
+| 11 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
 
 **After #6:** [#36](https://github.com/earlthepearl08/cura.tor/pull/36) expands the eval harness with a synthetic golden set (30 cards + 10 PH log sheets) plus `HOWTO-REAL-SAMPLES.md` for dropping real photos later. It can merge after #6 (eval-only; monitoring stays on #6).
 
