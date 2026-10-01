@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#38)
+## Inventory (#1–#39)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -55,6 +55,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 36 | Synthetic accuracy golden set (30/10) | P0 accuracy | Ready for review. `eval/accuracy/` fixtures + scoring + `HOWTO-REAL-SAMPLES.md` — **after #6** scaffold (Phase A follow-on); separate branch from #6 |
 | 37 | Gemini ops / cost monitoring docs | Meta ops | Ready for review. `GEMINI_OPS.md`, `VERCEL_SETUP.md`, `.env.example` (+ light `api/gemini.ts` / `api/ocr.ts` notes) — **anytime with #1 / #20 / #27**; rebase if OCR API PRs land first |
 | 38 | Landing SEO meta (OG/title/desc) | P0 landing | Ready for review. `Landing.tsx`, `AccuracyGallery.tsx`, `PageMeta.tsx`, `index.html` — **after #24**; PR base is `cursor/landing-accuracy-nav-link-9334` (stacked on #24) |
+| 39 | Drive backup data-loss prompt | P1 retention | Ready for review. Calm dismissible Google Drive backup reminder — `Home.tsx`, `Settings.tsx`, `DriveBackupPrompt.tsx` — **Phase B after #5**; **near #10** (shared Home/Settings) |
 
 ---
 
@@ -62,7 +63,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 | File | Extra owners beyond earlier table | Risk |
 |------|-----------------------------------|------|
-| `src/pages/Settings.tsx` | +21, 22, 25, **34** | Very high — #34 Advanced OCR after #5/#10 |
+| `src/pages/Settings.tsx` | +21, 22, 25, **34**, **39** | Very high — #34 Advanced OCR after #5/#10; #39 Drive backup near #10 |
 | `src/App.tsx` | +21, 23, 24, 26 | High — landing → gallery → a11y → events |
 | `src/contexts/AuthContext.tsx` | +**35**, 22, 26, 28 | High — Stripe → trust → **password reset** → Sentry → event pack → magic link |
 | `src/pages/Auth.tsx` | +**35**, 21, 23, 24, 28 | High — **#35** after #5 |
@@ -156,23 +157,26 @@ Expanded (meta docs anytime; same product order):
 
 ### Phase B — P1 retention / conversion (core five)
 
-Run **after Phase A is on `main`** (especially #5 Trust + #24 landing/gallery). These five are already **ready for review**. Merge serially; rebase each onto updated `main`.
+Run **after Phase A is on `main`** (especially #5 Trust + #24 landing/gallery). These are already **ready for review**. Merge serially; rebase each onto updated `main`.
 
 | Order | PR | Why this slot | Hot-file conflict notes |
 |------:|----|---------------|-------------------------|
+| B0 | **#39** Drive backup prompt | Data-loss / backup nudge on Home+Settings after #5 trust chrome; keep next to conversion UX | **Home**, **Settings**, `DriveBackupPrompt` — land **near #10** (before or right after) |
 | B1 | **#10** Free-tier upgrade UX | Conversion UX on Home/Settings/AuthContext before more Settings rows pile up | **Settings**, **Contacts**, Home, Scan/Upload, AuthContext, UpgradePrompt |
 | B2 | **#9** First-run onboarding | Tip sheets for Log/Multi before export menus and confidence UI rewrite those pages | **LogScan**, **MultiCardScan**, **Settings** (Help/tips entry) |
 | B3 | **#8** Sheets + CRM CSV | Export path after AuthContext/Settings from #10; before Contacts claim/realtime churn | **Contacts** (export menu), **LogScan** / MultiCard (export), **Settings**, AuthContext, `export.ts` |
 | B4 | **#7** Realtime team sync | Contacts/`teamStorage` listener before claim P2 (#12/#13) | **Contacts**, `teamStorage`, `WorkspaceContext`, TeamAdmin |
 | B5 | **#11** OCR confidence review | Field-level review after #9/#8 LogScan touches; before P2 guided/templates (#15/#14) | **LogScan**, `ocr.ts`, ContactReview |
 
-**Core one-liner:** `#10 → #9 → #8 → #7 → #11`
+**Core one-liner:** `#39 → #10 → #9 → #8 → #7 → #11` (or `#10 → #39 → #9…` if upgrade UX should land first — both share Home/Settings)
+
+**#39 note:** Dismissible Google Drive backup reminder. Requires **#5** Home/Settings baseline. Merge **in Phase B next to #10** so backup + upgrade prompts don’t fight on the same pages.
 
 #### Phase B conflict focus (LogScan / Settings / Contacts)
 
 | File | Phase B owners | Guidance |
 |------|----------------|----------|
-| `src/pages/Settings.tsx` | #10 → #34 → #9 → #8 | Highest P1 Settings traffic — land **#34** Advanced OCR right after **#10**; always rebase next PR after each merge |
+| `src/pages/Settings.tsx` | #39 → #10 → #34 → #9 → #8 | Highest P1 Settings traffic — keep **#39** Drive backup **near #10**; then **#34** Advanced OCR; always rebase next PR after each merge |
 | `src/pages/LogScan.tsx` | #9 → #8 → #11 | Onboarding chrome → export menu → confidence/review UI — **do not** parallel-merge these three |
 | `src/pages/Contacts.tsx` | #10 → #8 → #7 | Upgrade prompts / export → Sheets/CRM menu → realtime subscription — rebase #7 last among Contacts P1 |
 | `src/pages/MultiCardScan.tsx` | #9 → #8 | Same pattern as LogScan (tips then export) |
@@ -213,7 +217,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 - **`Auth.tsx`:** `#5` → `#35` → `#3` → `#21`/`#24` → `#23` → `#28`
 - **`Landing.tsx`:** `#3` → `#24` → `#38`
 - **`App.tsx`:** `#3` → `#16` → `#21`/`#24` → `#23` → `#19` → `#26`
-- **`Settings`:** `#4` → `#5` → `#3` → `#10` → `#34` → `#9` → `#8` → `#16` → `#21` → `#22` → `#25` → `#18` → `#17` → `#19`/`#26`
+- **`Settings`:** `#4` → `#5` → `#3` → `#39` → `#10` → `#34` → `#9` → `#8` → `#16` → `#21` → `#22` → `#25` → `#18` → `#17` → `#19`/`#26`
 - **`LogScan`:** `#3` → `#9` → `#8` → `#11` → `#31` → `#15` → `#14` → `#16` → `#18` → `#17` → `#23`
 - **`ocr.ts`:** `#5` → `#6` → `#11` → `#31` → `#34` → `#15` → `#14` → `#18` → `#22`
 - **`firestore.rules`:** `#12` → `#13` → `#17` → `#19` → `#26`
@@ -250,7 +254,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 ```
 Phase A: #1 → #4 → #5 → #35 → #33 → #24 → #38 → #2 → #32 → #6 → #36
   (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21; #38 after #24)
-→ Phase B core: #10 → #9 → #8 → #7 → #11
+→ Phase B core: #39 Drive backup → #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
 → #18 i18n → #17 Glossary → #23 a11y → #19 Events → #26 Event-pack Stripe
