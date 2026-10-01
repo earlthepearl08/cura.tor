@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import BatchNamingModal from '@/components/BatchNamingModal';
 import { compressForOCR } from '@/utils/compressPhoto';
+import { classifyScanError, type ScanErrorKind } from '@/utils/friendlyScanError';
 
 const MultiCardScan: React.FC = () => {
     const navigate = useNavigate();
@@ -22,6 +23,7 @@ const MultiCardScan: React.FC = () => {
     const [imageData, setImageData] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errorKind, setErrorKind] = useState<ScanErrorKind | null>(null);
     const [entries, setEntries] = useState<LogSheetEntry[] | null>(null);
     const [importFolder, setImportFolder] = useState('Uncategorized');
     const [folders, setFolders] = useState<string[]>([]);
@@ -63,6 +65,7 @@ const MultiCardScan: React.FC = () => {
 
         setIsProcessing(true);
         setError(null);
+        setErrorKind(null);
         setEntries(null);
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
@@ -82,21 +85,14 @@ const MultiCardScan: React.FC = () => {
                 setShowBatchNaming(true);
             }
         } catch (err) {
-            setError(friendlyError(err));
+            console.error('[MultiCard] scan failed:', err);
+            const friendly = classifyScanError(err);
+            setError(friendly.message);
+            setErrorKind(friendly.kind);
+            if (friendly.suggestUpgrade) setUpgradeFeature('scan');
         } finally {
             setIsProcessing(false);
         }
-    };
-
-    const friendlyError = (err: unknown): string => {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('timed out') || msg.includes('abort'))
-            return 'The server took too long to respond. Tap "Try Again" to retry.';
-        if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
-            return 'The server is busy right now. Please wait a moment and try again.';
-        if (msg.includes('500') || msg.includes('503'))
-            return 'The server encountered a temporary issue. Tap "Try Again" to retry.';
-        return msg;
     };
 
     /** Try parsing with up to 2 silent retries before surfacing an error */
@@ -224,6 +220,7 @@ const MultiCardScan: React.FC = () => {
         setImageData(null);
         setEntries(null);
         setError(null);
+        setErrorKind(null);
         setIsProcessing(false);
         setEditingIndex(null);
         setDuplicateMap(new Map());
@@ -399,9 +396,19 @@ const MultiCardScan: React.FC = () => {
                                 <AlertTriangle size={20} className="text-red-400 flex-shrink-0" />
                                 <div>
                                     <p className="text-sm text-red-300">{error}</p>
-                                    <button onClick={reset} className="text-xs text-red-400 underline mt-1">
-                                        Try Again
-                                    </button>
+                                    {errorKind === 'quota' ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setUpgradeFeature('scan')}
+                                            className="text-xs text-amber-400 underline mt-1"
+                                        >
+                                            View upgrade options
+                                        </button>
+                                    ) : (
+                                        <button onClick={reset} className="text-xs text-red-400 underline mt-1">
+                                            Try Again
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}

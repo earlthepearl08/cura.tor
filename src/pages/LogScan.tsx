@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import BatchNamingModal from '@/components/BatchNamingModal';
 import { compressForOCR } from '@/utils/compressPhoto';
+import { classifyScanError, type ScanErrorKind } from '@/utils/friendlyScanError';
 
 const LogScan: React.FC = () => {
     const navigate = useNavigate();
@@ -24,6 +25,7 @@ const LogScan: React.FC = () => {
     const [imageData, setImageData] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errorKind, setErrorKind] = useState<ScanErrorKind | null>(null);
     const [entries, setEntries] = useState<LogSheetEntry[] | null>(null);
     const [importFolder, setImportFolder] = useState('Uncategorized');
     const [folders, setFolders] = useState<string[]>([]);
@@ -105,6 +107,7 @@ const LogScan: React.FC = () => {
 
         setIsProcessing(true);
         setError(null);
+        setErrorKind(null);
         if (!append) {
             setEntries(null);
             setDuplicateMap(new Map());
@@ -223,15 +226,12 @@ const LogScan: React.FC = () => {
         setSelectedEntries(selected);
     };
 
-    const friendlyError = (err: unknown): string => {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('timed out') || msg.includes('abort'))
-            return 'The server took too long to respond. Tap retry to try again.';
-        if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
-            return 'The server is busy right now. Please wait a moment and try again.';
-        if (msg.includes('500') || msg.includes('503'))
-            return 'The server encountered a temporary issue. Tap retry to try again.';
-        return msg;
+    const applyScanError = (err: unknown) => {
+        console.error('[LogScan] scan failed:', err);
+        const friendly = classifyScanError(err);
+        setError(friendly.message);
+        setErrorKind(friendly.kind);
+        if (friendly.suggestUpgrade) setUpgradeFeature('scan');
     };
 
     /** Try parsing with up to 2 silent retries before surfacing an error */
@@ -261,6 +261,7 @@ const LogScan: React.FC = () => {
 
         setIsProcessing(true);
         setError(null);
+        setErrorKind(null);
 
         try {
             const results = await parseWithRetry(base64Image);
@@ -275,7 +276,7 @@ const LogScan: React.FC = () => {
                 await checkEntriesForDuplicates(combined);
             }
         } catch (err) {
-            setError(friendlyError(err));
+            applyScanError(err);
         } finally {
             setProcessingProgress(null);
             setIsProcessing(false);
@@ -290,6 +291,7 @@ const LogScan: React.FC = () => {
 
         setIsProcessing(true);
         setError(null);
+        setErrorKind(null);
         setEntries(null);
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
@@ -308,7 +310,7 @@ const LogScan: React.FC = () => {
                 setShowBatchNaming(true);
             }
         } catch (err) {
-            setError(friendlyError(err));
+            applyScanError(err);
         } finally {
             setProcessingProgress(null);
             setIsProcessing(false);
@@ -396,6 +398,7 @@ const LogScan: React.FC = () => {
         setImageData(null);
         setEntries(null);
         setError(null);
+        setErrorKind(null);
         setIsProcessing(false);
         setEditingIndex(null);
         setDuplicateMap(new Map());
@@ -574,12 +577,22 @@ const LogScan: React.FC = () => {
                         {error && (() => {
                             const isPartial = error.startsWith('partial:');
                             const displayMsg = isPartial ? error.slice(8) : error;
+                            const isQuota = errorKind === 'quota';
                             return (
                                 <div className={`flex items-center gap-3 p-4 rounded-xl ${isPartial ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
                                     <AlertTriangle size={20} className={`flex-shrink-0 ${isPartial ? 'text-amber-400' : 'text-red-400'}`} />
                                     <div>
                                         <p className={`text-sm ${isPartial ? 'text-amber-300' : 'text-red-300'}`}>{displayMsg}</p>
-                                        {!isPartial && (
+                                        {!isPartial && isQuota && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setUpgradeFeature('scan')}
+                                                className="text-xs text-amber-400 underline mt-1"
+                                            >
+                                                View upgrade options
+                                            </button>
+                                        )}
+                                        {!isPartial && !isQuota && (
                                             <button onClick={() => entries && entries.length > 0 ? processLogSheetAppend(imageData!) : processLogSheet(imageData!)} className="text-xs text-red-400 underline mt-1">
                                                 Retry
                                             </button>
