@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Landing from '@/pages/Landing';
 import Home from '@/pages/Home';
 import Scan from '@/pages/Scan';
 import Upload from '@/pages/Upload';
@@ -31,8 +32,10 @@ function App() {
                 <WorkspaceProvider>
                     <div className="min-height-screen bg-brand-950">
                         <Routes>
+                            <Route path="/" element={<Landing />} />
+                            <Route path="/welcome" element={<Landing />} />
                             <Route path="/auth" element={<Auth />} />
-                            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                            <Route path="/app" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                             <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
                             <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
                             <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
