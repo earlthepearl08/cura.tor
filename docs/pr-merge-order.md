@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#28)
+## Inventory (#1–#35)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -47,6 +47,11 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 26 | Stripe Event pack SKU | P2 billing+events | **Stacks on #19 + #4** — webhook/checkout, events API, rules/indexes, WorkspaceContext |
 | 27 | Go-live checklist | Meta | `docs/go-live-checklist.md` — anytime with #20/#1 |
 | 28 | Firebase magic-link sign-in | P1 auth | `AuthContext`, `Auth.tsx` — after **#5** (trust/Auth) to reduce Auth conflicts |
+| 31 | Friendly OCR 429/5xx errors | P1 OCR UX | Ready for review. `ocr.ts`, Scan/Upload/Log/Multi, `friendlyScanError.ts` — after **#11** confidence; near **#22** observability |
+| 32 | Stripe webhook Vitest fixtures | P0 tests | Ready for review. Webhook handler tests + fixtures — **after #4** (handler) and **#2** (Vitest scaffold); may overlap `package.json` / test harness with #2 |
+| 33 | Legal subprocessors + Privacy AI path | P0 trust/docs | Ready for review. `Legal.tsx`, `TECHNICAL_SPEC.md` — **after #5** (Legal trust edits); near **#1** docs (`TECHNICAL_SPEC` overlap — rebase onto #1 if both open) |
+| 34 | Settings OCR Advanced disclosure | P1 Settings | Ready for review. Hides OCR engine behind Advanced — `Settings.tsx`, `ocr.ts` — **after #5/#10** Settings stack (before later Settings pile-up) |
+| 35 | Email password reset on Auth | **P0** auth | Ready for review. `Auth.tsx`, `AuthContext` — **after #5** Auth trust edits; before #28 magic-link |
 
 ---
 
@@ -54,10 +59,10 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 | File | Extra owners beyond earlier table | Risk |
 |------|-----------------------------------|------|
-| `src/pages/Settings.tsx` | +21, 22, 25 | Very high |
+| `src/pages/Settings.tsx` | +21, 22, 25, **34** | Very high — #34 Advanced OCR after #5/#10 |
 | `src/App.tsx` | +21, 23, 24, 26 | High — landing → gallery → a11y → events |
-| `src/contexts/AuthContext.tsx` | +22, 26, 28 | High — Stripe → trust → Sentry → event pack → magic link |
-| `src/pages/Auth.tsx` | +21, 23, 24, 28 | High |
+| `src/contexts/AuthContext.tsx` | +**35**, 22, 26, 28 | High — Stripe → trust → **password reset** → Sentry → event pack → magic link |
+| `src/pages/Auth.tsx` | +**35**, 21, 23, 24, 28 | High — **#35** after #5 |
 | `src/pages/Landing.tsx` | **#3 ⊂ #24** | Prefer merge **#24** (or #3 then #24); do not also merge #21 |
 | `api/stripe-webhook.ts` / checkout | **#4, #26** | #26 after #4 |
 | `firestore.rules` | +19, 26 | Claims → glossary → events → event-pack |
@@ -111,13 +116,22 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 #20 / #27 / #1 (docs anytime)
 → #4 Stripe
 → #5 Trust
-→ #24 Landing + accuracy gallery + nav   ← includes #3 + #21; close #21 (and #3 if unused)
+→ #35 Password reset (Auth)            ← P0; after #5 Auth
+→ #33 Legal subprocessors + Privacy AI ← after #5 Legal; rebase if #1 already edited TECHNICAL_SPEC
+→ #24 Landing + accuracy gallery + nav ← includes #3 + #21; close #21 (and #3 if unused)
    (alt: #3 then #24; still skip standalone #21 merge)
 → #2 Tests
+→ #32 Stripe webhook Vitest fixtures   ← after #4 handler + #2 Vitest scaffold
 → #6 Accuracy scaffold
 ```
 
 **#24 note:** Stacked merge of landing (`#3`) + gallery (`#21`) + accuracy nav. See section above.
+
+**#32 note:** Lands real webhook handler coverage. Merge **after #4** (needs `api/stripe-webhook.ts`) and **after #2** (Vitest/`TESTING.md` scaffold). If #2 and #32 both touch `package.json` / test setup, rebase #32 onto #2.
+
+**#33 note:** Extends trust/Legal honesty with subprocessors + AI image/retention privacy. Merge **after #5**. If **#1** already landed `TECHNICAL_SPEC.md` fixes, rebase #33 onto that tip before merge.
+
+**#35 note:** Password reset is a **P0** trust/auth gap. Merge **immediately after #5** (shared `Auth.tsx` / `AuthContext`). Keep **#28** magic-link later so reset lands first.
 
 ### Phase B — P1 retention / conversion (core five)
 
@@ -137,19 +151,23 @@ Run **after Phase A is on `main`** (especially #5 Trust + #24 landing/gallery). 
 
 | File | Phase B owners | Guidance |
 |------|----------------|----------|
-| `src/pages/Settings.tsx` | #10 → #9 → #8 | Highest P1 Settings traffic — always rebase next PR after each merge; expect cosmetic section-order conflicts |
+| `src/pages/Settings.tsx` | #10 → #34 → #9 → #8 | Highest P1 Settings traffic — land **#34** Advanced OCR right after **#10**; always rebase next PR after each merge |
 | `src/pages/LogScan.tsx` | #9 → #8 → #11 | Onboarding chrome → export menu → confidence/review UI — **do not** parallel-merge these three |
 | `src/pages/Contacts.tsx` | #10 → #8 → #7 | Upgrade prompts / export → Sheets/CRM menu → realtime subscription — rebase #7 last among Contacts P1 |
 | `src/pages/MultiCardScan.tsx` | #9 → #8 | Same pattern as LogScan (tips then export) |
-| `src/contexts/AuthContext.tsx` | #10 → #8 | Upgrade gates then Sheets tier helpers — keep #28 magic-link **after** this pair if merging magic-link in the same window |
+| `src/contexts/AuthContext.tsx` | #10 → #8 | Upgrade gates then Sheets tier helpers — **#35** password reset is Phase A (after #5); keep #28 magic-link **after** this pair |
 
 #### Phase B follow-ons (still P1, after the core five)
 
 ```
-#28 Magic-link auth     (after #5; prefer after #10/#8 AuthContext calm)
-→ #22 Sentry + analytics  (after #6; package.json / ocr / Settings)
-→ #25 Priority support    (Settings mailto; after support-email decision from #5)
+#34 Settings OCR Advanced   (after #5/#10 Settings stack; before #9/#8/#22/#25 Settings pile-up if possible — or rebase onto #10)
+→ #28 Magic-link auth       (after #5/#35 Auth; prefer after #10/#8 AuthContext calm)
+→ #22 Sentry + analytics    (after #6; package.json / ocr / Settings)
+→ #31 Friendly OCR errors   (after #11; shared ocr.ts + Scan/Log/Multi — pairs with #22 user-visible failure UX)
+→ #25 Priority support      (Settings mailto; after support-email decision from #5)
 ```
+
+Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OCR disclosure doesn’t conflict with upgrade UX rows. Merge **#31** after **#11**. Prefer **#22** before or immediately around **#31**.
 
 **Phase B stop condition:** upgrade prompts feel right on free tier; Log/Multi onboarding shows once; Sheets/CRM export works for Pioneer+; team Contacts refresh live; log-sheet review shows field confidence. Then enter Phase C (#12+#13 already ready).
 
@@ -170,16 +188,16 @@ Run **after Phase A is on `main`** (especially #5 Trust + #24 landing/gallery). 
 
 ## Per-hotfile order (cheat sheet)
 
-- **`AuthContext`:** `#4` → `#5` → `#10` → `#8` → `#22` → `#28` → `#26`
-- **`Auth.tsx`:** `#5` → `#3` → `#21`/`#24` → `#23` → `#28`
+- **`AuthContext`:** `#4` → `#5` → `#35` → `#10` → `#8` → `#22` → `#28` → `#26`
+- **`Auth.tsx`:** `#5` → `#35` → `#3` → `#21`/`#24` → `#23` → `#28`
 - **`Landing.tsx`:** `#3` → `#24`
 - **`App.tsx`:** `#3` → `#16` → `#21`/`#24` → `#23` → `#19` → `#26`
-- **`Settings`:** `#4` → `#5` → `#3` → `#10` → `#9` → `#8` → `#16` → `#21` → `#22` → `#25` → `#18` → `#17` → `#19`/`#26`
-- **`LogScan`:** `#3` → `#9` → `#8` → `#11` → `#15` → `#14` → `#16` → `#18` → `#17` → `#23`
-- **`ocr.ts`:** `#5` → `#6` → `#11` → `#15` → `#14` → `#18` → `#22`
+- **`Settings`:** `#4` → `#5` → `#3` → `#10` → `#34` → `#9` → `#8` → `#16` → `#21` → `#22` → `#25` → `#18` → `#17` → `#19`/`#26`
+- **`LogScan`:** `#3` → `#9` → `#8` → `#11` → `#31` → `#15` → `#14` → `#16` → `#18` → `#17` → `#23`
+- **`ocr.ts`:** `#5` → `#6` → `#11` → `#31` → `#34` → `#15` → `#14` → `#18` → `#22`
 - **`firestore.rules`:** `#12` → `#13` → `#17` → `#19` → `#26`
-- **Stripe APIs:** `#4` → `#26`
-- **`package.json`:** `#5` → `#2` → `#6` → `#22`
+- **Stripe APIs:** `#4` → `#32` (tests) → `#26`
+- **`package.json`:** `#5` → `#2` → `#32` → `#6` → `#22`
 
 ---
 
@@ -200,17 +218,18 @@ Run **after Phase A is on `main`** (especially #5 Trust + #24 landing/gallery). 
 - **#24** is the landing+gallery stack (**includes #3 + #21**) — never merge #21 separately after #24; close #21 as superseded.  
 - **#26 stacks on #19 and #4** — never before Stripe lifecycle + event workspaces.  
 - `#14`+`#15` remain the hottest LogScan pair.  
-- Meta docs **#20** / **#27** / **#1** can merge any time without blocking product.
+- Meta docs **#20** / **#27** / **#1** / **#33** (Legal/docs) can land early in Phase A; **#33** still waits on **#5** for `Legal.tsx`.
 
 ---
 
 ## Quick reference — one-line order
 
 ```
-#20/#27/#1 (docs) → #4 Stripe → #5 Trust → #24 Landing+gallery+nav (includes #3+#21; close #21)
-→ #2 Tests → #6 Accuracy scaffold
+#20/#27/#1 (docs) → #4 Stripe → #5 Trust → #35 Password reset → #33 Legal subprocessors/Privacy AI
+→ #24 Landing+gallery+nav (includes #3+#21; close #21)
+→ #2 Tests → #32 Webhook Vitest → #6 Accuracy scaffold
 → Phase B core: #10 → #9 → #8 → #7 → #11
-→ (#28 Magic link → #22 Sentry → #25 Priority support)
+→ (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
 → #18 i18n → #17 Glossary → #23 a11y → #19 Events → #26 Event-pack Stripe
 ```
