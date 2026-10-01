@@ -14,10 +14,15 @@ Merge **one at a time**, then smoke the critical path before the next:
 |------:|----|-----------------|
 | 1 | **#1** Operator runbook | Ops docs / TECHNICAL_SPEC correction |
 | 2 | **#4** Stripe lifecycle | Webhook → `users.tier` + secured checkout/portal |
-| 3 | **#5** Trust / Auth / Home | Offline honesty, Legal, password reset, support email text |
-| 4 | **#24** Landing + accuracy gallery + nav | Public landing, `/accuracy`, nav/footer links — **includes #3 + #21** |
-| 5 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
-| 6 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
+| 3 | **#5** Trust / Auth / Home | Offline honesty, Legal baseline, support email text |
+| 4 | **#35** Password reset | Auth forgot-password via `sendPasswordResetEmail` |
+| 5 | **#33** Legal subprocessors | Privacy AI path + Gemini/Vision/Stripe/Firebase/Vercel |
+| 6 | **#24** Landing + accuracy gallery + nav | Public landing, `/accuracy`, nav/footer links — **includes #3 + #21** |
+| 7 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
+| 8 | **#32** Webhook fixture tests | Vitest coverage for Stripe lifecycle events (after #4/#2) |
+| 9 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
+
+**After #6:** [#36](https://github.com/earlthepearl08/cura.tor/pull/36) expands the eval harness with a synthetic golden set (30 cards + 10 PH log sheets) plus `HOWTO-REAL-SAMPLES.md` for dropping real photos later. It can merge after #6 (eval-only; monitoring stays on #6).
 
 **Accuracy stack:** Prefer merging **#24** only. It already contains landing (**#3**) and the gallery (**#21**). **Close #21** (and skip standalone **#3**) when #24 lands — do **not** merge #3+#21+#24 as three separate feature merges. Details: `docs/pr-merge-order.md`.
 
@@ -103,7 +108,7 @@ See `MONITORING.md` on the observability branch.
 
 ## 6. Support email confirmation
 
-Trust PR (**#5**) publishes **`support@curator-app.com`** in Legal (TODO wording removed).
+Trust PR (**#5**) publishes **`support@curator-app.com`** in Legal (TODO wording removed). Password reset is **not** part of #5 — that is **#35**.
 
 - [ ] Confirm this inbox exists and is monitored — **or** tell eng the real address before merge / follow-up commit
 - [ ] Spot-check Legal + any Settings “support” copy after #5 lands
@@ -140,7 +145,7 @@ Run on **production** (or a Preview that has prod-like secrets) after Phase A:
 
 **Auth + core**
 
-- [ ] Google sign-in and email/password (incl. password reset from #5)
+- [ ] Google sign-in and email/password (incl. password reset from **#35**)
 - [ ] Single card scan → review → save → Contacts list
 - [ ] Export CSV/Excel or vCard (Pioneer/Pro or access-code user)
 
