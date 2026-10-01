@@ -21,8 +21,9 @@ Merge **one at a time**, then smoke the critical path before the next:
 | 7 | **#24** Landing + accuracy gallery + nav | Public landing, `/accuracy`, nav/footer links — **includes #3 + #21** |
 | 8 | **#38** Landing SEO meta | Title/description/OG for Landing + Accuracy — **after #24** (PR base is #24 branch) |
 | 9 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
-| 10 | **#32** Webhook fixture tests | Vitest coverage for Stripe lifecycle events (after #4/#2) |
-| 11 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
+| 10 | **#43** Playwright smokes | Mocked e2e auth → scan → save → export — after #2 |
+| 11 | **#32** Webhook fixture tests | Vitest coverage for Stripe lifecycle events (after #4/#2) |
+| 12 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
 
 **After #6:** [#36](https://github.com/earlthepearl08/cura.tor/pull/36) expands the eval harness with a synthetic golden set (30 cards + 10 PH log sheets) plus `HOWTO-REAL-SAMPLES.md` for dropping real photos later. It can merge after #6 (eval-only; monitoring stays on #6).
 
