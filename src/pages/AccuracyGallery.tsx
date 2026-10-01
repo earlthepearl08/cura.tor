@@ -9,6 +9,7 @@ import {
     GallerySample,
     GallerySampleType,
 } from '@/data/accuracyGallery';
+import PageMeta, { ACCURACY_GALLERY_META } from '@/components/PageMeta';
 
 type Filter = 'all' | GallerySampleType;
 
@@ -134,6 +135,7 @@ const AccuracyGallery: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-brand-950 text-slate-200">
+            <PageMeta {...ACCURACY_GALLERY_META} />
             {/* Atmosphere */}
             <div className="pointer-events-none fixed inset-0 overflow-hidden">
                 <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[720px] h-[420px] rounded-full bg-sky-500/10 blur-3xl" />
