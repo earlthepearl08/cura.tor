@@ -40,8 +40,15 @@ Optional build-time flag: `VITE_E2E_MOCK_AUTH=true` (do **not** set this on prod
 
 ## CI notes
 
-- Set `CI=true` so Playwright does not reuse an existing Vite server and uses a single worker.
-- Install browsers in CI: `npx playwright install --with-deps chromium` (or `chromium` only on pre-provisioned images).
+GitHub Actions runs this suite on every PR via [`.github/workflows/playwright-e2e.yml`](../.github/workflows/playwright-e2e.yml):
+
+1. `npm ci`
+2. `npx playwright install --with-deps chromium`
+3. `CI=true npm run test:e2e`
+
+- `CI=true` prevents reusing an existing Vite server and uses a single worker.
+- No Gemini/Stripe/Firebase secrets are required (routes are mocked in the specs).
+- On failure, `playwright-report/` and `test-results/` are uploaded as artifacts (7-day retention).
 - These tests complement Vitest unit/critical-path suites; they do not replace them.
 
 ## Fixture
