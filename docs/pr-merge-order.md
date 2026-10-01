@@ -119,18 +119,39 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 
 **#24 note:** Stacked merge of landing (`#3`) + gallery (`#21`) + accuracy nav. See section above.
 
-### Phase B — P1 retention / conversion / ops
+### Phase B — P1 retention / conversion (core five)
+
+Run **after Phase A is on `main`** (especially #5 Trust + #24 landing/gallery). These five are already **ready for review**. Merge serially; rebase each onto updated `main`.
+
+| Order | PR | Why this slot | Hot-file conflict notes |
+|------:|----|---------------|-------------------------|
+| B1 | **#10** Free-tier upgrade UX | Conversion UX on Home/Settings/AuthContext before more Settings rows pile up | **Settings**, **Contacts**, Home, Scan/Upload, AuthContext, UpgradePrompt |
+| B2 | **#9** First-run onboarding | Tip sheets for Log/Multi before export menus and confidence UI rewrite those pages | **LogScan**, **MultiCardScan**, **Settings** (Help/tips entry) |
+| B3 | **#8** Sheets + CRM CSV | Export path after AuthContext/Settings from #10; before Contacts claim/realtime churn | **Contacts** (export menu), **LogScan** / MultiCard (export), **Settings**, AuthContext, `export.ts` |
+| B4 | **#7** Realtime team sync | Contacts/`teamStorage` listener before claim P2 (#12/#13) | **Contacts**, `teamStorage`, `WorkspaceContext`, TeamAdmin |
+| B5 | **#11** OCR confidence review | Field-level review after #9/#8 LogScan touches; before P2 guided/templates (#15/#14) | **LogScan**, `ocr.ts`, ContactReview |
+
+**Core one-liner:** `#10 → #9 → #8 → #7 → #11`
+
+#### Phase B conflict focus (LogScan / Settings / Contacts)
+
+| File | Phase B owners | Guidance |
+|------|----------------|----------|
+| `src/pages/Settings.tsx` | #10 → #9 → #8 | Highest P1 Settings traffic — always rebase next PR after each merge; expect cosmetic section-order conflicts |
+| `src/pages/LogScan.tsx` | #9 → #8 → #11 | Onboarding chrome → export menu → confidence/review UI — **do not** parallel-merge these three |
+| `src/pages/Contacts.tsx` | #10 → #8 → #7 | Upgrade prompts / export → Sheets/CRM menu → realtime subscription — rebase #7 last among Contacts P1 |
+| `src/pages/MultiCardScan.tsx` | #9 → #8 | Same pattern as LogScan (tips then export) |
+| `src/contexts/AuthContext.tsx` | #10 → #8 | Upgrade gates then Sheets tier helpers — keep #28 magic-link **after** this pair if merging magic-link in the same window |
+
+#### Phase B follow-ons (still P1, after the core five)
 
 ```
-#10 Upgrade UX
-→ #28 Magic-link auth          (after #5; before more Auth churn)
-→ #9 Onboarding
-→ #8 Sheets + CRM
-→ #7 Realtime sync
-→ #11 OCR confidence
-→ #22 Sentry + analytics       (after #6 observability scaffold / package.json)
-→ #25 Priority support mailto  (Settings; after trust support-email decision)
+#28 Magic-link auth     (after #5; prefer after #10/#8 AuthContext calm)
+→ #22 Sentry + analytics  (after #6; package.json / ocr / Settings)
+→ #25 Priority support    (Settings mailto; after support-email decision from #5)
 ```
+
+**Phase B stop condition:** upgrade prompts feel right on free tier; Log/Multi onboarding shows once; Sheets/CRM export works for Pioneer+; team Contacts refresh live; log-sheet review shows field confidence. Then enter Phase C (#12+#13 already ready).
 
 ### Phase C — P2 differentiators (serialize LogScan / rules / App)
 
@@ -188,8 +209,8 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 ```
 #20/#27/#1 (docs) → #4 Stripe → #5 Trust → #24 Landing+gallery+nav (includes #3+#21; close #21)
 → #2 Tests → #6 Accuracy scaffold
-→ #10 Upgrade → #28 Magic link → #9 Onboarding → #8 Sheets → #7 Realtime → #11 Confidence
-→ #22 Sentry → #25 Priority support
+→ Phase B core: #10 → #9 → #8 → #7 → #11
+→ (#28 Magic link → #22 Sentry → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
 → #18 i18n → #17 Glossary → #23 a11y → #19 Events → #26 Event-pack Stripe
 ```
