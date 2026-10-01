@@ -160,12 +160,23 @@ export interface OCRResult {
 
 export type OCREngine = 'tesseract' | 'cloud-vision';
 
+/** Default remains Gemini (`cloud-vision` label for stored prefs). */
 export const getOCREngine = (): OCREngine => {
+    try {
+        const stored = localStorage.getItem('ocr_engine');
+        if (stored === 'tesseract' || stored === 'cloud-vision') return stored;
+    } catch {
+        /* private mode */
+    }
     return 'cloud-vision';
 };
 
 export const setOCREngine = (engine: OCREngine): void => {
-    localStorage.setItem('ocr_engine', engine);
+    try {
+        localStorage.setItem('ocr_engine', engine);
+    } catch {
+        /* private mode */
+    }
 };
 
 // Common job titles for position detection
