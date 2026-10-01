@@ -617,6 +617,8 @@ const Contacts: React.FC = () => {
                         {/* Export */}
                         <div className="relative">
                             <button
+                                type="button"
+                                aria-label="Export contacts"
                                 onClick={() => setShowExportOptions(!showExportOptions)}
                                 className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400 hover:text-white"
                             >

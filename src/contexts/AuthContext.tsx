@@ -23,6 +23,29 @@ import {
     redeemAccessCode as redeemAccessCodeService,
 } from '@/services/userService';
 import { storage } from '@/services/storage';
+import { isE2EMockAuthEnabled } from '@/e2e/mockAuthFlag';
+
+/** Pro-tier stub used only when Playwright enables E2E mock auth */
+function createE2EMockProfile(): UserProfile {
+    const now = Date.now();
+    return {
+        uid: 'e2e-mock-user',
+        email: 'e2e@curator.test',
+        displayName: 'E2E Mock User',
+        photoURL: null,
+        tier: 'pro',
+        scanUsage: {
+            count: 0,
+            periodStart: now,
+            lifetimeCount: 0,
+            lifetimeLimit: null,
+        },
+        contactLimit: null,
+        accessCode: null,
+        createdAt: now,
+        updatedAt: now,
+    };
+}
 
 interface AuthContextType {
     user: UserProfile | null;
@@ -87,6 +110,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen to auth state
     useEffect(() => {
+        // Playwright / CI: skip Firebase Auth and seed a Pro profile locally.
+        if (isE2EMockAuthEnabled()) {
+            const profile = createE2EMockProfile();
+            storage.switchUser(profile.uid);
+            setUser(profile);
+            setFirebaseUser({
+                uid: profile.uid,
+                email: profile.email,
+                emailVerified: true,
+                displayName: profile.displayName,
+            } as User);
+            setEmailVerified(true);
+            setIsLoading(false);
+            return;
+        }
+
         // Handle redirect sign-in result (mobile PWA fallback)
         getRedirectResult(auth).then((result) => {
             if (result) {
@@ -127,6 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const refreshUserProfile = useCallback(async (): Promise<UserProfile | null> => {
+        if (isE2EMockAuthEnabled()) return null;
         if (!firebaseUser) return null;
         try {
             const profile = await getOrCreateUserDoc(firebaseUser);
@@ -203,7 +243,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const signOut = useCallback(async () => {
-        await firebaseSignOut(auth);
+        if (!isE2EMockAuthEnabled()) {
+            await firebaseSignOut(auth);
+        }
         storage.switchUser(null);
         // Clear Drive session so it doesn't persist across accounts
         sessionStorage.removeItem('gdrive_token');
@@ -270,6 +312,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // separately in each page's top-of-loop canPerformScan() check.
 
     const incrementScanCount = useCallback(async (_count: number = 1): Promise<boolean> => {
+        // E2E mock: scans are counted by mocked /api/gemini; skip Firestore refresh.
+        if (isE2EMockAuthEnabled()) return true;
         if (!firebaseUser) return false;
         try {
             const refreshed = await getOrCreateUserDoc(firebaseUser);
