@@ -687,11 +687,11 @@ const TESSERACT_ASSETS = [
 ## 9. Security Considerations
 
 ### 9.1 Data Privacy
-> **Outdated / incorrect for current app.** Card and log-sheet images **are** sent to Google Gemini and/or Cloud Vision via Vercel serverless proxies. Auth and team data use Firebase. Billing uses Stripe. Personal contacts remain primarily IndexedDB (+ optional Drive App Data). See Legal pages and [`README.md`](./README.md).
-- ~~All data stored locally on device~~ — **partially true** for personal contact records; not for OCR/auth/billing
-- ~~No data transmitted to external servers~~ — **false** for scan/OCR path
+> **Outdated for the shipped app.** Scan images are sent through Vercel APIs to **Google Gemini / Cloud Vision**. Auth, teams, and profiles use **Firebase**; payments use **Stripe**. Authoritative user-facing disclosure: in-app Privacy Policy (`src/pages/Legal.tsx`) — includes subprocessors and retention/deletion. See also [`README.md`](./README.md).
+- ~~All data stored locally on device~~ — personal contacts are primarily local; cloud systems hold account/team/billing-related data
+- ~~No data transmitted to external servers~~ — **false** for AI OCR and cloud auth/billing
 - Camera access requires explicit permission
-- No product analytics/Sentry wired yet (console-only ErrorBoundary)
+- No product analytics/Sentry wired yet (console-only ErrorBoundary); no third-party advertising analytics
 
 ### 9.2 Input Validation
 - Sanitize all user inputs
