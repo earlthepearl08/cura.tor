@@ -227,6 +227,13 @@ const TermsOfService = () => (
             <strong className="text-slate-300">Kinmo PW Corporation</strong><br />
             Email: support@curator-app.com
         </P>
+        <P>
+            B2B customers needing a data processing agreement can start from our{' '}
+            <a href="/dpa.md" target="_blank" rel="noopener noreferrer" className="text-brand-400 underline hover:text-brand-300">
+                DPA template stub
+            </a>{' '}
+            (not legal advice; not a signed contract until countersigned).
+        </P>
     </div>
 );
 
@@ -434,6 +441,16 @@ const PrivacyPolicy = () => (
         <P>
             <strong className="text-slate-300">Kinmo PW Corporation</strong><br />
             Email: support@curator-app.com
+        </P>
+        <P>
+            Early B2B customers: see the{' '}
+            <a href="/dpa.md" target="_blank" rel="noopener noreferrer" className="text-brand-400 underline hover:text-brand-300">
+                Data Processing Agreement template stub
+            </a>{' '}
+            (<code className="text-[10px] text-slate-500">DPA.md</code> /{' '}
+            <code className="text-[10px] text-slate-500">/dpa.md</code>). Template only — not legal advice.
+            It lists subprocessors consistent with this Privacy Policy (Google Gemini, Cloud Vision,
+            Firebase/Google, optional Drive, Vercel, Stripe). Request a countersigned copy via the email above.
         </P>
     </div>
 );
