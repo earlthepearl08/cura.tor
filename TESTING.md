@@ -31,6 +31,8 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
+**GitHub Actions:** `.github/workflows/playwright-e2e.yml` runs the same command on every PR (`npm ci` → Chromium → `npm run test:e2e`).
+
 Details: [`e2e/README.md`](./e2e/README.md).
 
 Happy path: **auth (mock) → upload/scan (mocked Gemini) → save → CSV export** — no live Gemini/Stripe.
