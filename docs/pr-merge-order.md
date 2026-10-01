@@ -113,8 +113,16 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 
 ### Phase A — P0 sell / trust / story
 
+Canonical one-liner (matches `docs/go-live-checklist.md`):
+
 ```
-#20 / #27 / #1 (docs anytime)
+#1 → #4 → #5 → #35 → #33 → #24 → #2 → #32 → #6 → #36
+```
+
+Expanded (meta docs anytime; same product order):
+
+```
+#1 Operator runbook   (+ #20 / #27 anytime)
 → #4 Stripe
 → #5 Trust
 → #35 Password reset (Auth)            ← P0; after #5 Auth
@@ -124,7 +132,7 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 → #2 Tests
 → #32 Stripe webhook Vitest fixtures   ← after #4 handler + #2 Vitest scaffold
 → #6 Accuracy scaffold
-→ #36 Synthetic 30-card / 10 log-sheet golden set + HOWTO-REAL-SAMPLES  ← after #6
+→ #36 Synthetic golden set (30/10) + HOWTO-REAL-SAMPLES  ← after #6
 ```
 
 **#24 note:** Stacked merge of landing (`#3`) + gallery (`#21`) + accuracy nav. See section above.
@@ -230,9 +238,8 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 ## Quick reference — one-line order
 
 ```
-#20/#27/#1 (docs) → #4 Stripe → #5 Trust → #35 Password reset → #33 Legal subprocessors/Privacy AI
-→ #24 Landing+gallery+nav (includes #3+#21; close #21)
-→ #2 Tests → #32 Webhook Vitest → #6 Accuracy scaffold → #36 Golden set 30/10
+Phase A: #1 → #4 → #5 → #35 → #33 → #24 → #2 → #32 → #6 → #36
+  (#20/#27 anytime with #1; #24 includes #3+#21 — close #21)
 → Phase B core: #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
