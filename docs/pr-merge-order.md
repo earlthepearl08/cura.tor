@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#47)
+## Inventory (#1–#48)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -64,6 +64,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 45 | Playwright GitHub Actions CI | P0 tests | Ready for review. `.github/workflows/playwright-e2e.yml` + **includes e2e tree** — **after #43** (stacked on Playwright smoke); near #32 |
 | 46 | Shared `api/_lib` scan guards | P1 maintenance | Ready for review. `api/_lib/scanGuards.ts` + refactor `api/ocr.ts` / `api/gemini.ts` — **anytime after #4**; prefer **after #31** (OCR API stack) / rebase if #37 touched same APIs |
 | 47 | Public synthetic accuracy report | P0 trust/landing | Ready for review. `/accuracy#report` — `AccuracyReportSection`, `accuracyReport.ts`, AccuracyGallery/Landing (+ Auth/Legal/Settings links) — **after #24**; **near #36/#38/#44**; base `cursor/landing-accuracy-nav-link-9334` |
+| 48 | Vitest GitHub Actions CI | P0 tests | Ready for review. `.github/workflows/vitest.yml` + **includes #2 test stack** (vitest config, unit tests, fixtures) — **after #2**; near #32/#43/#45 |
 
 ---
 
@@ -133,7 +134,7 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 Canonical one-liner (matches `docs/go-live-checklist.md`):
 
 ```
-#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #2 → #43 → #45 → #32 → #6 → #36
+#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #2 → #48 → #43 → #45 → #32 → #6 → #36
 ```
 
 Expanded (meta docs anytime; same product order):
@@ -151,6 +152,7 @@ Expanded (meta docs anytime; same product order):
 → #44 Landing competitor positioning   ← after #24/#38; same stack base
 → #47 Public synthetic accuracy report ← after #24; near #36/#38/#44 (`/accuracy#report`)
 → #2 Tests
+→ #48 Vitest GitHub Actions CI         ← after #2; includes #2 test stack + workflow
 → #43 Playwright smoke paths           ← after #2; near #32 (package.json / TESTING.md)
 → #45 Playwright GitHub Actions CI     ← after #43; includes e2e + workflow
 → #32 Stripe webhook Vitest fixtures   ← after #4 handler + #2 Vitest scaffold
@@ -166,13 +168,15 @@ Expanded (meta docs anytime; same product order):
 
 **#47 note:** Public synthetic accuracy report on `/accuracy#report`. **After #24** (base `cursor/landing-accuracy-nav-link-9334`). Keep **near #38/#44** (Landing/AccuracyGallery) and **near #36** (golden-set story). Rebase if #38/#44 already edited gallery/Landing; light Auth/Legal/Settings link touches.
 
+**#48 note:** GitHub Actions for Vitest unit tests. **After #2** — PR **includes the #2 test stack** (config, unit tests, fixtures) plus `.github/workflows/vitest.yml`. Merge #2 first when both open (or treat #48 as the combined land if it fully supersedes #2’s tip). Near **#32** (may overlap webhook contract fixtures) and the Playwright CI pair **#43→#45**.
+
 **#43 note:** Playwright smoke for auth → scan → save → export. Merge **after #2** (test harness / `TESTING.md`). Keep **near #32** — both extend the test stack and may touch `package.json`. Light AuthContext/Contacts hooks for e2e mocks: rebase if #10/#8/#42 already landed those files.
 
 **#45 note:** GitHub Actions workflow for Playwright e2e. **After #43** — PR **includes the e2e tree** (stacked on #43). Merge #43 first, then #45 (or retarget #45 onto `main` after #43 lands). If reviewing only one, prefer landing #43 then #45 so CI isn’t orphaned without specs.
 
 **#46 note:** Shared scan API helpers (`api/_lib/scanGuards.ts`). **Maintenance anytime after #4**. Prefer **after #31** if the OCR/friendly-error API surface is still landing; rebase if **#37** already edited `api/ocr.ts` / `api/gemini.ts`.
 
-**#32 note:** Lands real webhook handler coverage. Merge **after #4** (needs `api/stripe-webhook.ts`) and **after #2** (Vitest/`TESTING.md` scaffold). If #2 / #43 / #45 / #32 all touch `package.json` / test setup, rebase serially in that order.
+**#32 note:** Lands real webhook handler coverage. Merge **after #4** (needs `api/stripe-webhook.ts`) and **after #2/#48** (Vitest scaffold). If #2 / #48 / #43 / #45 / #32 all touch `package.json` / test setup, rebase serially in that order.
 
 **#33 note:** Extends trust/Legal honesty with subprocessors + AI image/retention privacy. Merge **after #5**. If **#1** already landed `TECHNICAL_SPEC.md` fixes, rebase #33 onto that tip before merge.
 
@@ -257,7 +261,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`. Merge **#31** 
 - **`firestore.rules`:** `#12` → `#13` → `#17` → `#19` → `#26`
 - **Stripe APIs:** `#4` → `#32` (tests) → `#26`
 - **`api/ocr.ts` / `api/gemini.ts`:** `#4` → `#37` (docs touch) → `#31` → `#46` (`_lib` extract)
-- **`package.json`:** `#5` → `#2` → `#43` → `#45` → `#32` → `#6` → `#22`
+- **`package.json`:** `#5` → `#2` → `#48` → `#43` → `#45` → `#32` → `#6` → `#22`
 - **`eval/`:** `#6` → `#36`
 
 ---
@@ -281,6 +285,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`. Merge **#31** 
 - **#44 stacks on #24** (same base as #38) — merge competitor positioning **after #24/#38**.  
 - **#47 stacks on #24** — public `/accuracy#report` after #24; near #36/#38/#44.  
 - **#45 stacks on #43** — Playwright CI workflow after smoke specs (e2e included in #45).  
+- **#48 includes #2 test stack** — Vitest GHA after #2 (similar pattern to #45 on #43).  
 - **#46** shared `api/_lib` — anytime after **#4**; prefer after **#31** OCR API stack.  
 - **#26 stacks on #19 and #4** — never before Stripe lifecycle + event workspaces.  
 - `#14`+`#15` remain the hottest LogScan pair.  
@@ -291,8 +296,8 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`. Merge **#31** 
 ## Quick reference — one-line order
 
 ```
-Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #2 → #43 → #45 → #32 → #6 → #36
-  (#20/#27/#37 anytime with #1; #46 anytime after #4 / prefer after #31; #24 includes #3+#21 — close #21; #38+#44+#47 after #24 near #36; #40 after #33; #43→#45 after #2 near #32)
+Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #2 → #48 → #43 → #45 → #32 → #6 → #36
+  (#20/#27/#37 anytime with #1; #46 anytime after #4 / prefer after #31; #24 includes #3+#21 — close #21; #38+#44+#47 after #24 near #36; #40 after #33; #2→#48 and #43→#45 CI stacks near #32)
 → Phase B core: #42 offline → #41 Home hero → #39 Drive backup → #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #46 api/_lib → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
