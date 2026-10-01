@@ -5,6 +5,7 @@ import {
     Cloud, Download, Users, ShieldCheck, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import PageMeta, { LANDING_META } from '@/components/PageMeta';
 import { STRIPE_PRICES } from '@/services/stripe';
 import { TIER_LIMITS } from '@/types/user';
 
@@ -106,6 +107,7 @@ const Landing: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-brand-950 text-slate-200">
+            <PageMeta {...LANDING_META} />
             {/* Nav */}
             <header className="sticky top-0 z-20 glass border-b border-brand-800/50">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
