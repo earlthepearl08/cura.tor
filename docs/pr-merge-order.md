@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#50)
+## Inventory (#1–#51)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -67,6 +67,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 48 | Vitest GitHub Actions CI | P0 tests | Ready for review. `.github/workflows/vitest.yml` + **includes #2 test stack** (vitest config, unit tests, fixtures) — **after #2**; near #32/#43/#45 |
 | 49 | Landing sample demo CTA | P0 landing | Ready for review. No-signup sample demo CTA — `Landing.tsx`, `AccuracyGallery.tsx` — **after #24/#47**; base `cursor/landing-accuracy-nav-link-9334` |
 | 50 | Lighthouse advisory CI | Meta CI | Ready for review. Advisory Lighthouse for Landing (§8 budgets) — `.github/workflows/lighthouse-advisory.yml`, `lighthouserc.cjs`, `docs/lighthouse.md` — **anytime with #45/#48** |
+| 51 | robots.txt + sitemap.xml | P0 landing SEO | Ready for review. `public/robots.txt`, `public/sitemap.xml`, `public/SEO.md` (+ `VERCEL_SETUP.md`) — **after #24** landing stack; base `cursor/landing-accuracy-nav-link-9334` |
 
 ---
 
@@ -111,8 +112,9 @@ Inspected 2026-10-01:
 4. Merge **#44** competitor positioning **after #24/#38** (same stack base `cursor/landing-accuracy-nav-link-9334`; rebase onto #38 if both open).  
 5. Merge **#47** public synthetic accuracy report (`/accuracy#report`) **after #24** — near **#38/#44** (shared gallery/Landing); conceptually near **#36** golden set.  
 6. Merge **#49** Landing sample demo CTA **after #24/#47** (same stack base; shared Landing/AccuracyGallery).  
-7. **Close #21** as superseded (do not merge separately).  
-8. **Close or skip #3** if #24 already merged (its commit is inside #24); if you want a smaller review first, merge **#3** then **#24** (Git will recognize #3 as already contained).
+7. Merge **#51** robots.txt + sitemap.xml **after #24** stack (same base; mostly `public/` — low clash with Landing.tsx PRs).  
+8. **Close #21** as superseded (do not merge separately).  
+9. **Close or skip #3** if #24 already merged (its commit is inside #24); if you want a smaller review first, merge **#3** then **#24** (Git will recognize #3 as already contained).
 
 **Alternative — staged reviews**
 
@@ -122,8 +124,9 @@ Inspected 2026-10-01:
 4. Merge **#44** competitor section (after #24/#38).  
 5. Merge **#47** accuracy report (after #24; rebase if #38/#44 touched gallery/Landing).  
 6. Merge **#49** sample demo CTA (after #24/#47).  
-7. **Never merge #21 after #24** — redundant / conflict theater on gallery assets.  
-8. Close #21 when #24 is merged (or earlier, with a PR comment pointing here).
+7. Merge **#51** robots/sitemap (after #24 stack; pairs with #38 SEO).  
+8. **Never merge #21 after #24** — redundant / conflict theater on gallery assets.  
+9. Close #21 when #24 is merged (or earlier, with a PR comment pointing here).
 
 **Do not:** merge #21 and #24 as independent feature PRs expecting additive history — #21 is a strict subset of #24’s commit graph.
 
@@ -138,7 +141,7 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 Canonical one-liner (matches `docs/go-live-checklist.md`):
 
 ```
-#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #49 → #2 → #48 → #43 → #45 → #32 → #6 → #36
+#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #49 → #51 → #2 → #48 → #43 → #45 → #32 → #6 → #36
 ```
 
 Expanded (meta docs anytime; same product order):
@@ -156,6 +159,7 @@ Expanded (meta docs anytime; same product order):
 → #44 Landing competitor positioning   ← after #24/#38; same stack base
 → #47 Public synthetic accuracy report ← after #24; near #36/#38/#44 (`/accuracy#report`)
 → #49 Landing sample demo CTA          ← after #24/#47; same stack base
+→ #51 robots.txt + sitemap.xml         ← after #24 stack; same base (public/ SEO)
 → #2 Tests
 → #48 Vitest GitHub Actions CI         ← after #2; includes #2 test stack + workflow
 → #43 Playwright smoke paths           ← after #2; near #32 (package.json / TESTING.md)
@@ -174,6 +178,8 @@ Expanded (meta docs anytime; same product order):
 **#47 note:** Public synthetic accuracy report on `/accuracy#report`. **After #24** (base `cursor/landing-accuracy-nav-link-9334`). Keep **near #38/#44** (Landing/AccuracyGallery) and **near #36** (golden-set story). Rebase if #38/#44 already edited gallery/Landing; light Auth/Legal/Settings link touches.
 
 **#49 note:** No-signup sample demo CTA on Landing. **After #24/#47** (same stack base). Shared `Landing.tsx` / `AccuracyGallery.tsx` — rebase onto #47 if both open.
+
+**#51 note:** `robots.txt` + `sitemap.xml` for public marketing routes. **After #24** landing stack (same base). Mostly new `public/` files — low conflict with Landing.tsx PRs; watch `VERCEL_SETUP.md` if #37 already edited it. Pairs with **#38** SEO meta.
 
 **#48 note:** GitHub Actions for Vitest unit tests. **After #2** — PR **includes the #2 test stack** (config, unit tests, fixtures) plus `.github/workflows/vitest.yml`. Merge #2 first when both open (or treat #48 as the combined land if it fully supersedes #2’s tip). Near **#32** (may overlap webhook contract fixtures) and the Playwright CI pair **#43→#45**.
 
@@ -294,6 +300,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`. Merge **#31** 
 - **#44 stacks on #24** (same base as #38) — merge competitor positioning **after #24/#38**.  
 - **#47 stacks on #24** — public `/accuracy#report` after #24; near #36/#38/#44.  
 - **#49 stacks on #24** — sample demo CTA after #24/#47.  
+- **#51 stacks on #24** — robots/sitemap after #24 landing stack.  
 - **#45 stacks on #43** — Playwright CI workflow after smoke specs (e2e included in #45).  
 - **#48 includes #2 test stack** — Vitest GHA **after #2** (similar pattern to #45 on #43).  
 - **#50** Lighthouse advisory CI — **anytime with #45/#48**.  
@@ -307,8 +314,8 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`. Merge **#31** 
 ## Quick reference — one-line order
 
 ```
-Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #49 → #2 → #48 → #43 → #45 → #32 → #6 → #36
-  (#20/#27/#37/#50 anytime; #50 with #45/#48; #46 after #4 / prefer #31; #24 stack #38+#44+#47+#49; #2→#48 confirmed; #43→#45 near #32)
+Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #49 → #51 → #2 → #48 → #43 → #45 → #32 → #6 → #36
+  (#20/#27/#37/#50 anytime; #50 with #45/#48; #46 after #4 / prefer #31; #24 stack #38+#44+#47+#49+#51; #2→#48; #43→#45 near #32)
 → Phase B core: #42 offline → #41 Home hero → #39 Drive backup → #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #46 api/_lib → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
@@ -329,8 +336,8 @@ Practical conflict forecast for the Phase A one-liner (Auth → Legal → Landin
 |---------|-------|-----------|
 | Auth | `#4 → #5 → #35` | `AuthContext`, `Auth.tsx`, `Settings` |
 | Legal | `#5 → #33 → #40` | `Legal.tsx` (+ `TECHNICAL_SPEC` from #1→#33) |
-| Landing stack | `#24 → #38 → #44 → #47 → #49` | `Landing.tsx`, `AccuracyGallery.tsx` |
+| Landing stack | `#24 → #38 → #44 → #47 → #49 → #51` | `Landing.tsx`, `AccuracyGallery.tsx` (+ #51 `public/robots.txt`/`sitemap.xml`) |
 | Test/CI | `#2 → #48 → #43 → #45 → #32` | `package.json`, `TESTING.md`, vitest/e2e (note: #48 includes #2 tree; #45 includes #43 tree) |
 | Eval | `#6 → #36` | `eval/accuracy/` |
 
-**Merge-day tip:** After #24 lands, retarget #38/#44/#47/#49 to `main`. Close #21; skip standalone #3. Rebase each next PR before merge — do not parallel-merge within a cluster.
+**Merge-day tip:** After #24 lands, retarget #38/#44/#47/#49/#51 to `main`. Close #21; skip standalone #3. Rebase each next PR before merge — do not parallel-merge within a cluster.
