@@ -354,6 +354,82 @@ const Landing: React.FC = () => {
                 </div>
             </section>
 
+            {/* Competitor positioning — honest differentiation */}
+            <section id="compare" className="border-b border-brand-800/40">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+                    <div className="text-center max-w-2xl mx-auto mb-10">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                            Built for booth days, not desk scanning
+                        </h2>
+                        <p className="mt-3 text-slate-400 text-sm sm:text-base">
+                            Card scanners and document OCR are excellent at what they do.
+                            Cura.tor focuses on the trade-show gap: sign-in sheets and stacks of cards in one pass.
+                        </p>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-brand-700/60">
+                        <table className="w-full min-w-[720px] text-left border-collapse">
+                            <thead>
+                                <tr className="bg-brand-900/80 border-b border-brand-700/60">
+                                    <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 w-[28%]">Capability</th>
+                                    <th className="px-3 py-3 text-xs font-bold uppercase tracking-wider text-sky-400 text-center">Cura.tor</th>
+                                    <th className="px-3 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 text-center">CamCard-style</th>
+                                    <th className="px-3 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 text-center">ABBYY-style</th>
+                                    <th className="px-3 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 text-center">Excel + photo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {[
+                                    {
+                                        label: 'Event log / sign-in sheets',
+                                        curator: 'Table-aware import with review',
+                                        camcard: 'Not the main job',
+                                        abbyy: 'Doc OCR, not lead import',
+                                        excel: 'Retype or messy paste',
+                                    },
+                                    {
+                                        label: 'Multi-card in one photo',
+                                        curator: 'Split + parse (Pro+)',
+                                        camcard: 'Usually one card at a time',
+                                        abbyy: 'Possible with setup',
+                                        excel: 'Manual crop / retype',
+                                    },
+                                    {
+                                        label: 'Booth-day workflow',
+                                        curator: 'Scan → edit → claim / export',
+                                        camcard: 'Strong CRM card capture',
+                                        abbyy: 'Enterprise pipelines',
+                                        excel: 'Flexible, slow at volume',
+                                    },
+                                    {
+                                        label: 'Where data lives',
+                                        curator: 'On-device first, optional Drive',
+                                        camcard: 'Typically cloud account',
+                                        abbyy: 'Enterprise / cloud stack',
+                                        excel: 'Your spreadsheet file',
+                                    },
+                                ].map((row, i) => (
+                                    <tr
+                                        key={row.label}
+                                        className={i % 2 === 0 ? 'bg-brand-950/40' : 'bg-brand-900/30'}
+                                    >
+                                        <td className="px-4 py-3 text-sm text-slate-300 font-medium">{row.label}</td>
+                                        <td className="px-3 py-3 text-center text-xs sm:text-sm text-sky-300/90">{row.curator}</td>
+                                        <td className="px-3 py-3 text-center text-xs sm:text-sm text-slate-500">{row.camcard}</td>
+                                        <td className="px-3 py-3 text-center text-xs sm:text-sm text-slate-500">{row.abbyy}</td>
+                                        <td className="px-3 py-3 text-center text-xs sm:text-sm text-slate-500">{row.excel}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p className="mt-4 text-center text-xs text-slate-600 max-w-2xl mx-auto">
+                        CamCard and ABBYY remain strong choices for classic card CRM capture and heavyweight document OCR.
+                        If your bottleneck is guest lists and multi-card booth hauls, that is where Cura.tor is built to win.
+                    </p>
+                </div>
+            </section>
+
             {/* Pricing */}
             <section id="pricing" className="border-b border-brand-800/40">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
