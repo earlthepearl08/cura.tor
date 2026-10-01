@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#48)
+## Inventory (#1–#50)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -65,6 +65,8 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 46 | Shared `api/_lib` scan guards | P1 maintenance | Ready for review. `api/_lib/scanGuards.ts` + refactor `api/ocr.ts` / `api/gemini.ts` — **anytime after #4**; prefer **after #31** (OCR API stack) / rebase if #37 touched same APIs |
 | 47 | Public synthetic accuracy report | P0 trust/landing | Ready for review. `/accuracy#report` — `AccuracyReportSection`, `accuracyReport.ts`, AccuracyGallery/Landing (+ Auth/Legal/Settings links) — **after #24**; **near #36/#38/#44**; base `cursor/landing-accuracy-nav-link-9334` |
 | 48 | Vitest GitHub Actions CI | P0 tests | Ready for review. `.github/workflows/vitest.yml` + **includes #2 test stack** (vitest config, unit tests, fixtures) — **after #2**; near #32/#43/#45 |
+| 49 | Landing sample demo CTA | P0 landing | Ready for review. No-signup sample demo CTA — `Landing.tsx`, `AccuracyGallery.tsx` — **after #24/#47**; base `cursor/landing-accuracy-nav-link-9334` |
+| 50 | Lighthouse advisory CI | Meta CI | Ready for review. Advisory Lighthouse for Landing (§8 budgets) — `.github/workflows/lighthouse-advisory.yml`, `lighthouserc.cjs`, `docs/lighthouse.md` — **anytime with #45/#48** |
 
 ---
 
@@ -76,7 +78,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | `src/App.tsx` | +21, 23, 24, 26 | High — landing → gallery → a11y → events |
 | `src/contexts/AuthContext.tsx` | +**35**, 22, 26, 28 | High — Stripe → trust → **password reset** → Sentry → event pack → magic link |
 | `src/pages/Auth.tsx` | +**35**, 21, 23, 24, 28 | High — **#35** after #5 |
-| `src/pages/Landing.tsx` | **#3 ⊂ #24 → #38 → #44 → #47** | Prefer **#24** then SEO **#38**, competitor **#44**, report **#47**; do not also merge #21 |
+| `src/pages/Landing.tsx` | **#3 ⊂ #24 → #38 → #44 → #47 → #49** | Prefer **#24** then SEO **#38**, competitor **#44**, report **#47**, demo CTA **#49**; do not also merge #21 |
 | `api/stripe-webhook.ts` / checkout | **#4, #26** | #26 after #4 |
 | `firestore.rules` | +19, 26 | Claims → glossary → events → event-pack |
 | `src/pages/LogScan.tsx` | +23 | Still highest with OCR stack |
@@ -108,8 +110,9 @@ Inspected 2026-10-01:
 3. Merge **#38** Landing SEO meta **immediately after #24** (PR base `cursor/landing-accuracy-nav-link-9334`; retarget to `main` once #24 lands if needed).  
 4. Merge **#44** competitor positioning **after #24/#38** (same stack base `cursor/landing-accuracy-nav-link-9334`; rebase onto #38 if both open).  
 5. Merge **#47** public synthetic accuracy report (`/accuracy#report`) **after #24** — near **#38/#44** (shared gallery/Landing); conceptually near **#36** golden set.  
-6. **Close #21** as superseded (do not merge separately).  
-7. **Close or skip #3** if #24 already merged (its commit is inside #24); if you want a smaller review first, merge **#3** then **#24** (Git will recognize #3 as already contained).
+6. Merge **#49** Landing sample demo CTA **after #24/#47** (same stack base; shared Landing/AccuracyGallery).  
+7. **Close #21** as superseded (do not merge separately).  
+8. **Close or skip #3** if #24 already merged (its commit is inside #24); if you want a smaller review first, merge **#3** then **#24** (Git will recognize #3 as already contained).
 
 **Alternative — staged reviews**
 
@@ -118,8 +121,9 @@ Inspected 2026-10-01:
 3. Merge **#38** SEO (after #24 is on `main`).  
 4. Merge **#44** competitor section (after #24/#38).  
 5. Merge **#47** accuracy report (after #24; rebase if #38/#44 touched gallery/Landing).  
-6. **Never merge #21 after #24** — redundant / conflict theater on gallery assets.  
-7. Close #21 when #24 is merged (or earlier, with a PR comment pointing here).
+6. Merge **#49** sample demo CTA (after #24/#47).  
+7. **Never merge #21 after #24** — redundant / conflict theater on gallery assets.  
+8. Close #21 when #24 is merged (or earlier, with a PR comment pointing here).
 
 **Do not:** merge #21 and #24 as independent feature PRs expecting additive history — #21 is a strict subset of #24’s commit graph.
 
@@ -134,13 +138,13 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 Canonical one-liner (matches `docs/go-live-checklist.md`):
 
 ```
-#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #2 → #48 → #43 → #45 → #32 → #6 → #36
+#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #49 → #2 → #48 → #43 → #45 → #32 → #6 → #36
 ```
 
 Expanded (meta docs anytime; same product order):
 
 ```
-#1 Operator runbook   (+ #20 / #27 / #37 anytime)
+#1 Operator runbook   (+ #20 / #27 / #37 anytime; #50 Lighthouse anytime with #45/#48)
 → #4 Stripe
 → #5 Trust
 → #35 Password reset (Auth)            ← P0; after #5 Auth
@@ -151,6 +155,7 @@ Expanded (meta docs anytime; same product order):
 → #38 Landing SEO meta                 ← after #24; base `cursor/landing-accuracy-nav-link-9334`
 → #44 Landing competitor positioning   ← after #24/#38; same stack base
 → #47 Public synthetic accuracy report ← after #24; near #36/#38/#44 (`/accuracy#report`)
+→ #49 Landing sample demo CTA          ← after #24/#47; same stack base
 → #2 Tests
 → #48 Vitest GitHub Actions CI         ← after #2; includes #2 test stack + workflow
 → #43 Playwright smoke paths           ← after #2; near #32 (package.json / TESTING.md)
@@ -168,7 +173,11 @@ Expanded (meta docs anytime; same product order):
 
 **#47 note:** Public synthetic accuracy report on `/accuracy#report`. **After #24** (base `cursor/landing-accuracy-nav-link-9334`). Keep **near #38/#44** (Landing/AccuracyGallery) and **near #36** (golden-set story). Rebase if #38/#44 already edited gallery/Landing; light Auth/Legal/Settings link touches.
 
+**#49 note:** No-signup sample demo CTA on Landing. **After #24/#47** (same stack base). Shared `Landing.tsx` / `AccuracyGallery.tsx` — rebase onto #47 if both open.
+
 **#48 note:** GitHub Actions for Vitest unit tests. **After #2** — PR **includes the #2 test stack** (config, unit tests, fixtures) plus `.github/workflows/vitest.yml`. Merge #2 first when both open (or treat #48 as the combined land if it fully supersedes #2’s tip). Near **#32** (may overlap webhook contract fixtures) and the Playwright CI pair **#43→#45**.
+
+**#50 note:** Advisory Lighthouse CI for Landing (§8 budgets). **Meta anytime with #45/#48** (CI workflows / `package.json`). Non-blocking advisory — can land parallel to product Phase A once Landing exists (#24+).
 
 **#43 note:** Playwright smoke for auth → scan → save → export. Merge **after #2** (test harness / `TESTING.md`). Keep **near #32** — both extend the test stack and may touch `package.json`. Light AuthContext/Contacts hooks for e2e mocks: rebase if #10/#8/#42 already landed those files.
 
@@ -251,8 +260,8 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`. Merge **#31** 
 
 - **`AuthContext`:** `#4` → `#5` → `#35` → `#10` → `#8` → `#22` → `#28` → `#26`
 - **`Auth.tsx`:** `#5` → `#35` → `#42` → `#3` → `#21`/`#24` → `#23` → `#28`
-- **`Landing.tsx`:** `#3` → `#24` → `#38` → `#44` → `#47`
-- **`AccuracyGallery.tsx`:** `#21`/`#24` → `#38` → `#47`
+- **`Landing.tsx`:** `#3` → `#24` → `#38` → `#44` → `#47` → `#49`
+- **`AccuracyGallery.tsx`:** `#21`/`#24` → `#38` → `#47` → `#49`
 - **`Home.tsx`:** `#5` → `#42` → `#41` → `#39` → `#10` → `#23`
 - **`App.tsx`:** `#3` → `#16` → `#21`/`#24` → `#23` → `#19` → `#26`
 - **`Settings`:** `#4` → `#5` → `#3` → `#39` → `#10` → `#34` → `#9` → `#8` → `#16` → `#21` → `#22` → `#25` → `#18` → `#17` → `#19`/`#26`
@@ -261,7 +270,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`. Merge **#31** 
 - **`firestore.rules`:** `#12` → `#13` → `#17` → `#19` → `#26`
 - **Stripe APIs:** `#4` → `#32` (tests) → `#26`
 - **`api/ocr.ts` / `api/gemini.ts`:** `#4` → `#37` (docs touch) → `#31` → `#46` (`_lib` extract)
-- **`package.json`:** `#5` → `#2` → `#48` → `#43` → `#45` → `#32` → `#6` → `#22`
+- **`package.json`:** `#5` → `#2` → `#48` → `#43` → `#45` → `#50` → `#32` → `#6` → `#22`
 - **`eval/`:** `#6` → `#36`
 
 ---
@@ -284,20 +293,22 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`. Merge **#31** 
 - **#38 stacks on #24** — merge SEO meta only after #24 (retarget to `main` once #24 lands if needed).  
 - **#44 stacks on #24** (same base as #38) — merge competitor positioning **after #24/#38**.  
 - **#47 stacks on #24** — public `/accuracy#report` after #24; near #36/#38/#44.  
+- **#49 stacks on #24** — sample demo CTA after #24/#47.  
 - **#45 stacks on #43** — Playwright CI workflow after smoke specs (e2e included in #45).  
-- **#48 includes #2 test stack** — Vitest GHA after #2 (similar pattern to #45 on #43).  
+- **#48 includes #2 test stack** — Vitest GHA **after #2** (similar pattern to #45 on #43).  
+- **#50** Lighthouse advisory CI — **anytime with #45/#48**.  
 - **#46** shared `api/_lib` — anytime after **#4**; prefer after **#31** OCR API stack.  
 - **#26 stacks on #19 and #4** — never before Stripe lifecycle + event workspaces.  
 - `#14`+`#15` remain the hottest LogScan pair.  
-- Meta docs **#20** / **#27** / **#1** / **#37** (Gemini ops) can merge any time; **#33** then **#40** wait on **#5** for `Legal.tsx`. **#37** is mostly ops docs — if `#31`/`#46`/`#6` already changed `api/ocr.ts`, rebase #37 first.
+- Meta docs **#20** / **#27** / **#1** / **#37** (Gemini ops) / **#50** (Lighthouse CI) can merge any time; **#33** then **#40** wait on **#5** for `Legal.tsx`. **#37** is mostly ops docs — if `#31`/`#46`/`#6` already changed `api/ocr.ts`, rebase #37 first.
 
 ---
 
 ## Quick reference — one-line order
 
 ```
-Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #2 → #48 → #43 → #45 → #32 → #6 → #36
-  (#20/#27/#37 anytime with #1; #46 anytime after #4 / prefer after #31; #24 includes #3+#21 — close #21; #38+#44+#47 after #24 near #36; #40 after #33; #2→#48 and #43→#45 CI stacks near #32)
+Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #47 → #49 → #2 → #48 → #43 → #45 → #32 → #6 → #36
+  (#20/#27/#37/#50 anytime; #50 with #45/#48; #46 after #4 / prefer #31; #24 stack #38+#44+#47+#49; #2→#48 confirmed; #43→#45 near #32)
 → Phase B core: #42 offline → #41 Home hero → #39 Drive backup → #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #46 api/_lib → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
