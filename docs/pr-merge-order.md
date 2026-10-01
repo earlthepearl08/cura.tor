@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#36)
+## Inventory (#1–#37)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -53,6 +53,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 34 | Settings OCR Advanced disclosure | P1 Settings | Ready for review. Hides OCR engine behind Advanced — `Settings.tsx`, `ocr.ts` — **after #5/#10** Settings stack (before later Settings pile-up) |
 | 35 | Email password reset on Auth | **P0** auth | Ready for review. `Auth.tsx`, `AuthContext` — **after #5** Auth trust edits; before #28 magic-link |
 | 36 | Synthetic accuracy golden set (30/10) | P0 accuracy | Ready for review. `eval/accuracy/` fixtures + scoring + `HOWTO-REAL-SAMPLES.md` — **after #6** scaffold (Phase A follow-on); separate branch from #6 |
+| 37 | Gemini ops / cost monitoring docs | Meta ops | Ready for review. `GEMINI_OPS.md`, `VERCEL_SETUP.md`, `.env.example` (+ light `api/gemini.ts` / `api/ocr.ts` notes) — **anytime with #1 / #20 / #27**; rebase if OCR API PRs land first |
 
 ---
 
@@ -122,7 +123,7 @@ Canonical one-liner (matches `docs/go-live-checklist.md`):
 Expanded (meta docs anytime; same product order):
 
 ```
-#1 Operator runbook   (+ #20 / #27 anytime)
+#1 Operator runbook   (+ #20 / #27 / #37 anytime)
 → #4 Stripe
 → #5 Trust
 → #35 Password reset (Auth)            ← P0; after #5 Auth
@@ -144,6 +145,8 @@ Expanded (meta docs anytime; same product order):
 **#35 note:** Password reset is a **P0** trust/auth gap. Merge **immediately after #5** (shared `Auth.tsx` / `AuthContext`). Keep **#28** magic-link later so reset lands first.
 
 **#36 note:** Phase A follow-on — full synthetic golden set (30 cards + 10 PH log sheets) and `HOWTO-REAL-SAMPLES.md`. Merge **after #6** so the eval scaffold/monitoring hooks exist first; rebase onto #6 if both touch `eval/`.
+
+**#37 note:** Ops docs for Gemini billing / rate+cost monitoring (`GEMINI_OPS.md`). Merge **anytime with #1 / #20 / #27**. Light touches to `api/gemini.ts` / `api/ocr.ts` — rebase if those APIs already changed on `main`.
 
 ### Phase B — P1 retention / conversion (core five)
 
@@ -231,7 +234,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 - **#24** is the landing+gallery stack (**includes #3 + #21**) — never merge #21 separately after #24; close #21 as superseded.  
 - **#26 stacks on #19 and #4** — never before Stripe lifecycle + event workspaces.  
 - `#14`+`#15` remain the hottest LogScan pair.  
-- Meta docs **#20** / **#27** / **#1** / **#33** (Legal/docs) can land early in Phase A; **#33** still waits on **#5** for `Legal.tsx`.
+- Meta docs **#20** / **#27** / **#1** / **#37** (Gemini ops) can merge any time; **#33** still waits on **#5** for `Legal.tsx`. **#37** is mostly ops docs — if `#31`/`#6` already changed `api/ocr.ts`, rebase #37 first.
 
 ---
 
@@ -239,7 +242,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 
 ```
 Phase A: #1 → #4 → #5 → #35 → #33 → #24 → #2 → #32 → #6 → #36
-  (#20/#27 anytime with #1; #24 includes #3+#21 — close #21)
+  (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21)
 → Phase B core: #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
