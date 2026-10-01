@@ -584,10 +584,10 @@ const Contacts: React.FC = () => {
     return (
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
-            <div className="flex flex-col glass sticky top-0 z-10 p-4 gap-4">
+            <header className="flex flex-col glass sticky top-0 z-10 p-4 gap-4">
                 <div className="flex items-center justify-between">
-                    <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                        <ArrowLeft size={24} />
+                    <button type="button" onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Back to home">
+                        <ArrowLeft size={24} aria-hidden="true" />
                     </button>
                     <div className="text-center">
                         <h1 className="text-lg font-semibold gradient-text">
@@ -597,58 +597,73 @@ const Contacts: React.FC = () => {
                             <p className="text-[10px] text-sky-400/70 mt-0.5">{organization.name}</p>
                         )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1" role="toolbar" aria-label="Contact actions">
                         {/* VCF Import */}
-                        <input ref={vcfFileRef} type="file" accept=".vcf" className="hidden" onChange={handleVcfFile} />
+                        <input ref={vcfFileRef} type="file" accept=".vcf" className="hidden" onChange={handleVcfFile} aria-hidden="true" tabIndex={-1} />
                         <button
+                            type="button"
                             onClick={() => vcfFileRef.current?.click()}
                             className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400 hover:text-white"
                             title="Import VCF"
+                            aria-label="Import VCF"
                         >
-                            <Upload size={20} />
+                            <Upload size={20} aria-hidden="true" />
                         </button>
                         {/* Select Mode Toggle */}
                         <button
+                            type="button"
                             onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
                             className={`p-2 rounded-full transition-colors ${selectMode ? 'bg-brand-500/20 text-brand-400' : 'hover:bg-white/10 text-brand-400 hover:text-white'}`}
+                            aria-label={selectMode ? 'Exit select mode' : 'Enter select mode'}
+                            aria-pressed={selectMode}
                         >
-                            <CheckSquare size={20} />
+                            <CheckSquare size={20} aria-hidden="true" />
                         </button>
                         {/* Export */}
                         <div className="relative">
                             <button
+                                type="button"
                                 onClick={() => setShowExportOptions(!showExportOptions)}
                                 className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400 hover:text-white"
+                                aria-label="Export contacts"
+                                aria-expanded={showExportOptions}
+                                aria-haspopup="menu"
                             >
-                                <Download size={20} />
+                                <Download size={20} aria-hidden="true" />
                             </button>
                             {showExportOptions && (
-                                <div className="absolute right-0 mt-2 w-48 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden">
+                                <div className="absolute right-0 mt-2 w-48 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden" role="menu">
                                     {selectedIds.size > 0 && (
                                         <div className="px-4 py-2 text-xs text-brand-400 border-b border-brand-800 bg-brand-500/10">
                                             {selectedIds.size} contact{selectedIds.size > 1 ? 's' : ''} selected
                                         </div>
                                     )}
                                     <button
+                                        type="button"
+                                        role="menuitem"
                                         onClick={() => handleExport('csv')}
                                         className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors flex items-center justify-between ${!canExportCSV() ? 'opacity-60' : ''}`}
                                     >
                                         Export as CSV
-                                        {!canExportCSV() && <Lock size={12} className="text-amber-400" />}
+                                        {!canExportCSV() && <Lock size={12} className="text-amber-400" aria-hidden="true" />}
                                     </button>
                                     <button
+                                        type="button"
+                                        role="menuitem"
                                         onClick={() => handleExport('excel')}
                                         className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportExcel() ? 'opacity-60' : ''}`}
                                     >
                                         Export as Excel
-                                        {!canExportExcel() && <Lock size={12} className="text-amber-400" />}
+                                        {!canExportExcel() && <Lock size={12} className="text-amber-400" aria-hidden="true" />}
                                     </button>
                                     <button
+                                        type="button"
+                                        role="menuitem"
                                         onClick={() => handleExport('vcard')}
                                         className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportBulkVCard() ? 'opacity-60' : ''}`}
                                     >
                                         Export as vCard (.vcf)
-                                        {!canExportBulkVCard() && <Lock size={12} className="text-amber-400" />}
+                                        {!canExportBulkVCard() && <Lock size={12} className="text-amber-400" aria-hidden="true" />}
                                     </button>
                                 </div>
                             )}
@@ -657,9 +672,11 @@ const Contacts: React.FC = () => {
                 </div>
 
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" size={18} />
+                    <label htmlFor="contacts-search" className="sr-only">Search contacts</label>
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" size={18} aria-hidden="true" />
                     <input
-                        type="text"
+                        id="contacts-search"
+                        type="search"
                         placeholder="Search contacts..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -670,11 +687,15 @@ const Contacts: React.FC = () => {
                 {/* Folder Filter */}
                 <div className="relative">
                     <button
+                        type="button"
                         onClick={() => setShowFolderDropdown(!showFolderDropdown)}
                         className="w-full flex items-center justify-between bg-brand-900/50 border border-brand-800 rounded-xl py-2.5 px-4 hover:bg-brand-900/70 transition-all text-sm"
+                        aria-expanded={showFolderDropdown}
+                        aria-haspopup="listbox"
+                        aria-label={`Folder filter: ${selectedFolder === 'all' ? 'All Folders' : selectedFolder}`}
                     >
                         <div className="flex items-center gap-2">
-                            <Folder size={18} className="text-brand-500" />
+                            <Folder size={18} className="text-brand-500" aria-hidden="true" />
                             <span>{selectedFolder === 'all' ? 'All Folders' : selectedFolder}</span>
                         </div>
                         <span className="text-brand-500 text-xs">{filteredContacts.length}</span>
@@ -753,14 +774,18 @@ const Contacts: React.FC = () => {
                 {/* Batch Filter */}
                 {batches.length > 0 && (
                     <div className="relative">
-                        <button
-                            onClick={() => setShowBatchDropdown(!showBatchDropdown)}
-                            className="w-full flex items-center justify-between bg-brand-900/50 border border-brand-800 rounded-xl py-2.5 px-4 hover:bg-brand-900/70 transition-all text-sm"
-                        >
-                            <div className="flex items-center gap-2">
-                                <Layers size={18} className="text-violet-500" />
-                                <span>{selectedBatch === 'all' ? 'All Batches' : batches.find(b => b.id === selectedBatch)?.name || 'Unknown'}</span>
-                            </div>
+                <button
+                    type="button"
+                    onClick={() => setShowBatchDropdown(!showBatchDropdown)}
+                    className="w-full flex items-center justify-between bg-brand-900/50 border border-brand-800 rounded-xl py-2.5 px-4 hover:bg-brand-900/70 transition-all text-sm"
+                    aria-expanded={showBatchDropdown}
+                    aria-haspopup="listbox"
+                    aria-label={`Batch filter: ${selectedBatch === 'all' ? 'All Batches' : batches.find(b => b.id === selectedBatch)?.name || 'Unknown'}`}
+                >
+                    <div className="flex items-center gap-2">
+                        <Layers size={18} className="text-violet-500" aria-hidden="true" />
+                        <span>{selectedBatch === 'all' ? 'All Batches' : batches.find(b => b.id === selectedBatch)?.name || 'Unknown'}</span>
+                    </div>
                             <span className="text-brand-500 text-xs">{filteredContacts.length}</span>
                         </button>
 
@@ -806,36 +831,44 @@ const Contacts: React.FC = () => {
                 {isTeamMode && (
                     <div className="flex gap-2 flex-wrap">
                         {uniqueScanners.length > 0 && (
-                            <select
-                                value={selectedScanner}
-                                onChange={(e) => setSelectedScanner(e.target.value)}
-                                className="flex-1 min-w-[140px] bg-brand-900/50 border border-brand-800 rounded-xl py-2 px-3 text-sm hover:bg-brand-900/70 transition-all outline-none focus:border-sky-500"
-                            >
-                                <option value="all">All scanners</option>
-                                {uniqueScanners.map(s => (
-                                    <option key={s.uid} value={s.uid}>
-                                        {s.uid === currentUid ? `${s.name} (you)` : s.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <>
+                                <label htmlFor="contacts-scanner-filter" className="sr-only">Filter by scanner</label>
+                                <select
+                                    id="contacts-scanner-filter"
+                                    value={selectedScanner}
+                                    onChange={(e) => setSelectedScanner(e.target.value)}
+                                    className="flex-1 min-w-[140px] bg-brand-900/50 border border-brand-800 rounded-xl py-2 px-3 text-sm hover:bg-brand-900/70 transition-all outline-none focus:border-sky-500"
+                                >
+                                    <option value="all">All scanners</option>
+                                    {uniqueScanners.map(s => (
+                                        <option key={s.uid} value={s.uid}>
+                                            {s.uid === currentUid ? `${s.name} (you)` : s.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </>
                         )}
                         {organization?.claimsEnabled !== false && (
-                            <select
-                                value={claimFilter}
-                                onChange={(e) => setClaimFilter(e.target.value as typeof claimFilter)}
-                                className="flex-1 min-w-[140px] bg-brand-900/50 border border-brand-800 rounded-xl py-2 px-3 text-sm hover:bg-brand-900/70 transition-all outline-none focus:border-sky-500"
-                            >
-                                <option value="all">All claims</option>
-                                <option value="mine">Claimed by me</option>
-                                <option value="unclaimed">Unclaimed</option>
-                                <option value="theirs">Claimed by others</option>
-                            </select>
+                            <>
+                                <label htmlFor="contacts-claim-filter" className="sr-only">Filter by claim status</label>
+                                <select
+                                    id="contacts-claim-filter"
+                                    value={claimFilter}
+                                    onChange={(e) => setClaimFilter(e.target.value as typeof claimFilter)}
+                                    className="flex-1 min-w-[140px] bg-brand-900/50 border border-brand-800 rounded-xl py-2 px-3 text-sm hover:bg-brand-900/70 transition-all outline-none focus:border-sky-500"
+                                >
+                                    <option value="all">All claims</option>
+                                    <option value="mine">Claimed by me</option>
+                                    <option value="unclaimed">Unclaimed</option>
+                                    <option value="theirs">Claimed by others</option>
+                                </select>
+                            </>
                         )}
                     </div>
                 )}
-            </div>
+            </header>
 
-            <div className="flex-1 p-4 space-y-6">
+            <main id="main-content" className="flex-1 p-4 space-y-6">
                 {isLoading ? (
                     <div className="flex items-center justify-center h-64">
                         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-400"></div>
@@ -878,16 +911,18 @@ const Contacts: React.FC = () => {
                     // Show flat list when folder is selected
                     filteredContacts.map((contact) => renderContactCard(contact))
                 )}
-            </div>
+            </main>
 
             {selectMode ? (
-                <div className="sticky bottom-0 glass border-t border-brand-800 p-4 z-10 space-y-3">
+                <div className="sticky bottom-0 glass border-t border-brand-800 p-4 z-10 space-y-3" role="region" aria-label="Bulk selection actions">
                     <div className="flex items-center justify-between gap-3">
                         <button
+                            type="button"
                             onClick={toggleSelectAll}
                             className="flex items-center gap-2 px-3 py-2 bg-brand-800/50 hover:bg-brand-800 rounded-xl text-sm transition-colors"
+                            aria-label={selectedIds.size === filteredContacts.length ? 'Deselect all contacts' : 'Select all contacts'}
                         >
-                            {selectedIds.size === filteredContacts.length ? <CheckSquare size={16} className="text-brand-400" /> : <Square size={16} className="text-brand-600" />}
+                            {selectedIds.size === filteredContacts.length ? <CheckSquare size={16} className="text-brand-400" aria-hidden="true" /> : <Square size={16} className="text-brand-500" aria-hidden="true" />}
                             <span>{selectedIds.size === filteredContacts.length ? 'Deselect All' : 'Select All'}</span>
                         </button>
                         <span className="text-xs text-brand-500">{selectedIds.size} selected</span>
@@ -932,10 +967,10 @@ const Contacts: React.FC = () => {
 
             {/* Create Folder Modal */}
             {showCreateFolder && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="create-folder-title">
                     <div className="bg-brand-900 rounded-2xl w-full max-w-sm border border-brand-800 shadow-2xl">
                         <div className="p-4 border-b border-brand-800">
-                            <h3 className="text-lg font-bold gradient-text">Create New Folder</h3>
+                            <h3 id="create-folder-title" className="text-lg font-bold gradient-text">Create New Folder</h3>
                         </div>
                         <div className="p-4 space-y-4">
                             <div className="relative">
@@ -1000,23 +1035,23 @@ const Contacts: React.FC = () => {
 
             {/* Edit Contact Modal */}
             {editingContact && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-contact-title">
                     <div className="bg-brand-900 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-brand-800 shadow-2xl">
                         {/* Modal Header */}
                         <div className="p-4 border-b border-brand-800 flex items-center justify-between sticky top-0 bg-brand-900">
-                            <button onClick={closeEditModal} className="p-2 text-brand-600 hover:text-white">
-                                <X size={20} />
+                            <button type="button" onClick={closeEditModal} className="p-2 text-brand-400 hover:text-white" aria-label="Close edit contact">
+                                <X size={20} aria-hidden="true" />
                             </button>
-                            <h3 className="text-lg font-bold gradient-text">Edit Contact</h3>
-                            <button onClick={handleSaveEdit} className="p-2 text-emerald-500 hover:text-emerald-400">
-                                <Save size={20} />
+                            <h3 id="edit-contact-title" className="text-lg font-bold gradient-text">Edit Contact</h3>
+                            <button type="button" onClick={handleSaveEdit} className="p-2 text-emerald-500 hover:text-emerald-400" aria-label="Save contact">
+                                <Save size={20} aria-hidden="true" />
                             </button>
                         </div>
 
                         {/* Card Preview + Photos */}
                         <div className="p-4 space-y-3">
                             <div className="w-full aspect-[1.586/1] rounded-xl overflow-hidden bg-brand-800 border border-brand-700">
-                                <img src={editingContact.imageData} alt="card" className="w-full h-full object-cover" />
+                                <img src={editingContact.imageData} alt="Business card preview" className="w-full h-full object-cover" />
                             </div>
                             <input ref={editPersonCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setEditPersonPhoto(await compressPhoto(f)); e.target.value = ''; }} />
                             <input ref={editPersonGalRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setEditPersonPhoto(await compressPhoto(f)); e.target.value = ''; }} />

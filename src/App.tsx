@@ -29,6 +29,9 @@ function App() {
         <Router>
             <AuthProvider>
                 <WorkspaceProvider>
+                    <a href="#main-content" className="skip-link">
+                        Skip to main content
+                    </a>
                     <div className="min-height-screen bg-brand-950">
                         <Routes>
                             <Route path="/auth" element={<Auth />} />
