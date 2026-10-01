@@ -7,7 +7,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TIER_LIMITS } from '@/types/user';
-import { STRIPE_PRICES, createCheckoutSession, createPortalSession, PLAN_TO_TIER, type BillingInterval } from '@/services/stripe';
+import { STRIPE_PRICES, createCheckoutSession, createPortalSession, type BillingInterval } from '@/services/stripe';
 import AccessCodeInput from '@/components/AccessCodeInput';
 import RequestTeamAccessCard from '@/components/RequestTeamAccessCard';
 import RedeemTeamCodeCard from '@/components/RedeemTeamCodeCard';
@@ -48,33 +48,69 @@ const Settings = () => {
     const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
     const [isUpgrading, setIsUpgrading] = useState(false);
     const [upgradeError, setUpgradeError] = useState('');
-    const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled'; text: string } | null>(null);
+    const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled' | 'pending'; text: string } | null>(null);
     const [showDeleteAccount, setShowDeleteAccount] = useState(false);
     const isOwnerAccount = !!user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
 
     const tierBadge = TIER_BADGES[user?.tier || 'free'];
     const limits = TIER_LIMITS[user?.tier || 'free'];
 
-    // Handle payment callback from Stripe
+    // Handle payment callback from Stripe — confirm upgrade from Firestore, not redirect alone
     useEffect(() => {
         const payment = searchParams.get('payment');
-        if (payment === 'success') {
-            setPaymentMessage({ type: 'success', text: 'Payment successful! Your plan has been upgraded.' });
-            refreshUserProfile();
-            // Clean up URL
-            searchParams.delete('payment');
-            setSearchParams(searchParams, { replace: true });
-        } else if (payment === 'canceled') {
+        if (!payment) return;
+
+        const next = new URLSearchParams(searchParams);
+        next.delete('payment');
+        setSearchParams(next, { replace: true });
+
+        if (payment === 'canceled') {
             setPaymentMessage({ type: 'canceled', text: 'Payment was canceled. No changes were made.' });
-            searchParams.delete('payment');
-            setSearchParams(searchParams, { replace: true });
+            return;
         }
+
+        if (payment !== 'success') return;
+
+        let cancelled = false;
+        const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+        (async () => {
+            setPaymentMessage({ type: 'pending', text: 'Confirming your upgrade…' });
+            const deadline = Date.now() + 45_000;
+
+            while (!cancelled && Date.now() < deadline) {
+                const profile = await refreshUserProfile();
+                if (
+                    profile?.stripe?.subscriptionId &&
+                    (profile.stripe.subscriptionStatus === 'active')
+                ) {
+                    const label = profile.tier === 'pro' ? 'Pro' : profile.tier === 'early_access' ? 'Pioneer' : 'paid';
+                    if (!cancelled) {
+                        setPaymentMessage({
+                            type: 'success',
+                            text: `You're on ${label}! Your plan is active.`,
+                        });
+                    }
+                    return;
+                }
+                await sleep(1_500);
+            }
+
+            if (!cancelled) {
+                setPaymentMessage({
+                    type: 'pending',
+                    text: 'Payment received — plan activation is taking longer than usual. Refresh this page in a moment.',
+                });
+            }
+        })();
+
+        return () => { cancelled = true; };
     }, []);
 
-    // Auto-dismiss payment message
+    // Auto-dismiss settled payment messages (keep pending visible)
     useEffect(() => {
-        if (paymentMessage) {
-            const timer = setTimeout(() => setPaymentMessage(null), 6000);
+        if (paymentMessage && paymentMessage.type !== 'pending') {
+            const timer = setTimeout(() => setPaymentMessage(null), 8000);
             return () => clearTimeout(timer);
         }
     }, [paymentMessage]);
@@ -86,12 +122,10 @@ const Settings = () => {
 
         try {
             const price = STRIPE_PRICES[plan][billingInterval];
-            const url = await createCheckoutSession({
-                firebaseUid: firebaseUser.uid,
-                email: user.email,
-                priceId: price.id,
-                tier: PLAN_TO_TIER[plan],
-            });
+            if (!price.id) {
+                throw new Error('Stripe price is not configured for this plan.');
+            }
+            const url = await createCheckoutSession({ priceId: price.id });
             window.location.href = url;
         } catch (err: any) {
             console.error('Upgrade failed:', err);
@@ -106,7 +140,7 @@ const Settings = () => {
         setUpgradeError('');
 
         try {
-            const url = await createPortalSession(user.stripe.customerId);
+            const url = await createPortalSession();
             window.location.href = url;
         } catch (err: any) {
             console.error('Portal failed:', err);
@@ -159,6 +193,8 @@ const Settings = () => {
                 <div className={`mx-6 mt-4 p-3 rounded-xl flex items-center justify-between text-sm ${
                     paymentMessage.type === 'success'
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : paymentMessage.type === 'pending'
+                        ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
                         : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                 }`}>
                     <span>{paymentMessage.text}</span>

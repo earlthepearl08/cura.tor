@@ -57,8 +57,8 @@ interface AuthContextType {
     resendVerificationEmail: () => Promise<void>;
     reloadFirebaseUser: () => Promise<void>;
 
-    // Refresh
-    refreshUserProfile: () => Promise<void>;
+    // Refresh — returns the latest profile (or null if signed out / load failed)
+    refreshUserProfile: () => Promise<UserProfile | null>;
 }
 
 const DEFAULT_LIMITS: TierLimits = TIER_LIMITS.free;
@@ -124,10 +124,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => unsubscribe();
     }, []);
 
-    const refreshUserProfile = useCallback(async () => {
-        if (firebaseUser) {
+    const refreshUserProfile = useCallback(async (): Promise<UserProfile | null> => {
+        if (!firebaseUser) return null;
+        try {
             const profile = await getOrCreateUserDoc(firebaseUser);
             setUser(profile);
+            return profile;
+        } catch (err) {
+            console.error('Failed to refresh user profile:', err);
+            return null;
         }
     }, [firebaseUser]);
 
