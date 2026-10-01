@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#35)
+## Inventory (#1–#36)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -52,6 +52,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 33 | Legal subprocessors + Privacy AI path | P0 trust/docs | Ready for review. `Legal.tsx`, `TECHNICAL_SPEC.md` — **after #5** (Legal trust edits); near **#1** docs (`TECHNICAL_SPEC` overlap — rebase onto #1 if both open) |
 | 34 | Settings OCR Advanced disclosure | P1 Settings | Ready for review. Hides OCR engine behind Advanced — `Settings.tsx`, `ocr.ts` — **after #5/#10** Settings stack (before later Settings pile-up) |
 | 35 | Email password reset on Auth | **P0** auth | Ready for review. `Auth.tsx`, `AuthContext` — **after #5** Auth trust edits; before #28 magic-link |
+| 36 | Synthetic accuracy golden set (30/10) | P0 accuracy | Ready for review. `eval/accuracy/` fixtures + scoring + `HOWTO-REAL-SAMPLES.md` — **after #6** scaffold (Phase A follow-on); separate branch from #6 |
 
 ---
 
@@ -123,6 +124,7 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 → #2 Tests
 → #32 Stripe webhook Vitest fixtures   ← after #4 handler + #2 Vitest scaffold
 → #6 Accuracy scaffold
+→ #36 Synthetic 30-card / 10 log-sheet golden set + HOWTO-REAL-SAMPLES  ← after #6
 ```
 
 **#24 note:** Stacked merge of landing (`#3`) + gallery (`#21`) + accuracy nav. See section above.
@@ -132,6 +134,8 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 **#33 note:** Extends trust/Legal honesty with subprocessors + AI image/retention privacy. Merge **after #5**. If **#1** already landed `TECHNICAL_SPEC.md` fixes, rebase #33 onto that tip before merge.
 
 **#35 note:** Password reset is a **P0** trust/auth gap. Merge **immediately after #5** (shared `Auth.tsx` / `AuthContext`). Keep **#28** magic-link later so reset lands first.
+
+**#36 note:** Phase A follow-on — full synthetic golden set (30 cards + 10 PH log sheets) and `HOWTO-REAL-SAMPLES.md`. Merge **after #6** so the eval scaffold/monitoring hooks exist first; rebase onto #6 if both touch `eval/`.
 
 ### Phase B — P1 retention / conversion (core five)
 
@@ -198,6 +202,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 - **`firestore.rules`:** `#12` → `#13` → `#17` → `#19` → `#26`
 - **Stripe APIs:** `#4` → `#32` (tests) → `#26`
 - **`package.json`:** `#5` → `#2` → `#32` → `#6` → `#22`
+- **`eval/`:** `#6` → `#36`
 
 ---
 
@@ -227,7 +232,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 ```
 #20/#27/#1 (docs) → #4 Stripe → #5 Trust → #35 Password reset → #33 Legal subprocessors/Privacy AI
 → #24 Landing+gallery+nav (includes #3+#21; close #21)
-→ #2 Tests → #32 Webhook Vitest → #6 Accuracy scaffold
+→ #2 Tests → #32 Webhook Vitest → #6 Accuracy scaffold → #36 Golden set 30/10
 → Phase B core: #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
