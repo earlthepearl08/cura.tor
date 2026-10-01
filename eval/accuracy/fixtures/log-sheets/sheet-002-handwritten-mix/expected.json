@@ -1,0 +1,29 @@
+{
+  "entries": [
+    {
+      "name": "Carlo Mendoza",
+      "company": "Bright Solar PH",
+      "position": "Owner",
+      "phone": ["0917-111-2222"],
+      "email": [],
+      "address": "Batangas",
+      "notes": "wants quote"
+    },
+    {
+      "name": "Liza Cruz",
+      "company": "Metro Builders Co.",
+      "position": "Architect",
+      "phone": ["02-8123-4567"],
+      "email": ["liza@metrobuilders.ph"],
+      "address": "",
+      "notes": ""
+    }
+  ],
+  "_meta": {
+    "id": "sheet-002-handwritten-mix",
+    "difficulty": "hard",
+    "handwriting": true,
+    "tags": ["ph", "handwriting", "partial-fields", "trade-show"],
+    "notes": "Mostly handwritten rows; some cells empty (no email / no address). Hard for OCR — expect lower field F1 until prompt/confidence work lands."
+  }
+}

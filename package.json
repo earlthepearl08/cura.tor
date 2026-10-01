@@ -13,7 +13,9 @@
         "test:coverage": "vitest run --coverage",
         "test:e2e": "playwright test",
         "test:e2e:ui": "playwright test --ui",
-        "test:e2e:install": "playwright install chromium"
+        "test:e2e:install": "playwright install chromium",
+        "eval:accuracy": "node eval/accuracy/run-eval.mjs",
+        "eval:accuracy:live": "node eval/accuracy/run-eval.mjs --live"
     },
     "dependencies": {
         "@stripe/stripe-js": "^9.0.0",
