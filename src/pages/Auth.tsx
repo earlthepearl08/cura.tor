@@ -20,10 +20,10 @@ function detectInAppBrowser(): string | null {
 }
 
 const BENEFITS: { icon: React.ComponentType<{ className?: string }>; label: string; detail: string }[] = [
-    { icon: ScanLine, label: 'Scan in seconds', detail: 'AI reads even stylized or crumpled cards' },
+    { icon: ScanLine, label: 'Scan in seconds', detail: 'AI reads even stylized or crumpled cards (needs a connection)' },
     { icon: UsersIcon, label: 'Never lose a lead', detail: 'Saved to your device, synced to Google Drive' },
     { icon: FileDown, label: 'Export anywhere', detail: 'vCard, CSV, or Excel — no retyping' },
-    { icon: WifiOff, label: 'Works offline', detail: 'Scan at events with zero signal' },
+    { icon: WifiOff, label: 'Contacts work offline', detail: 'View, edit, and export saved contacts without signal — new scans need a connection' },
 ];
 
 const Auth: React.FC = () => {
