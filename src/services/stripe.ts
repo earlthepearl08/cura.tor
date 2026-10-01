@@ -1,4 +1,5 @@
 import { UserTier } from '@/types/user';
+import { authFetch } from '@/utils/authFetch';
 
 export const STRIPE_PRICES = {
     pioneer: {
@@ -27,6 +28,18 @@ export const STRIPE_PRICES = {
     },
 } as const;
 
+/**
+ * One-time Event pack SKU (not a subscription).
+ * Amount is display-only placeholder — real charge comes from the Stripe Price in Dashboard.
+ */
+export const EVENT_PACK_PRICE = {
+    id: import.meta.env.VITE_STRIPE_EVENT_PACK_PRICE_ID || '',
+    /** Display placeholder until Dashboard price is set; do not hardcode a sell price in checkout. */
+    amountLabel: 'One-time',
+    label: 'Event pack',
+    description: 'Adds one concurrent event-host slot (2–10 seats, short-lived show workspace).',
+} as const;
+
 export type StripePlan = 'pioneer' | 'pro';
 export type BillingInterval = 'monthly' | 'yearly';
 
@@ -36,7 +49,7 @@ export const PLAN_TO_TIER: Record<StripePlan, UserTier> = {
     pro: 'pro',
 };
 
-/** Create a Stripe Checkout session and return the redirect URL */
+/** Create a Stripe Checkout session and return the redirect URL (Pioneer/Pro subscription). */
 export async function createCheckoutSession(params: {
     firebaseUid: string;
     email: string;
@@ -55,6 +68,35 @@ export async function createCheckoutSession(params: {
     if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to create checkout session');
+    }
+
+    const { url } = await res.json();
+    return url;
+}
+
+/**
+ * One-time Event pack Checkout. Requires signed-in user (Bearer token).
+ * Redirects back to /events?payment=… so capacity can refresh after webhook.
+ */
+export async function createEventPackCheckoutSession(): Promise<string> {
+    const priceId = EVENT_PACK_PRICE.id;
+    if (!priceId) {
+        throw new Error('Event pack price is not configured (VITE_STRIPE_EVENT_PACK_PRICE_ID)');
+    }
+
+    const res = await authFetch('/api/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            product: 'event_pack',
+            priceId,
+            origin: window.location.origin,
+        }),
+    });
+
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to start Event pack checkout');
     }
 
     const { url } = await res.json();

@@ -58,7 +58,7 @@ interface AuthContextType {
     reloadFirebaseUser: () => Promise<void>;
 
     // Refresh
-    refreshUserProfile: () => Promise<void>;
+    refreshUserProfile: () => Promise<UserProfile | null>;
 }
 
 const DEFAULT_LIMITS: TierLimits = TIER_LIMITS.free;
@@ -124,11 +124,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => unsubscribe();
     }, []);
 
-    const refreshUserProfile = useCallback(async () => {
-        if (firebaseUser) {
-            const profile = await getOrCreateUserDoc(firebaseUser);
-            setUser(profile);
-        }
+    const refreshUserProfile = useCallback(async (): Promise<UserProfile | null> => {
+        if (!firebaseUser) return null;
+        const profile = await getOrCreateUserDoc(firebaseUser);
+        setUser(profile);
+        return profile;
     }, [firebaseUser]);
 
     // --- Auth methods ---

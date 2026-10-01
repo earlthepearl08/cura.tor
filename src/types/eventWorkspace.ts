@@ -30,5 +30,12 @@ export const DEFAULT_EVENT_DURATION_DAYS = 7;
 export const EVENT_SEAT_MIN = 2;
 export const EVENT_SEAT_MAX = 10;
 export const EVENT_SEAT_DEFAULT = 5;
-/** Soft cap: how many active events one user may host. */
-export const MAX_ACTIVE_EVENTS_HOSTED = 3;
+/**
+ * Free concurrent host slots without a paid Event pack.
+ * Paid packs add `user.eventPackCredits` on top of this.
+ */
+export const FREE_HOST_SLOTS = 1;
+/** @deprecated Use FREE_HOST_SLOTS + eventPackCredits — kept as absolute ceiling. */
+export const MAX_ACTIVE_EVENTS_HOSTED = 10;
+/** Credits granted per successful Event pack Checkout (one-time price). */
+export const EVENT_PACK_CREDITS_PER_PURCHASE = 1;
