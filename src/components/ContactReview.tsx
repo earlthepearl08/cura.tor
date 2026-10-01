@@ -8,6 +8,13 @@ import { exportService } from '@/services/export';
 import { useAuth } from '@/contexts/AuthContext';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
+import { CorrectionSuggestionChip, CorrectionAppliedBanner } from '@/components/CorrectionHint';
+import {
+    applyCorrectionsToRecord,
+    learnFromFieldDiffs,
+    recordCorrectionHit,
+} from '@/services/correctionMemory';
+import { AppliedCorrection, CorrectionSuggestion, CorrectionField } from '@/types/correction';
 
 interface ContactReviewProps {
     ocrResult: OCRResult;
@@ -27,8 +34,8 @@ const NOTE_CONTEXTS = [
 ];
 
 const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, onDelete, reviewOnly, initialNotes, initialFolder }) => {
-    const { canExportVCard } = useAuth();
-    const { storage } = useWorkspace();
+    const { canExportVCard, user } = useAuth();
+    const { storage, mode } = useWorkspace();
     const [formData, setFormData] = useState({
         name: ocrResult.name,
         position: ocrResult.position,
@@ -53,6 +60,10 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
     const [personPhoto, setPersonPhoto] = useState<string | null>(null);
     const [locationPhoto, setLocationPhoto] = useState<string | null>(null);
     const [photoSheet, setPhotoSheet] = useState<'person' | 'location' | null>(null);
+    const [appliedCorrections, setAppliedCorrections] = useState<AppliedCorrection[]>([]);
+    const [suggestions, setSuggestions] = useState<CorrectionSuggestion[]>([]);
+    const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
+    const glossaryAppliedRef = useRef(false);
     const newFolderInputRef = useRef<HTMLInputElement>(null);
     const personCamRef = useRef<HTMLInputElement>(null);
     const personGalRef = useRef<HTMLInputElement>(null);
@@ -78,6 +89,45 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         };
         loadFolders();
     }, []);
+
+    // Apply / suggest glossary corrections against original OCR fields (once)
+    useEffect(() => {
+        if (glossaryAppliedRef.current) return;
+        glossaryAppliedRef.current = true;
+        let cancelled = false;
+        (async () => {
+            try {
+                const corrections = await storage.getAllCorrections();
+                if (cancelled || corrections.length === 0) return;
+                const { record, applied, suggestions: nextSuggestions } = applyCorrectionsToRecord(
+                    {
+                        name: ocrResult.name,
+                        position: ocrResult.position,
+                        company: ocrResult.company,
+                    },
+                    corrections
+                );
+                if (applied.length > 0) {
+                    setFormData(prev => ({
+                        ...prev,
+                        name: record.name,
+                        position: record.position,
+                        company: record.company,
+                    }));
+                    setAppliedCorrections(applied);
+                    for (const a of applied) {
+                        await recordCorrectionHit(storage, a.correctionId);
+                    }
+                }
+                if (nextSuggestions.length > 0) {
+                    setSuggestions(nextSuggestions);
+                }
+            } catch (err) {
+                console.warn('Glossary apply failed:', err);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [ocrResult, storage]);
 
     // Check for duplicates when form data changes
     useEffect(() => {
@@ -130,11 +180,67 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         setIsReparsing(false);
     };
 
+    const acceptSuggestion = async (suggestion: CorrectionSuggestion) => {
+        setFormData(prev => ({ ...prev, [suggestion.field]: suggestion.to }));
+        setSuggestions(prev => prev.filter(s => s.correctionId !== suggestion.correctionId));
+        setAppliedCorrections(prev => [
+            ...prev.filter(a => a.field !== suggestion.field),
+            {
+                field: suggestion.field,
+                from: suggestion.from,
+                to: suggestion.to,
+                correctionId: suggestion.correctionId,
+                autoApplied: false,
+            },
+        ]);
+        try {
+            await recordCorrectionHit(storage, suggestion.correctionId);
+        } catch { /* non-blocking */ }
+    };
+
+    const dismissSuggestion = (suggestion: CorrectionSuggestion) => {
+        setDismissedSuggestions(prev => new Set(prev).add(suggestion.correctionId));
+        setSuggestions(prev => prev.filter(s => s.correctionId !== suggestion.correctionId));
+    };
+
+    const undoApplied = (field: CorrectionField) => {
+        const entry = appliedCorrections.find(a => a.field === field);
+        if (!entry) return;
+        setFormData(prev => ({ ...prev, [field]: entry.from }));
+        setAppliedCorrections(prev => prev.filter(a => a.field !== field));
+    };
+
+    const suggestionFor = (field: CorrectionField) =>
+        suggestions.find(s => s.field === field && !dismissedSuggestions.has(s.correctionId));
+
     const handleSave = async (forceSave: boolean = false) => {
         // Show warning if duplicate detected and not forcing save
         if (duplicateWarning && !forceSave) {
             setShowDuplicateWarning(true);
             return;
+        }
+
+        // Teach glossary from original OCR → final values (user/org scoped)
+        try {
+            await learnFromFieldDiffs(
+                storage,
+                {
+                    name: ocrResult.name,
+                    position: ocrResult.position,
+                    company: ocrResult.company,
+                },
+                {
+                    name: formData.name,
+                    position: formData.position,
+                    company: formData.company,
+                },
+                {
+                    scope: mode === 'team' ? 'org' : 'user',
+                    createdBy: user?.uid,
+                }
+            );
+        } catch (err) {
+            console.warn('Failed to learn corrections:', err);
         }
 
         const contact: Contact = {
@@ -306,42 +412,73 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                     <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Contact Details</span>
                 </div>
 
+                {appliedCorrections.length > 0 && (
+                    <CorrectionAppliedBanner applied={appliedCorrections} onUndo={undoApplied} />
+                )}
+
                 {/* Form Fields */}
                 <div className="space-y-4">
-                    <div className="relative">
-                        <User className="absolute left-3 top-3 text-brand-500" size={18} />
-                        <input
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            placeholder="Full Name"
-                            readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
-                        />
+                    <div>
+                        <div className="relative">
+                            <User className="absolute left-3 top-3 text-brand-500" size={18} />
+                            <input
+                                type="text"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                placeholder="Full Name"
+                                readOnly={!isEditMode}
+                                className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            />
+                        </div>
+                        {suggestionFor('name') && (
+                            <CorrectionSuggestionChip
+                                suggestion={suggestionFor('name')!}
+                                onAccept={() => acceptSuggestion(suggestionFor('name')!)}
+                                onDismiss={() => dismissSuggestion(suggestionFor('name')!)}
+                            />
+                        )}
                     </div>
 
-                    <div className="relative">
-                        <Briefcase className="absolute left-3 top-3 text-brand-500" size={18} />
-                        <input
-                            type="text"
-                            value={formData.position}
-                            onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                            placeholder="Job Title"
-                            readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
-                        />
+                    <div>
+                        <div className="relative">
+                            <Briefcase className="absolute left-3 top-3 text-brand-500" size={18} />
+                            <input
+                                type="text"
+                                value={formData.position}
+                                onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                                placeholder="Job Title"
+                                readOnly={!isEditMode}
+                                className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            />
+                        </div>
+                        {suggestionFor('position') && (
+                            <CorrectionSuggestionChip
+                                suggestion={suggestionFor('position')!}
+                                onAccept={() => acceptSuggestion(suggestionFor('position')!)}
+                                onDismiss={() => dismissSuggestion(suggestionFor('position')!)}
+                            />
+                        )}
                     </div>
 
-                    <div className="relative">
-                        <Building2 className="absolute left-3 top-3 text-brand-500" size={18} />
-                        <input
-                            type="text"
-                            value={formData.company}
-                            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                            placeholder="Company Name"
-                            readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
-                        />
+                    <div>
+                        <div className="relative">
+                            <Building2 className="absolute left-3 top-3 text-brand-500" size={18} />
+                            <input
+                                type="text"
+                                value={formData.company}
+                                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                                placeholder="Company Name"
+                                readOnly={!isEditMode}
+                                className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            />
+                        </div>
+                        {suggestionFor('company') && (
+                            <CorrectionSuggestionChip
+                                suggestion={suggestionFor('company')!}
+                                onAccept={() => acceptSuggestion(suggestionFor('company')!)}
+                                onDismiss={() => dismissSuggestion(suggestionFor('company')!)}
+                            />
+                        )}
                     </div>
 
                     <div className="relative">

@@ -15,6 +15,16 @@ function normalize(str: string): string {
     return str.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
+/** Exported for correction memory / glossary matching */
+export function normalizeText(str: string): string {
+    return normalize(str);
+}
+
+/** Exported for correction memory fuzzy match */
+export function textSimilarity(str1: string, str2: string): number {
+    return stringSimilarity(str1, str2);
+}
+
 /**
  * Normalize phone number (remove all non-digits)
  */
