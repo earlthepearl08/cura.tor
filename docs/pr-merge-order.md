@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#43)
+## Inventory (#1–#44)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -60,6 +60,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 41 | Home Log/Multi hero workflows | P1 Home UX | Ready for review. Elevates Log Sheet + Multi-Card on `Home.tsx` — **after #5** Home; **near #10 / #39** |
 | 42 | Offline honesty UX | P1 trust UX | Ready for review. Saved contacts work offline; new scans need network — `OfflineStatusBanner`, Auth/Home/Contacts — **after #5**; **near #41** |
 | 43 | Playwright smoke paths | P0 tests | Ready for review. Auth → scan → save → export e2e — `e2e/`, Playwright config, `TESTING.md`, `package.json` (+ light AuthContext/Contacts) — **after #2**; **near #32** |
+| 44 | Landing competitor positioning | P0 landing | Ready for review. Honest competitor comparison on `Landing.tsx` — **after #24 / #38**; PR base `cursor/landing-accuracy-nav-link-9334` (stacked on #24) |
 
 ---
 
@@ -71,7 +72,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | `src/App.tsx` | +21, 23, 24, 26 | High — landing → gallery → a11y → events |
 | `src/contexts/AuthContext.tsx` | +**35**, 22, 26, 28 | High — Stripe → trust → **password reset** → Sentry → event pack → magic link |
 | `src/pages/Auth.tsx` | +**35**, 21, 23, 24, 28 | High — **#35** after #5 |
-| `src/pages/Landing.tsx` | **#3 ⊂ #24 → #38** | Prefer merge **#24** then **#38** SEO; do not also merge #21 |
+| `src/pages/Landing.tsx` | **#3 ⊂ #24 → #38 → #44** | Prefer **#24** then **#38** SEO then **#44** competitor section; do not also merge #21 |
 | `api/stripe-webhook.ts` / checkout | **#4, #26** | #26 after #4 |
 | `firestore.rules` | +19, 26 | Claims → glossary → events → event-pack |
 | `src/pages/LogScan.tsx` | +23 | Still highest with OCR stack |
@@ -101,16 +102,18 @@ Inspected 2026-10-01:
 1. Land Phase A prerequisites (**#4**, **#5**) as usual.  
 2. Merge **#24** onto `main` (brings landing + `/accuracy` gallery + nav/footer links together).  
 3. Merge **#38** Landing SEO meta **immediately after #24** (PR base `cursor/landing-accuracy-nav-link-9334`; retarget to `main` once #24 lands if needed).  
-4. **Close #21** as superseded (do not merge separately).  
-5. **Close or skip #3** if #24 already merged (its commit is inside #24); if you want a smaller review first, merge **#3** then **#24** (Git will recognize #3 as already contained).
+4. Merge **#44** competitor positioning **after #24/#38** (same stack base `cursor/landing-accuracy-nav-link-9334`; rebase onto #38 if both open).  
+5. **Close #21** as superseded (do not merge separately).  
+6. **Close or skip #3** if #24 already merged (its commit is inside #24); if you want a smaller review first, merge **#3** then **#24** (Git will recognize #3 as already contained).
 
 **Alternative — staged reviews**
 
 1. Merge **#3** (landing only).  
 2. Merge **#24** (already contains #21; rebases cleanly if #3 is on main).  
 3. Merge **#38** SEO (after #24 is on `main`).  
-4. **Never merge #21 after #24** — redundant / conflict theater on gallery assets.  
-5. Close #21 when #24 is merged (or earlier, with a PR comment pointing here).
+4. Merge **#44** competitor section (after #24/#38).  
+5. **Never merge #21 after #24** — redundant / conflict theater on gallery assets.  
+6. Close #21 when #24 is merged (or earlier, with a PR comment pointing here).
 
 **Do not:** merge #21 and #24 as independent feature PRs expecting additive history — #21 is a strict subset of #24’s commit graph.
 
@@ -125,7 +128,7 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 Canonical one-liner (matches `docs/go-live-checklist.md`):
 
 ```
-#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #2 → #43 → #32 → #6 → #36
+#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #2 → #43 → #32 → #6 → #36
 ```
 
 Expanded (meta docs anytime; same product order):
@@ -139,7 +142,8 @@ Expanded (meta docs anytime; same product order):
 → #40 DPA stub                         ← after #33 Legal (DPA.md + Legal.tsx link)
 → #24 Landing + accuracy gallery + nav ← includes #3 + #21; close #21 (and #3 if unused)
    (alt: #3 then #24; still skip standalone #21 merge)
-→ #38 Landing SEO meta                 ← after #24; base branch `cursor/landing-accuracy-nav-link-9334`
+→ #38 Landing SEO meta                 ← after #24; base `cursor/landing-accuracy-nav-link-9334`
+→ #44 Landing competitor positioning   ← after #24/#38; same stack base
 → #2 Tests
 → #43 Playwright smoke paths           ← after #2; near #32 (package.json / TESTING.md)
 → #32 Stripe webhook Vitest fixtures   ← after #4 handler + #2 Vitest scaffold
@@ -150,6 +154,8 @@ Expanded (meta docs anytime; same product order):
 **#24 note:** Stacked merge of landing (`#3`) + gallery (`#21`) + accuracy nav. See section above.
 
 **#38 note:** SEO title/description/Open Graph for Landing + Accuracy gallery. **Stacks on #24** (PR base `cursor/landing-accuracy-nav-link-9334`). Merge **immediately after #24** onto `main` (or retarget to `main` once #24 lands). Do not merge before #24.
+
+**#44 note:** Honest competitor comparison section on Landing. **After #24/#38**; same PR base `cursor/landing-accuracy-nav-link-9334`. Rebase onto #38 if both still open (shared `Landing.tsx`).
 
 **#43 note:** Playwright smoke for auth → scan → save → export. Merge **after #2** (test harness / `TESTING.md`). Keep **near #32** — both extend the test stack and may touch `package.json`. Light AuthContext/Contacts hooks for e2e mocks: rebase if #10/#8/#42 already landed those files.
 
@@ -227,7 +233,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 
 - **`AuthContext`:** `#4` → `#5` → `#35` → `#10` → `#8` → `#22` → `#28` → `#26`
 - **`Auth.tsx`:** `#5` → `#35` → `#42` → `#3` → `#21`/`#24` → `#23` → `#28`
-- **`Landing.tsx`:** `#3` → `#24` → `#38`
+- **`Landing.tsx`:** `#3` → `#24` → `#38` → `#44`
 - **`Home.tsx`:** `#5` → `#42` → `#41` → `#39` → `#10` → `#23`
 - **`App.tsx`:** `#3` → `#16` → `#21`/`#24` → `#23` → `#19` → `#26`
 - **`Settings`:** `#4` → `#5` → `#3` → `#39` → `#10` → `#34` → `#9` → `#8` → `#16` → `#21` → `#22` → `#25` → `#18` → `#17` → `#19`/`#26`
@@ -256,6 +262,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 - No automatic merge train without Earl.  
 - **#24** is the landing+gallery stack (**includes #3 + #21**) — never merge #21 separately after #24; close #21 as superseded.  
 - **#38 stacks on #24** — merge SEO meta only after #24 (retarget to `main` once #24 lands if needed).  
+- **#44 stacks on #24** (same base as #38) — merge competitor positioning **after #24/#38**.  
 - **#26 stacks on #19 and #4** — never before Stripe lifecycle + event workspaces.  
 - `#14`+`#15` remain the hottest LogScan pair.  
 - Meta docs **#20** / **#27** / **#1** / **#37** (Gemini ops) can merge any time; **#33** then **#40** wait on **#5** for `Legal.tsx`. **#37** is mostly ops docs — if `#31`/`#6` already changed `api/ocr.ts`, rebase #37 first.
@@ -265,8 +272,8 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 ## Quick reference — one-line order
 
 ```
-Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #2 → #43 → #32 → #6 → #36
-  (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21; #38 after #24; #40 after #33; #43 after #2 near #32)
+Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #2 → #43 → #32 → #6 → #36
+  (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21; #38+#44 after #24; #40 after #33; #43 after #2 near #32)
 → Phase B core: #42 offline → #41 Home hero → #39 Drive backup → #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
