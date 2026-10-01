@@ -39,10 +39,10 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 18 | Multi-language OCR / i18n | P2 i18n | `ocr.ts`, Settings, scan pages |
 | 19 | Shared event workspaces | P2 events | App, rules, WorkspaceContext, Contacts, Home |
 | 20 | Merge-order doc (this file) | Meta | `docs/pr-merge-order.md` — anytime |
-| 21 | Accuracy sample gallery | P0 trust content | `/accuracy`, Auth/Legal/Settings links, SVG placeholders |
+| 21 | Accuracy sample gallery | P0 trust content | **Superseded as a standalone merge by #24** (see stack note below). Tip `0388eaa` is an ancestor of #24. Files = strict subset of #24. |
 | 22 | Sentry + funnel analytics | P1 observability | `package.json`, `main.tsx`, sentry/observability, AuthContext, ocr, Settings |
 | 23 | Accessibility pass | P2 a11y | App, Auth, Home, Contacts, LogScan, Scan |
-| 24 | Landing ↔ `/accuracy` nav | P0 polish | **Stacks on #3** (`Landing.tsx` + App/Auth). Also carries gallery assets overlapping **#21** — prefer merge **#3 → (#21 or absorb) → #24**, or treat #24 as superseding #21 if files duplicate |
+| 24 | Landing + accuracy gallery + nav | P0 landing+trust | **Merge stack:** includes **#3** (`6a375f8`) + **#21** (`0388eaa`) + nav commits. Unique vs #21: primarily `Landing.tsx` accuracy links (+ README note). |
 | 25 | Pro priority support mailto | P1 support | `SUPPORT.md`, ContactSupportModal, Settings |
 | 26 | Stripe Event pack SKU | P2 billing+events | **Stacks on #19 + #4** — webhook/checkout, events API, rules/indexes, WorkspaceContext |
 | 27 | Go-live checklist | Meta | `docs/go-live-checklist.md` — anytime with #20/#1 |
@@ -58,11 +58,48 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | `src/App.tsx` | +21, 23, 24, 26 | High — landing → gallery → a11y → events |
 | `src/contexts/AuthContext.tsx` | +22, 26, 28 | High — Stripe → trust → Sentry → event pack → magic link |
 | `src/pages/Auth.tsx` | +21, 23, 24, 28 | High |
-| `src/pages/Landing.tsx` | **#3, #24** | **#24 stacks on #3** — merge #3 first, rebase #24 |
+| `src/pages/Landing.tsx` | **#3 ⊂ #24** | Prefer merge **#24** (or #3 then #24); do not also merge #21 |
 | `api/stripe-webhook.ts` / checkout | **#4, #26** | #26 after #4 |
 | `firestore.rules` | +19, 26 | Claims → glossary → events → event-pack |
 | `src/pages/LogScan.tsx` | +23 | Still highest with OCR stack |
 | `package.json` | +22 | After #2/#5/#6 |
+
+---
+
+## Accuracy gallery / landing stack (#3 · #21 · #24)
+
+Inspected 2026-10-01:
+
+| PR | Tip / vs main | Ancestry |
+|----|---------------|----------|
+| **#3** landing | `6a375f8` · ahead 1 | base for stack |
+| **#21** gallery | `0388eaa` · ahead 1 | **ancestor of #24**; **zero files unique** vs #24 |
+| **#24** landing+gallery+nav | ahead 4 | merge-base ancestors: **#3 and #21**; + `81c718b` wire nav, `9aaae50` README note |
+
+**Overlapping paths (identical ownership in both #21 and #24):**  
+`public/accuracy-samples/*`, `src/pages/AccuracyGallery.tsx`, `src/data/accuracyGallery.ts`, plus shared touches to `App.tsx`, `Auth.tsx`, `Legal.tsx`, `Settings.tsx`.
+
+**Only in #24 (not in #21):** `src/pages/Landing.tsx` (and the landing stack from #3).
+
+### Correct merge sequence (pick one)
+
+**Preferred — single stack merge**
+
+1. Land Phase A prerequisites (**#4**, **#5**) as usual.  
+2. Merge **#24** onto `main` (brings landing + `/accuracy` gallery + nav/footer links together).  
+3. **Close #21** as superseded (do not merge separately).  
+4. **Close or skip #3** if #24 already merged (its commit is inside #24); if you want a smaller review first, merge **#3** then **#24** (Git will recognize #3 as already contained).
+
+**Alternative — staged reviews**
+
+1. Merge **#3** (landing only).  
+2. Merge **#24** (already contains #21; rebases cleanly if #3 is on main).  
+3. **Never merge #21 after #24** — redundant / conflict theater on gallery assets.  
+4. Close #21 when #24 is merged (or earlier, with a PR comment pointing here).
+
+**Do not:** merge #21 and #24 as independent feature PRs expecting additive history — #21 is a strict subset of #24’s commit graph.
+
+No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent edits.
 
 ---
 
@@ -74,14 +111,13 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 #20 / #27 / #1 (docs anytime)
 → #4 Stripe
 → #5 Trust
-→ #3 Landing
-→ #21 Accuracy gallery   (if still separate from #24)
-→ #24 Accuracy nav       ← STACKS ON #3 (and needs /accuracy route from #21 or bundled assets)
+→ #24 Landing + accuracy gallery + nav   ← includes #3 + #21; close #21 (and #3 if unused)
+   (alt: #3 then #24; still skip standalone #21 merge)
 → #2 Tests
 → #6 Accuracy scaffold
 ```
 
-**#24 note:** Branch includes `Landing.tsx` + accuracy gallery files. Land **#3 first**, then rebase **#24**. If #21 and #24 both open with overlapping `public/accuracy-samples/*` / `AccuracyGallery.tsx`, merge one and close/rebase the other to avoid duplicate asset commits.
+**#24 note:** Stacked merge of landing (`#3`) + gallery (`#21`) + accuracy nav. See section above.
 
 ### Phase B — P1 retention / conversion / ops
 
@@ -140,7 +176,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 ## Intentionally not merging yet
 
 - No automatic merge train without Earl.  
-- **#24 stacks on #3** — never merge #24 before #3.  
+- **#24** is the landing+gallery stack (**includes #3 + #21**) — never merge #21 separately after #24; close #21 as superseded.  
 - **#26 stacks on #19 and #4** — never before Stripe lifecycle + event workspaces.  
 - `#14`+`#15` remain the hottest LogScan pair.  
 - Meta docs **#20** / **#27** / **#1** can merge any time without blocking product.
@@ -150,7 +186,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 ## Quick reference — one-line order
 
 ```
-#20/#27/#1 (docs) → #4 Stripe → #5 Trust → #3 Landing → #21 Gallery → #24 Accuracy nav (on #3)
+#20/#27/#1 (docs) → #4 Stripe → #5 Trust → #24 Landing+gallery+nav (includes #3+#21; close #21)
 → #2 Tests → #6 Accuracy scaffold
 → #10 Upgrade → #28 Magic link → #9 Onboarding → #8 Sheets → #7 Realtime → #11 Confidence
 → #22 Sentry → #25 Priority support
