@@ -6,14 +6,16 @@
 
 ### Status snapshot (vs `origin/main` @ `ee4e1a2`)
 
-| Range | GitHub `mergeable` / `mergeStateStatus` | Notes |
-|-------|------------------------------------------|--------|
-| **#1–#16** | `MERGEABLE` / **CLEAN** | Tip already contains current `main` (`behind=0`) |
-| **#17–#21** | `MERGEABLE` / **UNSTABLE** | **Not behind main** — Vercel preview check still **pending** (UNSTABLE ≠ git conflict). Rebase of #14–#19 on 2026-10-01 was a no-op (`ALREADY_UP_TO_DATE`). |
+| Range | GitHub status | Notes |
+|-------|---------------|--------|
+| **#1–#17** | Typically **CLEAN** once Vercel finishes | Tips contain current `main` (`behind=0`) |
+| **#18–#24** | Often **UNSTABLE** while Vercel preview is **pending** | **Not git-behind** — `UNSTABLE ≠ conflict`. Confirm with `git rev-list` before assuming rebase pain. |
+
+**Rebase passes (2026-10-01):** `#14–#19` and `#21–#23` → all `ALREADY_UP_TO_DATE` on `origin/main`. No force-pushes. No conflicts.
 
 ---
 
-## Inventory (21 open drafts)
+## Inventory (24 open drafts)
 
 | # | Title | Theme | Hot files touched |
 |---|--------|--------|-------------------|
@@ -37,7 +39,10 @@
 | 18 | Multi-language OCR + i18n scaffold | P2 i18n | `ocr.ts`, `Settings`, Scan/Log/Multi, `src/i18n/*` |
 | 19 | Shared event workspaces | P2 events | `App.tsx`, `firestore.rules`, `WorkspaceContext`, `Contacts`, `Home`, `Settings`, `teamStorage` |
 | 20 | PR merge-order doc (this file) | Meta | `docs/pr-merge-order.md` only — merge anytime |
-| 21 | Public accuracy sample gallery | P0/P2 trust content | (marketing/eval samples — check PR files before merge) |
+| 21 | Public accuracy sample gallery | P0 trust content | `App.tsx`, `AccuracyGallery`, `Auth`, `Legal`, `Settings`, `public/accuracy-samples/*` |
+| 22 | Sentry init + product funnel analytics | P1 observability | `package.json`, `main.tsx`, `observability`/`sentry`, `AuthContext`, `ocr.ts`, `Settings`, `api/gemini` |
+| 23 | Accessibility pass (Scan/Log/Contacts/Auth/Home) | P2 a11y | `App.tsx`, `Auth`, `Home`, `Contacts`, `LogScan`, `Scan`, `index.css` |
+| 24 | Wire `/accuracy` into landing nav/footer | P0 polish | Likely `Landing` / nav — rebase after `#3` + `#21` |
 
 ---
 
@@ -45,24 +50,22 @@
 
 | File | PRs | Risk |
 |------|-----|------|
-| `src/pages/LogScan.tsx` | 3, 8, 9, 11, 14, 15, 16, 17, 18 | **Highest** — serialize log-sheet work |
-| `src/pages/Settings.tsx` | 3, 4, 5, 8, 9, 10, 16, 17, 18, 19 | High — almost every feature adds a row |
-| `src/pages/Contacts.tsx` | 3, 7, 8, 10, 12, 13, 14, 19 | High — team/export/claims/events |
-| `src/services/ocr.ts` | 5, 6, 11, 14, 15, 18 | High — trust → accuracy → confidence → templates → i18n |
-| `src/services/teamStorage.ts` | 7, 12, 13, 14, 17, 19 | High — realtime → claims → glossary → events |
-| `src/contexts/AuthContext.tsx` | 4, 5, 8, 10 | Medium-high — billing/trust before export/upgrade UX |
-| `firestore.rules` | 12, 13, 17, 19 | Medium-high — claims then glossary then events |
-| `src/App.tsx` | 3, 16, 19 | Medium — landing → Help → Events routes |
-| `package.json` | 2, 5, 6 | Medium — version/deps |
-| `src/services/export.ts` | 8, 13, 14 | Medium — Sheets/CRM then follow-up cols then templates |
-| `src/types/contact.ts` | 13, 14 | Medium — follow-up fields before template fields |
-| `src/contexts/WorkspaceContext.tsx` | 7, 19 | Medium — realtime then event workspaces |
+| `src/pages/LogScan.tsx` | 3, 8, 9, 11, 14, 15, 16, 17, 18, 23 | **Highest** |
+| `src/pages/Settings.tsx` | 3, 4, 5, 8, 9, 10, 16, 17, 18, 19, 21, 22 | High |
+| `src/pages/Contacts.tsx` | 3, 7, 8, 10, 12, 13, 14, 19, 23 | High |
+| `src/services/ocr.ts` | 5, 6, 11, 14, 15, 18, 22 | High |
+| `src/services/teamStorage.ts` | 7, 12, 13, 14, 17, 19 | High |
+| `src/contexts/AuthContext.tsx` | 4, 5, 8, 10, 22 | Medium-high |
+| `src/App.tsx` | 3, 16, 19, 21, 23 | Medium-high — landing → Help → Events → gallery → a11y |
+| `firestore.rules` | 12, 13, 17, 19 | Medium-high |
+| `package.json` | 2, 5, 6, 22 | Medium |
+| `src/pages/Auth.tsx` | 3, 5, 21, 23 | Medium |
+| `src/pages/Home.tsx` | 5, 10, 19, 23 | Medium |
+| `src/services/export.ts` | 8, 13, 14 | Medium |
+| `src/types/contact.ts` | 13, 14 | Medium |
+| `src/contexts/WorkspaceContext.tsx` | 7, 19 | Medium |
 
-`CLEAN` means clean vs **today’s** `main`, not “clean forever.” Pairwise merges will conflict once earlier PRs land.
-
-### Rebase pass (2026-10-01)
-
-Serial `git rebase origin/main` on `#14–#19`: all **already up to date** (`behind=0`). No force-push. No git conflicts. `#17–#19` (and `#20`) remain **UNSTABLE** only while Vercel preview is pending.
+`CLEAN` = clean vs **today’s** `main`, not forever. Pairwise merges still conflict after earlier PRs land.
 
 ---
 
@@ -70,54 +73,52 @@ Serial `git rebase origin/main` on `#14–#19`: all **already up to date** (`beh
 
 ### Phase A — P0 (sell / trust / story)
 
-| Step | PR | Why this slot | Rebase after |
-|------|-----|---------------|--------------|
-| A0 | **#20 Merge-order doc** and/or **#1 Runbook** | Docs-only — free merges anytime | — |
-| A1 | **#4 Stripe** | Billing fulfillment; touches `AuthContext`/`Settings` early | — |
-| A2 | **#5 Trust** | Auth/Home/Legal honesty; overlaps `#4` on Auth/Settings | Rebase onto `#4` |
-| A3 | **#3 Landing** | Public marketing; overlaps `#5` on `Auth.tsx`; adds `App.tsx` routes | Rebase onto `#5` |
-| A4 | **#2 Tests** | Vitest + Stripe contract helpers; `package.json` shared with `#5`/`#6` | Rebase onto `#4`+`#5` |
-| A5 | **#6 Accuracy** | Eval harness + `ocr.ts` / monitoring | Rebase onto `#5` (+ `#2` if sharing `package.json`) |
-| A6 | **#21 Accuracy gallery** (if kept as P0 trust content) | After `#6` scaffold so gallery/eval story aligns | Rebase onto `#6` / landing as needed |
+| Step | PR | Why this slot |
+|------|-----|---------------|
+| A0 | **#20** / **#1** | Docs-only — anytime |
+| A1 | **#4 Stripe** | Billing first |
+| A2 | **#5 Trust** | Rebase onto `#4` (Auth/Settings) |
+| A3 | **#3 Landing** | Rebase onto `#5` (Auth); adds `App.tsx` |
+| A4 | **#2 Tests** | After `#4`/`#5` (`package.json` + webhook contract) |
+| A5 | **#6 Accuracy scaffold** | After `#5` (`ocr.ts`) |
+| A6 | **#21 Accuracy gallery** | After `#3` (`App.tsx`/`Auth`) + ideally `#6` story alignment |
+| A7 | **#24 Accuracy nav wire-up** | After `#3` + `#21` |
 
-**P0 stop condition:** auth → scan → export smoke; checkout honesty; public landing; CI green.
+### Phase B — P1 (retention / conversion / ops)
 
-### Phase B — P1 (retention / conversion)
+| Step | PR | Notes |
+|------|-----|--------|
+| B1 | **#10 Free-tier upgrade UX** | After `#5` |
+| B2 | **#9 Onboarding** | Before `#16` |
+| B3 | **#8 Sheets + CRM** | After AuthContext settles |
+| B4 | **#7 Realtime sync** | Before claims / `#19` |
+| B5 | **#11 OCR confidence** | Before `#14`/`#15`/`#18` |
+| B6 | **#22 Sentry + analytics** | After `#5`/`#6` if sharing `ocr`/observability/`package.json`; before heavy Settings pile-up if possible |
 
-| Step | PR | Depends on / rebase note |
-|------|-----|---------------------------|
-| B1 | **#10 Free-tier upgrade UX** | After `#5`. Prefer before `#8`. |
-| B2 | **#9 First-run onboarding** | Before `#16` Help (Settings/Log/Multi). |
-| B3 | **#8 Sheets + CRM CSV** | After AuthContext settles; before `#13`/`#14` export churn. |
-| B4 | **#7 Realtime team sync** | Before `#12`/`#13`/`#19` (`Contacts`/`teamStorage`/`WorkspaceContext`). |
-| B5 | **#11 OCR confidence review** | After `#6`; **before** `#14`/`#15`/`#18`. |
+### Phase C — P2 (differentiators) — serialize LogScan / App
 
-### Phase C — P2 (differentiators) — serialize LogScan / rules
-
-| Step | PR | Depends on / rebase note |
-|------|-----|---------------------------|
-| C1 | **#12 Admin claim override** | After `#7`; before `#13`. |
-| C2 | **#13 Follow-up pipeline** | After `#12`; before `#14` (`contact.ts` / export). |
-| C3 | **#16 In-app help** | After `#3` (`App.tsx`); after `#9` if Help entry overlaps. |
-| C4 | **#15 Guided log capture** | After `#11`; **before `#14`**. |
-| C5 | **#14 Column templates** | After `#13` + `#15` + `#11`. |
-| C6 | **#18 Multi-language OCR** | After `#11`/`#14`/`#15` settle `ocr.ts` + scan pages; before or after `#17` carefully on Settings. |
-| C7 | **#17 Correction memory** | After `#12`/`#13` rules + `#11` ContactReview; rebase onto LogScan stack. |
-| C8 | **#19 Event workspaces** | **Late** — touches `App.tsx`, `firestore.rules`, `WorkspaceContext`, `Contacts`, `Home`, `Settings`. After `#7` + claim rules (`#12`/`#13`) at minimum; rebase onto `#3`/`#16` for `App.tsx`. |
+| Step | PR | Notes |
+|------|-----|--------|
+| C1 | **#12 Claim admin** → **#13 Follow-up** | Rules + Contacts |
+| C2 | **#16 Help** | After `#3` App routes |
+| C3 | **#15 Guided capture** → **#14 Templates** | LogScan/`ocr` |
+| C4 | **#18 i18n** | After OCR stack settles |
+| C5 | **#17 Glossary** | After rules + ContactReview |
+| C6 | **#23 Accessibility** | Wide UI surface (`Auth`/`Home`/`Contacts`/`LogScan`/`Scan`/`App`) — late Phase C or after Phase A landing/trust so chrome is stable; rebase onto `#3`/`#5`/`#21` App/Auth touches |
+| C7 | **#19 Event workspaces** | Latest — largest blast radius |
 
 ---
 
-## Per-hotfile “who wins first” cheat sheet
+## Per-hotfile “who wins first” (updated)
 
-- **`AuthContext`:** `#4` → `#5` → `#10` → `#8`
-- **`Settings`:** `#4` → `#5` → `#3` → `#10` → `#9` → `#8` → `#16` → `#18` → `#17` → `#19`
-- **`App.tsx`:** `#3` → `#16` → `#19`
-- **`LogScan`:** `#3` → `#9` → `#8` → `#11` → `#15` → `#14` → `#16` → `#18` → `#17`
-- **`Contacts`:** `#3` → `#7` → `#10` → `#8` → `#12` → `#13` → `#14` → `#19`
-- **`ocr.ts`:** `#5` → `#6` → `#11` → `#15` → `#14` → `#18`
+- **`AuthContext`:** `#4` → `#5` → `#10` → `#8` → `#22`
+- **`Settings`:** `#4` → `#5` → `#3` → `#10` → `#9` → `#8` → `#16` → `#21` → `#22` → `#18` → `#17` → `#19`
+- **`App.tsx`:** `#3` → `#16` → `#21` → `#23` → `#19`
+- **`LogScan`:** `#3` → `#9` → `#8` → `#11` → `#15` → `#14` → `#16` → `#18` → `#17` → `#23`
+- **`Contacts`:** `#3` → `#7` → `#10` → `#8` → `#12` → `#13` → `#14` → `#19` → `#23`
+- **`ocr.ts`:** `#5` → `#6` → `#11` → `#15` → `#14` → `#18` → `#22`
 - **`firestore.rules`:** `#12` → `#13` → `#17` → `#19`
-- **`export.ts`:** `#8` → `#13` → `#14`
-- **`WorkspaceContext`:** `#7` → `#19`
+- **`package.json`:** `#5` → `#2` → `#6` → `#22`
 
 ---
 
@@ -125,27 +126,27 @@ Serial `git rebase origin/main` on `#14–#19`: all **already up to date** (`beh
 
 1. Earl reviews draft → mark ready when intentional.  
 2. `gh pr checkout <n> && git fetch origin main && git rebase origin/main`.  
-3. Fix conflicts; run `npm test` / `tsc` / critical paths as applicable.  
-4. Merge with one consistent strategy (merge commit or squash).  
-5. Rebase the **next** PR in the table onto updated `main`.  
-6. Treat `UNSTABLE` as “checks pending/failing” first — confirm `behind` with `git rev-list` before assuming conflicts.
+3. Fix conflicts; run tests / `tsc` as applicable.  
+4. Merge with one consistent strategy.  
+5. Rebase the **next** PR onto updated `main`.  
+6. If status is `UNSTABLE`, check Vercel pending **before** assuming git conflicts (`behind` count).
 
 ---
 
 ## Intentionally not merging yet
 
 - No automatic multi-PR merge train without Earl.  
-- `#14` + `#15` remain the highest collision pair on `LogScan`/`ocr`.  
-- `#19` event workspaces is a wide blast radius — keep until claim + realtime land.  
-- `#2` Stripe contract tests vs `#4` webhook: tiny follow-up on `main` if they diverge after merge.
+- `#14` + `#15` remain the highest LogScan collision pair.  
+- `#19` and `#23` are wide UI/rules blasts — keep late.  
+- `#22` overlaps `#6` observability story — prefer `#6` then `#22` or expect a combine/rebase.
 
 ---
 
 ## Quick reference — one-line order
 
 ```
-#20/#1 (docs anytime) → #4 Stripe → #5 Trust → #3 Landing → #2 Tests → #6 Accuracy → (#21 gallery)
-→ #10 Upgrade UX → #9 Onboarding → #8 Sheets → #7 Realtime → #11 Confidence
-→ #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided capture → #14 Templates
-→ #18 i18n → #17 Glossary → #19 Event workspaces
+#20/#1 (docs) → #4 Stripe → #5 Trust → #3 Landing → #2 Tests → #6 Accuracy → #21 Gallery → #24 Accuracy nav
+→ #10 Upgrade UX → #9 Onboarding → #8 Sheets → #7 Realtime → #11 Confidence → #22 Sentry
+→ #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
+→ #18 i18n → #17 Glossary → #23 a11y → #19 Event workspaces
 ```
