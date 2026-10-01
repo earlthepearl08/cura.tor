@@ -95,15 +95,17 @@ Inspected 2026-10-01:
 
 1. Land Phase A prerequisites (**#4**, **#5**) as usual.  
 2. Merge **#24** onto `main` (brings landing + `/accuracy` gallery + nav/footer links together).  
-3. **Close #21** as superseded (do not merge separately).  
-4. **Close or skip #3** if #24 already merged (its commit is inside #24); if you want a smaller review first, merge **#3** then **#24** (Git will recognize #3 as already contained).
+3. Merge **#38** Landing SEO meta **immediately after #24** (PR base `cursor/landing-accuracy-nav-link-9334`; retarget to `main` once #24 lands if needed).  
+4. **Close #21** as superseded (do not merge separately).  
+5. **Close or skip #3** if #24 already merged (its commit is inside #24); if you want a smaller review first, merge **#3** then **#24** (Git will recognize #3 as already contained).
 
 **Alternative — staged reviews**
 
 1. Merge **#3** (landing only).  
 2. Merge **#24** (already contains #21; rebases cleanly if #3 is on main).  
-3. **Never merge #21 after #24** — redundant / conflict theater on gallery assets.  
-4. Close #21 when #24 is merged (or earlier, with a PR comment pointing here).
+3. Merge **#38** SEO (after #24 is on `main`).  
+4. **Never merge #21 after #24** — redundant / conflict theater on gallery assets.  
+5. Close #21 when #24 is merged (or earlier, with a PR comment pointing here).
 
 **Do not:** merge #21 and #24 as independent feature PRs expecting additive history — #21 is a strict subset of #24’s commit graph.
 
