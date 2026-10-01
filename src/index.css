@@ -96,6 +96,48 @@ body {
   position: absolute;
 }
 
+/* Landing page motion */
+@keyframes landingFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landingScanBeam {
+  0% { top: 12%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { top: 88%; opacity: 0; }
+}
+
+@keyframes landingFillBar {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.landing-fade-up {
+  animation: landingFadeUp 0.7s ease-out both;
+}
+
+.landing-fade-up-delay {
+  animation: landingFadeUp 0.8s ease-out 0.15s both;
+}
+
+.landing-scan-beam {
+  position: absolute;
+  animation: landingScanBeam 2.8s ease-in-out infinite;
+}
+
+.landing-fill-bar {
+  transform-origin: left center;
+  animation: landingFillBar 0.9s ease-out both;
+}
+
 /* ========== Light Theme ========== */
 [data-theme="light"] {
   color-scheme: light;

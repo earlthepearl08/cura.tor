@@ -40,7 +40,7 @@ const Auth: React.FC = () => {
 
     // Already signed in — redirect to home
     if (!isLoading && user) {
-        return <Navigate to="/" replace />;
+        return <Navigate to="/app" replace />;
     }
 
     const handleEmailAuth = async (e: React.FormEvent) => {
@@ -106,7 +106,9 @@ const Auth: React.FC = () => {
                 {/* --- Left panel: value prop (desktop) --- */}
                 <div className="hidden lg:flex flex-col justify-between p-12 bg-[radial-gradient(ellipse_at_top_left,rgba(56,189,248,0.08),transparent_55%)] border-r border-brand-800">
                     <div>
-                        <img src="/logo.svg" alt="Cura.tor" className="h-10" />
+                        <Link to="/">
+                            <img src="/logo.svg" alt="Cura.tor" className="h-10" />
+                        </Link>
                     </div>
 
                     <div className="max-w-lg">
@@ -148,7 +150,9 @@ const Auth: React.FC = () => {
                         <div className="w-full max-w-sm">
                             {/* Mobile header */}
                             <div className="lg:hidden text-center mb-8">
-                                <img src="/logo.svg" alt="Cura.tor" className="h-9 mx-auto mb-6" />
+                                <Link to="/">
+                                    <img src="/logo.svg" alt="Cura.tor" className="h-9 mx-auto mb-6" />
+                                </Link>
                                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 mb-5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
                                     <span className="text-[10px] font-medium text-sky-400 tracking-wide uppercase">In testing — early access</span>
