@@ -161,6 +161,12 @@ export interface OCRResult {
 export type OCREngine = 'tesseract' | 'cloud-vision';
 
 export const getOCREngine = (): OCREngine => {
+    try {
+        const stored = localStorage.getItem('ocr_engine');
+        if (stored === 'tesseract' || stored === 'cloud-vision') return stored;
+    } catch {
+        // Ignore storage errors (private mode, etc.)
+    }
     return 'cloud-vision';
 };
 

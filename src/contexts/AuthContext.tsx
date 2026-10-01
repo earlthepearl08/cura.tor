@@ -9,6 +9,7 @@ import {
     updateProfile,
     signOut as firebaseSignOut,
     sendEmailVerification,
+    sendPasswordResetEmail,
     GoogleAuthProvider,
     User
 } from 'firebase/auth';
@@ -34,6 +35,7 @@ interface AuthContextType {
     signInWithGoogle: () => Promise<void>;
     signInWithEmail: (email: string, password: string) => Promise<void>;
     signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
+    resetPassword: (email: string) => Promise<void>;
     signOut: () => Promise<void>;
 
     // Tier checks
@@ -179,6 +181,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, []);
 
+    const resetPassword = useCallback(async (email: string) => {
+        await sendPasswordResetEmail(auth, email.trim(), {
+            url: window.location.origin,
+        });
+    }, []);
+
     const resendVerificationEmail = useCallback(async () => {
         if (!auth.currentUser) throw new Error('Not signed in');
         await sendEmailVerification(auth.currentUser, {
@@ -299,6 +307,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             signInWithGoogle,
             signInWithEmail,
             signUpWithEmail,
+            resetPassword,
             signOut,
             canPerformScan,
             canSaveContact,
