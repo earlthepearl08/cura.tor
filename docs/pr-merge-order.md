@@ -314,3 +314,23 @@ Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #4
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
 → #18 i18n → #17 Glossary → #23 a11y → #19 Events → #26 Event-pack Stripe
 ```
+
+---
+
+## Appendix — Phase A merge-day forecast
+
+Practical conflict forecast for the Phase A one-liner (Auth → Legal → Landing stack → Test/CI → Eval) also mirrored in-repo as `docs/phase-a-merge-forecast.md`. Project Context:
+
+**`/cursor/stores/self/docs/phase-a-merge-forecast.md`**
+
+**Highest-risk serial clusters on merge day**
+
+| Cluster | Order | Hot files |
+|---------|-------|-----------|
+| Auth | `#4 → #5 → #35` | `AuthContext`, `Auth.tsx`, `Settings` |
+| Legal | `#5 → #33 → #40` | `Legal.tsx` (+ `TECHNICAL_SPEC` from #1→#33) |
+| Landing stack | `#24 → #38 → #44 → #47 → #49` | `Landing.tsx`, `AccuracyGallery.tsx` |
+| Test/CI | `#2 → #48 → #43 → #45 → #32` | `package.json`, `TESTING.md`, vitest/e2e (note: #48 includes #2 tree; #45 includes #43 tree) |
+| Eval | `#6 → #36` | `eval/accuracy/` |
+
+**Merge-day tip:** After #24 lands, retarget #38/#44/#47/#49 to `main`. Close #21; skip standalone #3. Rebase each next PR before merge — do not parallel-merge within a cluster.
