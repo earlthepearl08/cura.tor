@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#39)
+## Inventory (#1–#42)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -56,6 +56,9 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 37 | Gemini ops / cost monitoring docs | Meta ops | Ready for review. `GEMINI_OPS.md`, `VERCEL_SETUP.md`, `.env.example` (+ light `api/gemini.ts` / `api/ocr.ts` notes) — **anytime with #1 / #20 / #27**; rebase if OCR API PRs land first |
 | 38 | Landing SEO meta (OG/title/desc) | P0 landing | Ready for review. `Landing.tsx`, `AccuracyGallery.tsx`, `PageMeta.tsx`, `index.html` — **after #24**; PR base is `cursor/landing-accuracy-nav-link-9334` (stacked on #24) |
 | 39 | Drive backup data-loss prompt | P1 retention | Ready for review. Calm dismissible Google Drive backup reminder — `Home.tsx`, `Settings.tsx`, `DriveBackupPrompt.tsx` — **Phase B after #5**; **near #10** (shared Home/Settings) |
+| 40 | B2B DPA template stub | P0 trust/docs | Ready for review. `DPA.md`, `public/dpa.md`, `Legal.tsx` — **after #33** Legal subprocessors |
+| 41 | Home Log/Multi hero workflows | P1 Home UX | Ready for review. Elevates Log Sheet + Multi-Card on `Home.tsx` — **after #5** Home; **near #10 / #39** |
+| 42 | Offline honesty UX | P1 trust UX | Ready for review. Saved contacts work offline; new scans need network — `OfflineStatusBanner`, Auth/Home/Contacts — **after #5**; **near #41** |
 
 ---
 
@@ -121,7 +124,7 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 Canonical one-liner (matches `docs/go-live-checklist.md`):
 
 ```
-#1 → #4 → #5 → #35 → #33 → #24 → #38 → #2 → #32 → #6 → #36
+#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #2 → #32 → #6 → #36
 ```
 
 Expanded (meta docs anytime; same product order):
@@ -132,6 +135,7 @@ Expanded (meta docs anytime; same product order):
 → #5 Trust
 → #35 Password reset (Auth)            ← P0; after #5 Auth
 → #33 Legal subprocessors + Privacy AI ← after #5 Legal; rebase if #1 already edited TECHNICAL_SPEC
+→ #40 DPA stub                         ← after #33 Legal (DPA.md + Legal.tsx link)
 → #24 Landing + accuracy gallery + nav ← includes #3 + #21; close #21 (and #3 if unused)
    (alt: #3 then #24; still skip standalone #21 merge)
 → #38 Landing SEO meta                 ← after #24; base branch `cursor/landing-accuracy-nav-link-9334`
@@ -149,6 +153,8 @@ Expanded (meta docs anytime; same product order):
 
 **#33 note:** Extends trust/Legal honesty with subprocessors + AI image/retention privacy. Merge **after #5**. If **#1** already landed `TECHNICAL_SPEC.md` fixes, rebase #33 onto that tip before merge.
 
+**#40 note:** B2B DPA template stub + Legal link. Merge **immediately after #33** (shared `Legal.tsx` / subprocessors narrative).
+
 **#35 note:** Password reset is a **P0** trust/auth gap. Merge **immediately after #5** (shared `Auth.tsx` / `AuthContext`). Keep **#28** magic-link later so reset lands first.
 
 **#36 note:** Phase A follow-on — full synthetic golden set (30 cards + 10 PH log sheets) and `HOWTO-REAL-SAMPLES.md`. Merge **after #6** so the eval scaffold/monitoring hooks exist first; rebase onto #6 if both touch `eval/`.
@@ -161,16 +167,18 @@ Run **after Phase A is on `main`** (especially #5 Trust + #24 landing/gallery). 
 
 | Order | PR | Why this slot | Hot-file conflict notes |
 |------:|----|---------------|-------------------------|
-| B0 | **#39** Drive backup prompt | Data-loss / backup nudge on Home+Settings after #5 trust chrome; keep next to conversion UX | **Home**, **Settings**, `DriveBackupPrompt` — land **near #10** (before or right after) |
+| B0a | **#42** Offline honesty UX | Clarify offline: saved contacts OK, new scans need network — after #5 Auth/Home | **Auth**, **Home**, **Contacts**, `OfflineStatusBanner` — **near #41** |
+| B0b | **#41** Home Log/Multi hero | Elevate Log Sheet + Multi-Card as primary Home workflows | **Home** only — **after #5**; **near #10 / #39** |
+| B0c | **#39** Drive backup prompt | Data-loss / backup nudge on Home+Settings after #5 trust chrome; keep next to conversion UX | **Home**, **Settings**, `DriveBackupPrompt` — land **near #10** |
 | B1 | **#10** Free-tier upgrade UX | Conversion UX on Home/Settings/AuthContext before more Settings rows pile up | **Settings**, **Contacts**, Home, Scan/Upload, AuthContext, UpgradePrompt |
 | B2 | **#9** First-run onboarding | Tip sheets for Log/Multi before export menus and confidence UI rewrite those pages | **LogScan**, **MultiCardScan**, **Settings** (Help/tips entry) |
 | B3 | **#8** Sheets + CRM CSV | Export path after AuthContext/Settings from #10; before Contacts claim/realtime churn | **Contacts** (export menu), **LogScan** / MultiCard (export), **Settings**, AuthContext, `export.ts` |
 | B4 | **#7** Realtime team sync | Contacts/`teamStorage` listener before claim P2 (#12/#13) | **Contacts**, `teamStorage`, `WorkspaceContext`, TeamAdmin |
 | B5 | **#11** OCR confidence review | Field-level review after #9/#8 LogScan touches; before P2 guided/templates (#15/#14) | **LogScan**, `ocr.ts`, ContactReview |
 
-**Core one-liner:** `#39 → #10 → #9 → #8 → #7 → #11` (or `#10 → #39 → #9…` if upgrade UX should land first — both share Home/Settings)
+**Core one-liner:** `#42 → #41 → #39 → #10 → #9 → #8 → #7 → #11`
 
-**#39 note:** Dismissible Google Drive backup reminder. Requires **#5** Home/Settings baseline. Merge **in Phase B next to #10** so backup + upgrade prompts don’t fight on the same pages.
+**#42 / #41 / #39 note:** Home cluster after **#5**. Land **#42** offline honesty, then **#41** Log/Multi hero, then **#39** Drive backup next to **#10** upgrade — all share `Home.tsx` (and #42 also Auth/Contacts).
 
 #### Phase B conflict focus (LogScan / Settings / Contacts)
 
@@ -214,9 +222,9 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 ## Per-hotfile order (cheat sheet)
 
 - **`AuthContext`:** `#4` → `#5` → `#35` → `#10` → `#8` → `#22` → `#28` → `#26`
-- **`Auth.tsx`:** `#5` → `#35` → `#3` → `#21`/`#24` → `#23` → `#28`
+- **`Auth.tsx`:** `#5` → `#35` → `#42` → `#3` → `#21`/`#24` → `#23` → `#28`
 - **`Landing.tsx`:** `#3` → `#24` → `#38`
-- **`Home.tsx`:** `#5` → `#39` → `#10` → `#23`
+- **`Home.tsx`:** `#5` → `#42` → `#41` → `#39` → `#10` → `#23`
 - **`App.tsx`:** `#3` → `#16` → `#21`/`#24` → `#23` → `#19` → `#26`
 - **`Settings`:** `#4` → `#5` → `#3` → `#39` → `#10` → `#34` → `#9` → `#8` → `#16` → `#21` → `#22` → `#25` → `#18` → `#17` → `#19`/`#26`
 - **`LogScan`:** `#3` → `#9` → `#8` → `#11` → `#31` → `#15` → `#14` → `#16` → `#18` → `#17` → `#23`
@@ -246,16 +254,16 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 - **#38 stacks on #24** — merge SEO meta only after #24 (retarget to `main` once #24 lands if needed).  
 - **#26 stacks on #19 and #4** — never before Stripe lifecycle + event workspaces.  
 - `#14`+`#15` remain the hottest LogScan pair.  
-- Meta docs **#20** / **#27** / **#1** / **#37** (Gemini ops) can merge any time; **#33** still waits on **#5** for `Legal.tsx`. **#37** is mostly ops docs — if `#31`/`#6` already changed `api/ocr.ts`, rebase #37 first.
+- Meta docs **#20** / **#27** / **#1** / **#37** (Gemini ops) can merge any time; **#33** then **#40** wait on **#5** for `Legal.tsx`. **#37** is mostly ops docs — if `#31`/`#6` already changed `api/ocr.ts`, rebase #37 first.
 
 ---
 
 ## Quick reference — one-line order
 
 ```
-Phase A: #1 → #4 → #5 → #35 → #33 → #24 → #38 → #2 → #32 → #6 → #36
-  (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21; #38 after #24)
-→ Phase B core: #39 Drive backup → #10 → #9 → #8 → #7 → #11
+Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #2 → #32 → #6 → #36
+  (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21; #38 after #24; #40 after #33)
+→ Phase B core: #42 offline → #41 Home hero → #39 Drive backup → #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
 → #18 i18n → #17 Glossary → #23 a11y → #19 Events → #26 Event-pack Stripe
