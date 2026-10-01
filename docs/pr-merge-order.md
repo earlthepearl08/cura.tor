@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#44)
+## Inventory (#1–#45)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -61,6 +61,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 42 | Offline honesty UX | P1 trust UX | Ready for review. Saved contacts work offline; new scans need network — `OfflineStatusBanner`, Auth/Home/Contacts — **after #5**; **near #41** |
 | 43 | Playwright smoke paths | P0 tests | Ready for review. Auth → scan → save → export e2e — `e2e/`, Playwright config, `TESTING.md`, `package.json` (+ light AuthContext/Contacts) — **after #2**; **near #32** |
 | 44 | Landing competitor positioning | P0 landing | Ready for review. Honest competitor comparison on `Landing.tsx` — **after #24 / #38**; PR base `cursor/landing-accuracy-nav-link-9334` (stacked on #24) |
+| 45 | Playwright GitHub Actions CI | P0 tests | Ready for review. `.github/workflows/playwright-e2e.yml` + **includes e2e tree** — **after #43** (stacked on Playwright smoke); near #32 |
 
 ---
 
@@ -128,7 +129,7 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 Canonical one-liner (matches `docs/go-live-checklist.md`):
 
 ```
-#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #2 → #43 → #32 → #6 → #36
+#1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #2 → #43 → #45 → #32 → #6 → #36
 ```
 
 Expanded (meta docs anytime; same product order):
@@ -146,6 +147,7 @@ Expanded (meta docs anytime; same product order):
 → #44 Landing competitor positioning   ← after #24/#38; same stack base
 → #2 Tests
 → #43 Playwright smoke paths           ← after #2; near #32 (package.json / TESTING.md)
+→ #45 Playwright GitHub Actions CI     ← after #43; includes e2e + workflow
 → #32 Stripe webhook Vitest fixtures   ← after #4 handler + #2 Vitest scaffold
 → #6 Accuracy scaffold
 → #36 Synthetic golden set (30/10) + HOWTO-REAL-SAMPLES  ← after #6
@@ -159,7 +161,9 @@ Expanded (meta docs anytime; same product order):
 
 **#43 note:** Playwright smoke for auth → scan → save → export. Merge **after #2** (test harness / `TESTING.md`). Keep **near #32** — both extend the test stack and may touch `package.json`. Light AuthContext/Contacts hooks for e2e mocks: rebase if #10/#8/#42 already landed those files.
 
-**#32 note:** Lands real webhook handler coverage. Merge **after #4** (needs `api/stripe-webhook.ts`) and **after #2** (Vitest/`TESTING.md` scaffold). If #2 / #43 / #32 all touch `package.json` / test setup, rebase serially in that order.
+**#45 note:** GitHub Actions workflow for Playwright e2e. **After #43** — PR **includes the e2e tree** (stacked on #43). Merge #43 first, then #45 (or retarget #45 onto `main` after #43 lands). If reviewing only one, prefer landing #43 then #45 so CI isn’t orphaned without specs.
+
+**#32 note:** Lands real webhook handler coverage. Merge **after #4** (needs `api/stripe-webhook.ts`) and **after #2** (Vitest/`TESTING.md` scaffold). If #2 / #43 / #45 / #32 all touch `package.json` / test setup, rebase serially in that order.
 
 **#33 note:** Extends trust/Legal honesty with subprocessors + AI image/retention privacy. Merge **after #5**. If **#1** already landed `TECHNICAL_SPEC.md` fixes, rebase #33 onto that tip before merge.
 
@@ -241,7 +245,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 - **`ocr.ts`:** `#5` → `#6` → `#11` → `#31` → `#34` → `#15` → `#14` → `#18` → `#22`
 - **`firestore.rules`:** `#12` → `#13` → `#17` → `#19` → `#26`
 - **Stripe APIs:** `#4` → `#32` (tests) → `#26`
-- **`package.json`:** `#5` → `#2` → `#43` → `#32` → `#6` → `#22`
+- **`package.json`:** `#5` → `#2` → `#43` → `#45` → `#32` → `#6` → `#22`
 - **`eval/`:** `#6` → `#36`
 
 ---
@@ -263,6 +267,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 - **#24** is the landing+gallery stack (**includes #3 + #21**) — never merge #21 separately after #24; close #21 as superseded.  
 - **#38 stacks on #24** — merge SEO meta only after #24 (retarget to `main` once #24 lands if needed).  
 - **#44 stacks on #24** (same base as #38) — merge competitor positioning **after #24/#38**.  
+- **#45 stacks on #43** — Playwright CI workflow after smoke specs (e2e included in #45).  
 - **#26 stacks on #19 and #4** — never before Stripe lifecycle + event workspaces.  
 - `#14`+`#15` remain the hottest LogScan pair.  
 - Meta docs **#20** / **#27** / **#1** / **#37** (Gemini ops) can merge any time; **#33** then **#40** wait on **#5** for `Legal.tsx`. **#37** is mostly ops docs — if `#31`/`#6` already changed `api/ocr.ts`, rebase #37 first.
@@ -272,8 +277,8 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 ## Quick reference — one-line order
 
 ```
-Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #2 → #43 → #32 → #6 → #36
-  (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21; #38+#44 after #24; #40 after #33; #43 after #2 near #32)
+Phase A: #1 → #4 → #5 → #35 → #33 → #40 → #24 → #38 → #44 → #2 → #43 → #45 → #32 → #6 → #36
+  (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21; #38+#44 after #24; #40 after #33; #43→#45 after #2 near #32)
 → Phase B core: #42 offline → #41 Home hero → #39 Drive backup → #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
