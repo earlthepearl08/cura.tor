@@ -69,11 +69,21 @@ export function classifyScanError(err: unknown): FriendlyScanError {
         };
     }
 
-    // Abuse / provider rate limits and capacity
+    // Auth (check before broad 429/busy matching so 403 "Quota check failed" isn't "busy")
+    if (status === 401 || status === 403 || /unauthorized|forbidden|not signed in|sign in/i.test(msg)) {
+        return {
+            kind: 'auth',
+            suggestUpgrade: false,
+            suggestRetry: false,
+            message: 'Please sign in again to continue scanning.',
+        };
+    }
+
+    // Abuse / provider rate limits and capacity (avoid bare "quota" — that false-positives ops errors)
     if (
         status === 429 ||
         reason.startsWith('rate-limit') ||
-        /rate.?limit|resource.?exhausted|high demand|overloaded|too many requests|quota/i.test(msg)
+        /rate.?limit|resource.?exhausted|high demand|overloaded|too many requests|(?:exceeded|exhausted).{0,40}quota|quota.{0,40}(?:exceeded|exhausted)/i.test(msg)
     ) {
         return {
             kind: 'rate_limit',
@@ -103,16 +113,6 @@ export function classifyScanError(err: unknown): FriendlyScanError {
             suggestUpgrade: false,
             suggestRetry: true,
             message: 'No internet connection. Check your network and try again.',
-        };
-    }
-
-    // Auth
-    if (status === 401 || status === 403 || /unauthorized|forbidden|not signed in|sign in/i.test(msg)) {
-        return {
-            kind: 'auth',
-            suggestUpgrade: false,
-            suggestRetry: false,
-            message: 'Please sign in again to continue scanning.',
         };
     }
 

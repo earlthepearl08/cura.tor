@@ -48,16 +48,29 @@ const MultiCardScan: React.FC = () => {
         loadFolders();
     }, []);
 
-    const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        e.target.value = '';
+    /** Try parsing with up to 2 silent retries before surfacing an error */
+    const parseWithRetry = async (base64Image: string): Promise<LogSheetEntry[]> => {
+        const MAX_SILENT_RETRIES = 2;
+        for (let attempt = 0; attempt <= MAX_SILENT_RETRIES; attempt++) {
+            try {
+                return await ocrService.parseMultiCards(base64Image);
+            } catch (err) {
+                console.log(`[MultiCard] Attempt ${attempt + 1} failed:`, err);
+                if (attempt < MAX_SILENT_RETRIES) {
+                    await new Promise(r => setTimeout(r, 8000 + attempt * 4000));
+                } else {
+                    throw err;
+                }
+            }
+        }
+        throw new Error('All attempts failed');
+    };
 
+    const processMultiCard = async (data: string) => {
         if (!canUseBulkScan()) {
             setUpgradeFeature('bulk-scan');
             return;
         }
-
         if (!canPerformScan()) {
             setUpgradeFeature('scan');
             return;
@@ -69,10 +82,9 @@ const MultiCardScan: React.FC = () => {
         setEntries(null);
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
+        setImageData(data);
 
         try {
-            const data = await compressForOCR(file);
-            setImageData(data);
             const results = await parseWithRetry(data);
             setEntries(results);
             if (results.length === 0) {
@@ -95,22 +107,20 @@ const MultiCardScan: React.FC = () => {
         }
     };
 
-    /** Try parsing with up to 2 silent retries before surfacing an error */
-    const parseWithRetry = async (base64Image: string): Promise<LogSheetEntry[]> => {
-        const MAX_SILENT_RETRIES = 2;
-        for (let attempt = 0; attempt <= MAX_SILENT_RETRIES; attempt++) {
-            try {
-                return await ocrService.parseMultiCards(base64Image);
-            } catch (err) {
-                console.log(`[MultiCard] Attempt ${attempt + 1} failed:`, err);
-                if (attempt < MAX_SILENT_RETRIES) {
-                    await new Promise(r => setTimeout(r, 8000 + attempt * 4000));
-                } else {
-                    throw err;
-                }
-            }
+    const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        const data = await compressForOCR(file);
+        await processMultiCard(data);
+    };
+
+    const retryCurrentImage = () => {
+        if (!imageData) {
+            reset();
+            return;
         }
-        throw new Error('All attempts failed');
+        void processMultiCard(imageData);
     };
 
     const checkEntriesForDuplicates = async (entryList: LogSheetEntry[]) => {
@@ -405,7 +415,11 @@ const MultiCardScan: React.FC = () => {
                                             View upgrade options
                                         </button>
                                     ) : (
-                                        <button onClick={reset} className="text-xs text-red-400 underline mt-1">
+                                        <button
+                                            type="button"
+                                            onClick={retryCurrentImage}
+                                            className="text-xs text-red-400 underline mt-1"
+                                        >
                                             Try Again
                                         </button>
                                     )}

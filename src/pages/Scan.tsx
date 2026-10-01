@@ -271,6 +271,16 @@ const Scanner: React.FC = () => {
                                 >
                                     View upgrade options
                                 </button>
+                            ) : errorKind === 'auth' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/settings')}
+                                    className="text-xs font-medium text-brand-300 underline underline-offset-2"
+                                >
+                                    Open Settings
+                                </button>
+                            ) : errorKind === 'rate_limit' ? (
+                                <p className="text-xs text-brand-500">Wait a moment, then tap the checkmark to retry</p>
                             ) : (
                                 <p className="text-xs text-brand-500">Tap the checkmark to retry</p>
                             )}
