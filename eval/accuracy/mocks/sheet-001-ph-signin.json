@@ -3,8 +3,12 @@
     "name": "Maria Santos",
     "company": "Acme Corp",
     "position": "Sales Manager",
-    "phone": ["+63 917 555 1234"],
-    "email": ["maria.santos@acme.com"],
+    "phone": [
+      "+63 917 555 1234"
+    ],
+    "email": [
+      "maria.santos@acme.com"
+    ],
     "address": "Makati City",
     "notes": "Booth interest"
   },
@@ -12,8 +16,13 @@
     "name": "Dr. John Lee, MD",
     "company": "Health First Inc.",
     "position": "Medical Director",
-    "phone": ["+63 2 8888 9999", "0917-222-3333"],
-    "email": ["jlee@healthfirst.ph"],
+    "phone": [
+      "+63 2 8888 9999",
+      "0917-222-3333"
+    ],
+    "email": [
+      "jlee@healthfirst.ph"
+    ],
     "address": "Quezon City",
     "notes": ""
   },
@@ -21,8 +30,12 @@
     "name": "Ana Reyes",
     "company": "KINMO PW Corporation",
     "position": "Procurement Lead",
-    "phone": ["0918-777-8888"],
-    "email": ["ana.reyes@kinmopw.com"],
+    "phone": [
+      "0918-777-8888"
+    ],
+    "email": [
+      "ana.reyes@kinmopw.com"
+    ],
     "address": "Taguig",
     "notes": "Follow up next week"
   }

@@ -3,7 +3,9 @@
     "name": "Carlo Mendoza",
     "company": "Bright Solar PH",
     "position": "Owner",
-    "phone": ["0917-111-2222"],
+    "phone": [
+      "0917-111-2222"
+    ],
     "email": [],
     "address": "Batangas",
     "notes": "wants quote"
@@ -12,8 +14,12 @@
     "name": "Liza Cruz",
     "company": "Metro Builders Co.",
     "position": "Architect",
-    "phone": ["02-8123-4567"],
-    "email": ["liza@metrobuilders.ph"],
+    "phone": [
+      "02-8123-4567"
+    ],
+    "email": [
+      "liza@metrobuilders.ph"
+    ],
     "address": "",
     "notes": ""
   }

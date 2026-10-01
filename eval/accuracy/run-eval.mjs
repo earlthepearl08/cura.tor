@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { aggregateCardScores, scoreContact, scoreLogSheet } from './lib/score.mjs';
+import { aggregateCardScores, PRIMARY_FIELDS, scoreContact, scoreLogSheet } from './lib/score.mjs';
 import { callGeminiVision } from './lib/gemini-client.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -127,14 +127,17 @@ async function main() {
         const score = scoreContact(expectedContact, predicted);
         cardScores.push(score);
         details.push({ id: fixture.id, kind: 'card', mode, score });
-        console.log(`${mode} — field accuracy ${pct(score.fieldAccuracy)} (${score.hits}/${score.total})`);
+        console.log(
+          `${mode} — primary ${pct(score.primaryAccuracy)} ` +
+            `(${score.primaryHits}/${score.primaryTotal} name/company/phone/email)`
+        );
       } else {
         const expectedEntries = expected.entries || expected;
         const sheetScore = scoreLogSheet(expectedEntries, entries);
         sheetResults.push(sheetScore);
         details.push({ id: fixture.id, kind: 'log-sheet', mode, score: sheetScore });
         console.log(
-          `${mode} — avg row field accuracy ${pct(sheetScore.avgFieldAccuracy)} ` +
+          `${mode} — primary ${pct(sheetScore.avgPrimaryAccuracy)} ` +
             `(${sheetScore.predictedCount} pred / ${sheetScore.expectedCount} exp` +
             (sheetScore.extraPredicted ? `, +${sheetScore.extraPredicted} extra` : '') +
             `)`
@@ -148,32 +151,39 @@ async function main() {
   }
 
   const cardAgg = aggregateCardScores(cardScores);
-  const sheetAvg =
+  const sheetPrimaryAvg =
     sheetResults.length === 0
       ? null
-      : sheetResults.reduce((s, r) => s + r.avgFieldAccuracy, 0) / sheetResults.length;
+      : sheetResults.reduce((s, r) => s + r.avgPrimaryAccuracy, 0) / sheetResults.length;
 
-  console.log('\n── Summary ──');
-  console.log(`Cards (${cardAgg.fixtures}): overall field accuracy ${pct(cardAgg.overallFieldAccuracy)}`);
+  console.log('\n── Summary (primary: name / company / phone / email) ──');
+  console.log(`Cards (${cardAgg.fixtures}): primary accuracy ${pct(cardAgg.primaryAccuracy)}`);
   if (cardAgg.fixtures) {
-    for (const [field, value] of Object.entries(cardAgg.perField)) {
+    for (const field of PRIMARY_FIELDS) {
+      const value = cardAgg.primaryPerField[field];
       if (value == null) continue;
       console.log(`  ${field.padEnd(10)} ${pct(value)}`);
     }
+    console.log(`  (all fields incl. position/address/notes: ${pct(cardAgg.allFieldAccuracy)})`);
   }
-  if (sheetAvg != null) {
-    console.log(`Log sheets (${sheetResults.length}): avg row field accuracy ${pct(sheetAvg)}`);
+  if (sheetPrimaryAvg != null) {
+    console.log(`Log sheets (${sheetResults.length}): avg row primary accuracy ${pct(sheetPrimaryAvg)}`);
   }
 
   const targetCards = 30;
   const targetSheets = 10;
   const cardCount = listFixtureDirs('cards').length;
   const sheetCount = listFixtureDirs('log-sheets').length;
+  const cardsMet = cardCount >= targetCards;
+  const sheetsMet = sheetCount >= targetSheets;
   console.log(
-    `\nGolden-set progress: cards ${cardCount}/${targetCards}, log sheets ${sheetCount}/${targetSheets}`
+    `\nGolden-set progress: cards ${cardCount}/${targetCards}${cardsMet ? ' ✓' : ''}, ` +
+      `log sheets ${sheetCount}/${targetSheets}${sheetsMet ? ' ✓' : ''}`
   );
-  if (cardCount < targetCards || sheetCount < targetSheets) {
-    console.log('  → See eval/accuracy/README.md for how to add fixtures.');
+  if (!cardsMet || !sheetsMet) {
+    console.log('  → See eval/accuracy/HOWTO-REAL-SAMPLES.md to grow the set with real photos.');
+  } else {
+    console.log('  → Synthetic baseline met. Drop real samples per HOWTO-REAL-SAMPLES.md for live proof.');
   }
 
   fs.mkdirSync(RESULTS, { recursive: true });
@@ -182,9 +192,20 @@ async function main() {
   const report = {
     generatedAt: new Date().toISOString(),
     mode: opts.live ? 'live' : 'mock',
-    progress: { cards: cardCount, targetCards, logSheets: sheetCount, targetSheets },
+    primaryFields: PRIMARY_FIELDS,
+    progress: {
+      cards: cardCount,
+      targetCards,
+      logSheets: sheetCount,
+      targetSheets,
+      baselineMet: cardsMet && sheetsMet,
+    },
     cards: cardAgg,
-    logSheets: { fixtures: sheetResults.length, avgFieldAccuracy: sheetAvg },
+    logSheets: {
+      fixtures: sheetResults.length,
+      avgPrimaryAccuracy: sheetPrimaryAvg,
+      avgFieldAccuracy: sheetPrimaryAvg,
+    },
     details,
   };
   fs.writeFileSync(outPath, JSON.stringify(report, null, 2));
@@ -193,12 +214,12 @@ async function main() {
   if (opts.failUnder != null && !Number.isNaN(opts.failUnder)) {
     const overall =
       cardAgg.fixtures > 0
-        ? cardAgg.overallFieldAccuracy
-        : sheetAvg != null
-          ? sheetAvg
+        ? cardAgg.primaryAccuracy
+        : sheetPrimaryAvg != null
+          ? sheetPrimaryAvg
           : 0;
     if (overall < opts.failUnder) {
-      console.error(`FAIL: overall ${pct(overall)} < fail-under ${pct(opts.failUnder)}`);
+      console.error(`FAIL: primary ${pct(overall)} < fail-under ${pct(opts.failUnder)}`);
       process.exit(2);
     }
   }

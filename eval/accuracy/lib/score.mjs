@@ -6,7 +6,13 @@ import {
   normalizeString,
 } from './normalize.mjs';
 
-const STRING_FIELDS = ['name', 'company', 'position', 'address', 'notes'];
+/** Secondary fields — scored for diagnostics but not the sellability gate. */
+const SECONDARY_STRING_FIELDS = ['position', 'address', 'notes'];
+
+/** P0 accuracy proof fields (product-readiness review). */
+export const PRIMARY_FIELDS = ['name', 'company', 'phone', 'email'];
+
+const STRING_FIELDS = ['name', 'company', ...SECONDARY_STRING_FIELDS];
 const ARRAY_FIELDS = ['phone', 'email'];
 
 function stringsEqual(a, b) {
@@ -17,8 +23,13 @@ function phoneEqual(a, b) {
   const na = normalizePhone(a);
   const nb = normalizePhone(b);
   if (!na || !nb) return false;
-  // Allow suffix match so "+639175551234" ≈ "9175551234"
-  return na === nb || na.endsWith(nb) || nb.endsWith(na);
+  if (na === nb) return true;
+  // Allow truncated OCR (last 7–10 digits) without equating unrelated short stubs.
+  const minLen = 7;
+  if (na.length >= minLen && nb.length >= minLen) {
+    return na.endsWith(nb) || nb.endsWith(na);
+  }
+  return false;
 }
 
 function emailEqual(a, b) {
@@ -48,9 +59,21 @@ function setF1(expectedArr, predictedArr, equalFn) {
   return { precision, recall, f1, tp, fp, fn, emptyBoth: false };
 }
 
+function fieldMatchSummary(fields, keys) {
+  const scoredKeys = keys.filter((k) => fields[k] && !fields[k].skipped);
+  const hits = scoredKeys.filter((k) => fields[k].match).length;
+  const total = scoredKeys.length;
+  return {
+    hits,
+    total,
+    accuracy: total === 0 ? 1 : hits / total,
+    keys: scoredKeys,
+  };
+}
+
 /**
  * Score one predicted contact against one expected contact.
- * Returns per-field match booleans + array F1 for phone/email.
+ * Headline metric: primaryAccuracy over name / company / phone / email.
  */
 export function scoreContact(expectedRaw, predictedRaw) {
   const expected = contactFields(expectedRaw);
@@ -69,29 +92,43 @@ export function scoreContact(expectedRaw, predictedRaw) {
     };
   }
 
+  const phoneStats = setF1(expected.phone, predicted.phone, phoneEqual);
   fields.phone = {
-    ...setF1(expected.phone, predicted.phone, phoneEqual),
-    match: setF1(expected.phone, predicted.phone, phoneEqual).f1 >= 0.999,
+    ...phoneStats,
+    match: phoneStats.f1 >= 0.999,
+    skipped: phoneStats.emptyBoth,
     expected: expected.phone,
     predicted: predicted.phone,
   };
+  const emailStats = setF1(expected.email, predicted.email, emailEqual);
   fields.email = {
-    ...setF1(expected.email, predicted.email, emailEqual),
-    match: setF1(expected.email, predicted.email, emailEqual).f1 >= 0.999,
+    ...emailStats,
+    match: emailStats.f1 >= 0.999,
+    skipped: emailStats.emptyBoth,
     expected: expected.email,
     predicted: predicted.email,
   };
 
-  const scoredKeys = [...STRING_FIELDS, ...ARRAY_FIELDS].filter((k) => !fields[k].skipped);
-  const hits = scoredKeys.filter((k) => fields[k].match).length;
-  const fieldAccuracy = scoredKeys.length === 0 ? 1 : hits / scoredKeys.length;
+  const all = fieldMatchSummary(fields, [...STRING_FIELDS, ...ARRAY_FIELDS]);
+  const primary = fieldMatchSummary(fields, PRIMARY_FIELDS);
+  const secondary = fieldMatchSummary(fields, SECONDARY_STRING_FIELDS);
 
-  return { fields, fieldAccuracy, hits, total: scoredKeys.length };
+  return {
+    fields,
+    /** @deprecated use primaryAccuracy — kept for older report consumers */
+    fieldAccuracy: primary.accuracy,
+    hits: primary.hits,
+    total: primary.total,
+    primaryAccuracy: primary.accuracy,
+    primaryHits: primary.hits,
+    primaryTotal: primary.total,
+    secondaryAccuracy: secondary.accuracy,
+    allFieldAccuracy: all.accuracy,
+  };
 }
 
 /**
- * Align predicted rows to expected rows by best name+company fuzzy match (greedy).
- * Used for log sheets where row order may differ slightly.
+ * Align predicted rows to expected rows by best primary-field accuracy (greedy).
  */
 export function scoreLogSheet(expectedEntries, predictedEntries) {
   const expected = expectedEntries.map(contactFields);
@@ -105,8 +142,8 @@ export function scoreLogSheet(expectedEntries, predictedEntries) {
     for (let i = 0; i < predicted.length; i++) {
       if (used.has(i)) continue;
       const s = scoreContact(exp, predicted[i]);
-      if (s.fieldAccuracy > bestScore) {
-        bestScore = s.fieldAccuracy;
+      if (s.primaryAccuracy > bestScore) {
+        bestScore = s.primaryAccuracy;
         bestIdx = i;
       }
     }
@@ -123,42 +160,76 @@ export function scoreLogSheet(expectedEntries, predictedEntries) {
         predictedName: null,
         fields: {},
         fieldAccuracy: 0,
+        primaryAccuracy: 0,
+        secondaryAccuracy: 0,
+        allFieldAccuracy: 0,
         hits: 0,
-        total: 7,
+        total: PRIMARY_FIELDS.length,
+        primaryHits: 0,
+        primaryTotal: PRIMARY_FIELDS.length,
         missing: true,
       });
     }
   }
 
   const extraPredicted = predicted.length - used.size;
-  const avg =
+  const avgPrimary =
     rowScores.length === 0
       ? 0
-      : rowScores.reduce((sum, r) => sum + r.fieldAccuracy, 0) / rowScores.length;
+      : rowScores.reduce((sum, r) => sum + r.primaryAccuracy, 0) / rowScores.length;
+  const avgAll =
+    rowScores.length === 0
+      ? 0
+      : rowScores.reduce((sum, r) => sum + (r.allFieldAccuracy ?? r.fieldAccuracy), 0) /
+        rowScores.length;
 
-  return { rowScores, avgFieldAccuracy: avg, extraPredicted, expectedCount: expected.length, predictedCount: predicted.length };
+  return {
+    rowScores,
+    avgFieldAccuracy: avgPrimary,
+    avgPrimaryAccuracy: avgPrimary,
+    avgAllFieldAccuracy: avgAll,
+    extraPredicted,
+    expectedCount: expected.length,
+    predictedCount: predicted.length,
+  };
 }
 
-/** Aggregate macro field accuracy across contacts (cards). */
-export function aggregateCardScores(scores) {
-  const keys = [...STRING_FIELDS, ...ARRAY_FIELDS];
+function aggregateByKeys(scores, keys) {
   const perField = Object.fromEntries(keys.map((k) => [k, { hits: 0, total: 0 }]));
   let hits = 0;
   let total = 0;
   for (const s of scores) {
-    hits += s.hits;
-    total += s.total;
     for (const k of keys) {
       if (!s.fields[k] || s.fields[k].skipped) continue;
       perField[k].total += 1;
-      if (s.fields[k].match) perField[k].hits += 1;
+      total += 1;
+      if (s.fields[k].match) {
+        perField[k].hits += 1;
+        hits += 1;
+      }
     }
   }
   return {
-    overallFieldAccuracy: total === 0 ? 0 : hits / total,
+    accuracy: total === 0 ? 0 : hits / total,
+    hits,
+    total,
     perField: Object.fromEntries(
       Object.entries(perField).map(([k, v]) => [k, v.total === 0 ? null : v.hits / v.total])
     ),
+  };
+}
+
+/** Aggregate macro field accuracy across contacts (cards). */
+export function aggregateCardScores(scores) {
+  const primary = aggregateByKeys(scores, PRIMARY_FIELDS);
+  const all = aggregateByKeys(scores, [...STRING_FIELDS, ...ARRAY_FIELDS]);
+  return {
     fixtures: scores.length,
+    /** Headline sellability metric */
+    primaryAccuracy: primary.accuracy,
+    primaryPerField: primary.perField,
+    overallFieldAccuracy: primary.accuracy,
+    perField: all.perField,
+    allFieldAccuracy: all.accuracy,
   };
 }

@@ -3,8 +3,13 @@
     "name": "Engr. Maria Santos, REE, PEE",
     "company": "KINMO PW Corporation",
     "position": "Senior Sales Manager",
-    "phone": ["+63 917 555 1234", "8703-5284"],
-    "email": ["maria.santos@kinmopw.com"],
+    "phone": [
+      "+63 917 555 1234",
+      "8703-5284"
+    ],
+    "email": [
+      "maria.santos@kinmopw.com"
+    ],
     "address": "Main Office: 12th Floor, BGC Tower, Taguig | Branch: Cebu Business Park",
     "notes": "www.kinmopw.com"
   }

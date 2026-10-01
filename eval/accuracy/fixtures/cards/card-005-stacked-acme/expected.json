@@ -1,0 +1,23 @@
+{
+  "name": "Rico Tan",
+  "company": "ACME Industries Inc.",
+  "position": "VP of Sales & Marketing",
+  "phone": [
+    "8703-1111",
+    "8703-2222"
+  ],
+  "email": [
+    "rico.tan@acmeind.ph"
+  ],
+  "address": "Head Office: Alabang, Muntinlupa",
+  "notes": "Tagline: Building Tomorrow",
+  "_meta": {
+    "id": "card-005-stacked-acme",
+    "difficulty": "hard",
+    "tags": [
+      "stacked-logo",
+      "multi-phone",
+      "ph"
+    ]
+  }
+}

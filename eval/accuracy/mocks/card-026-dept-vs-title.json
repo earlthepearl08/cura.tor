@@ -1,0 +1,15 @@
+[
+  {
+    "name": "Patricia Uy",
+    "company": "Northwind Retail Inc.",
+    "position": "Marketing Manager",
+    "phone": [
+      "02-8777-5555"
+    ],
+    "email": [
+      "patricia.uy@northwind.ph"
+    ],
+    "address": "Ortigas, Pasig",
+    "notes": ""
+  }
+]

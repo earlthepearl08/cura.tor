@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-018-pte-style",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Apex Trade Pte Ltd",
+    "Wei Chen",
+    "Regional Director",
+    "+65 6123 4567 / +63 917 900 8000",
+    "wei.chen@apextrade.com",
+    "BGC Office: Taguig",
+    "www.apextrade.com"
+  ]
+}

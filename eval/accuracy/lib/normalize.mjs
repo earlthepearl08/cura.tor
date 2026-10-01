@@ -12,11 +12,14 @@ export function normalizeString(value) {
 }
 
 export function normalizePhone(value) {
-  return String(value ?? '')
+  let digits = String(value ?? '')
     .toLowerCase()
     .replace(/\(fax\)/gi, '')
-    .replace(/[^\d+]/g, '')
-    .replace(/(?!^)\+/g, '');
+    .replace(/\D/g, '');
+  // PH mobile: +63 9xx… ↔ 09xx… — compare on national significant digits.
+  if (digits.startsWith('63') && digits.length >= 12) digits = digits.slice(2);
+  if (digits.startsWith('0') && digits.length >= 10) digits = digits.slice(1);
+  return digits;
 }
 
 export function normalizeEmail(value) {

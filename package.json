@@ -15,7 +15,9 @@
         "test:e2e:ui": "playwright test --ui",
         "test:e2e:install": "playwright install chromium",
         "eval:accuracy": "node eval/accuracy/run-eval.mjs",
-        "eval:accuracy:live": "node eval/accuracy/run-eval.mjs --live"
+        "eval:accuracy:live": "node eval/accuracy/run-eval.mjs --live",
+        "eval:accuracy:score-test": "node eval/accuracy/scripts/score-test.mjs",
+        "eval:accuracy:generate": "node eval/accuracy/scripts/generate-synthetic-fixtures.mjs"
     },
     "dependencies": {
         "@stripe/stripe-js": "^9.0.0",

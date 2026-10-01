@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-028-low-contrast-fields",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "AquaPure Filters Co.",
+    "Tina Bautista",
+    "Sales Representative",
+    "0918-777-0101",
+    "tina.b@aquapure.ph",
+    "Pampanga"
+  ]
+}
