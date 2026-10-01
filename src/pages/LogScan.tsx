@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import BatchNamingModal from '@/components/BatchNamingModal';
 import { compressForOCR } from '@/utils/compressPhoto';
+import { formatOcrLanguageSummary, t } from '@/i18n';
 
 const LogScan: React.FC = () => {
     const navigate = useNavigate();
@@ -534,7 +535,15 @@ const LogScan: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="glass border border-brand-800 rounded-xl p-4 max-w-sm mt-4">
+                        <button
+                            type="button"
+                            onClick={() => navigate('/settings')}
+                            className="px-3 py-1 rounded-full text-[11px] font-semibold bg-brand-800/80 text-brand-300 border border-brand-700 hover:border-brand-500 transition-colors"
+                        >
+                            {t('logScan.ocrLangBadge', { langs: formatOcrLanguageSummary() })}
+                        </button>
+
+                        <div className="glass border border-brand-800 rounded-xl p-4 max-w-sm mt-1">
                             <p className="text-[10px] text-brand-500 uppercase tracking-wider font-bold mb-2">Tips</p>
                             <ul className="text-xs text-brand-400 space-y-1">
                                 <li>- Ensure the sheet is flat and well-lit</li>
