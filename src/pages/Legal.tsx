@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, FileText, Shield } from 'lucide-react';
 
 type Tab = 'tos' | 'privacy';
@@ -52,6 +52,13 @@ const Legal = () => {
                 <div className="max-w-lg mx-auto prose-sm text-slate-300">
                     {activeTab === 'tos' ? <TermsOfService /> : <PrivacyPolicy />}
                 </div>
+            </div>
+
+            <div className="p-4 border-t border-brand-800 text-center">
+                <Link to="/accuracy" className="text-xs text-sky-400 hover:text-sky-300 underline-offset-2 hover:underline">
+                    Accuracy samples
+                </Link>
+                <span className="text-xs text-slate-600"> · public before/after extraction examples</span>
             </div>
         </div>
     );
