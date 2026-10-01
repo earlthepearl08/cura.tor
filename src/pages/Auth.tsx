@@ -306,7 +306,13 @@ const Auth: React.FC = () => {
                     </div>
 
                     {/* Footer */}
-                    <div className="p-6 text-center">
+                    <div className="p-6 text-center space-y-2">
+                        <p className="text-xs text-slate-500">
+                            <Link to="/accuracy" className="text-sky-400/90 hover:text-sky-300 underline-offset-2 hover:underline transition-colors">
+                                See accuracy samples
+                            </Link>
+                            <span className="text-slate-600"> — PH cards & log sheets, before/after</span>
+                        </p>
                         <p className="text-xs text-slate-500">
                             By continuing, you agree to our{' '}
                             <Link to="/legal?tab=tos" className="text-slate-400 hover:text-sky-400 underline-offset-2 hover:underline transition-colors">Terms</Link>
