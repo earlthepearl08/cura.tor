@@ -2,7 +2,7 @@
 
 **Audience:** Earl  
 **Goal:** Ship a honest paid beta after Phase A merges — billing works, trust surfaces are real, landing is public.  
-**Do not** bulk-merge; rebase each PR onto `main` after the previous lands. Full sequence: `docs/pr-merge-order.md`.
+**Do not** bulk-merge; rebase each PR onto `main` after the previous lands. Full sequence: [`docs/pr-merge-order.md`](./pr-merge-order.md). Merge-day conflict tips: [`docs/phase-a-merge-forecast.md`](./phase-a-merge-forecast.md) (ships with [#20](https://github.com/earlthepearl08/cura.tor/pull/20)).
 
 ---
 
@@ -23,12 +23,13 @@ Merge **one at a time**, then smoke the critical path before the next:
 | 9 | **#44** Competitor comparison | Honest Landing section vs CamCard/ABBYY/Excel+photo — after #24/#38 |
 | 10 | **#47** Public accuracy report | `/accuracy#report` synthetic field metrics — after #24 (same stack base) |
 | 11 | **#49** Sample demo CTA | No-signup “See sample results” → Accuracy gallery — after #24 stack |
-| 12 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
-| 13 | **#48** Vitest CI | GitHub Actions unit tests — after #2 |
-| 14 | **#43** Playwright smokes | Mocked e2e auth → scan → save → export — after #2 |
-| 15 | **#45** Playwright CI | GitHub Actions Chromium smoke — after #43 |
-| 16 | **#32** Webhook fixture tests | Vitest coverage for Stripe lifecycle events (after #4/#2) |
-| 17 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
+| 12 | **#51** Sitemap + robots | `robots.txt` / `sitemap.xml` for public routes — after #24 stack |
+| 13 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
+| 14 | **#48** Vitest CI | GitHub Actions unit tests — after #2 |
+| 15 | **#43** Playwright smokes | Mocked e2e auth → scan → save → export — after #2 |
+| 16 | **#45** Playwright CI | GitHub Actions Chromium smoke — after #43 |
+| 17 | **#32** Webhook fixture tests | Vitest coverage for Stripe lifecycle events (after #4/#2) |
+| 18 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
 
 **After #6:** [#36](https://github.com/earlthepearl08/cura.tor/pull/36) expands the eval harness with a synthetic golden set (30 cards + 10 PH log sheets) plus `HOWTO-REAL-SAMPLES.md` for dropping real photos later. It can merge after #6 (eval-only; monitoring stays on #6).
 
