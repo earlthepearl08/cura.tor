@@ -12,6 +12,7 @@ import MultiCardScan from '@/pages/MultiCardScan';
 import BatchHistory from '@/pages/BatchHistory';
 import Legal from '@/pages/Legal';
 import Auth from '@/pages/Auth';
+import AccuracyGallery from '@/pages/AccuracyGallery';
 import TeamAdmin from '@/pages/TeamAdmin';
 import AcceptInvite from '@/pages/AcceptInvite';
 import Admin from '@/pages/Admin';
@@ -32,6 +33,9 @@ function App() {
                     <div className="min-height-screen bg-brand-950">
                         <Routes>
                             <Route path="/auth" element={<Auth />} />
+                            {/* Public marketing trust surface — no auth */}
+                            <Route path="/accuracy" element={<AccuracyGallery />} />
+                            <Route path="/samples" element={<Navigate to="/accuracy" replace />} />
                             <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                             <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
                             <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
