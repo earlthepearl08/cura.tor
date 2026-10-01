@@ -3,6 +3,10 @@
 ## Document Version: 1.0
 ## Date: January 21, 2026
 
+> **⚠️ OUTDATED — operator source of truth is [`README.md`](./README.md)**  
+> This spec describes an early local-Tesseract design. The shipped app uses **Gemini / Cloud Vision** (server proxies), **Firebase Auth + Firestore**, **Stripe Checkout**, Google Drive sync, team workspaces, and owner admin APIs. Do **not** treat §2.3, §5.3, §9.1, §14.3, or §15 as current architecture.  
+> Ops: env vars, Vercel, Firebase rules, Stripe webhook, Gemini/Vision keys, owner admin → **[`README.md`](./README.md)**.
+
 ---
 
 ## 1. Executive Summary
@@ -13,9 +17,9 @@ A Progressive Web Application (PWA) designed for scanning, extracting, and manag
 ### 1.2 Core Objectives
 - Scan business cards using device camera (mobile)
 - Upload single or bulk images (mobile & desktop)
-- Extract contact data using OCR (Tesseract.js)
+- Extract contact data using OCR — ~~Tesseract.js only~~ **(outdated)** → production path is Gemini via `/api/gemini`, with Cloud Vision (`/api/ocr`) and Tesseract as fallbacks; see [`README.md`](./README.md)
 - Parse and structure extracted text into defined fields
-- Store contacts locally using IndexedDB
+- Store contacts locally using IndexedDB (**plus** Firestore profiles/teams and optional Google Drive App Data sync — not in original scope)
 - Export data to CSV and Excel formats
 
 ### 1.3 Target Platforms
@@ -45,11 +49,13 @@ A Progressive Web Application (PWA) designed for scanning, extracting, and manag
 ### 2.3 Core Libraries
 | Library | Version | Purpose |
 |---------|---------|---------|
-| tesseract.js | 5.x | OCR Engine |
+| tesseract.js | 5.x | OCR fallback only (**not** primary — Gemini/Vision are) |
 | idb | 8.x | IndexedDB Wrapper |
 | xlsx (SheetJS) | 0.20.x | Excel Export |
 | react-webcam | 7.x | Camera Access |
 | react-dropzone | 14.x | Drag & Drop Upload |
+| firebase / firebase-admin | — | Auth, Firestore, server Admin (**shipped; missing from original spec**) |
+| stripe / @stripe/stripe-js | — | Checkout + portal (**shipped; webhook fulfillment incomplete**) |
 
 ---
 
@@ -317,7 +323,9 @@ const cameraConfig = {
 
 ### 5.3 OCR Processing
 
-#### 5.3.1 Tesseract.js Configuration
+> **Outdated section.** Primary extraction is server-side Gemini (`api/gemini.ts`) and optional Cloud Vision (`api/ocr.ts`). Tesseract.js remains a client fallback. Operator key setup: [`README.md`](./README.md#gemini--cloud-vision-keys).
+
+#### 5.3.1 Tesseract.js Configuration *(historical / fallback)*
 ```typescript
 const ocrConfig = {
   lang: 'eng',                    // Language
@@ -679,10 +687,11 @@ const TESSERACT_ASSETS = [
 ## 9. Security Considerations
 
 ### 9.1 Data Privacy
-- All data stored locally on device
-- No data transmitted to external servers
+> **Outdated / incorrect for current app.** Card and log-sheet images **are** sent to Google Gemini and/or Cloud Vision via Vercel serverless proxies. Auth and team data use Firebase. Billing uses Stripe. Personal contacts remain primarily IndexedDB (+ optional Drive App Data). See Legal pages and [`README.md`](./README.md).
+- ~~All data stored locally on device~~ — **partially true** for personal contact records; not for OCR/auth/billing
+- ~~No data transmitted to external servers~~ — **false** for scan/OCR path
 - Camera access requires explicit permission
-- No analytics or tracking
+- No product analytics/Sentry wired yet (console-only ErrorBoundary)
 
 ### 9.2 Input Validation
 - Sanitize all user inputs
@@ -843,7 +852,10 @@ npm run build
 ```
 
 ### 14.3 Environment Variables
+> **Outdated list.** Full current env var tables (Firebase, Gemini/Vision, Stripe, owner emails): [`README.md`](./README.md#environment-variables) and [`.env.example`](./.env.example).
+
 ```env
+# Historical placeholder — do not use as deploy checklist
 VITE_APP_VERSION=1.0.0
 VITE_TESSERACT_LANG=eng
 ```
@@ -852,18 +864,22 @@ VITE_TESSERACT_LANG=eng
 
 ## 15. Future Enhancements (Out of Scope)
 
-The following features are documented for potential future development:
+> Several items below **shipped** after this spec was written. Struck items are no longer “future.”
 
-1. **Cloud Sync** - Firebase/Supabase integration for cross-device sync
-2. **AI Enhancement** - Claude/OpenAI API for improved field extraction
+The following features were documented for potential future development:
+
+1. ~~**Cloud Sync** - Firebase/Supabase integration for cross-device sync~~ — **done** (Firebase + optional Google Drive App Data)
+2. ~~**AI Enhancement** - Claude/OpenAI API for improved field extraction~~ — **done** via Gemini (not Claude/OpenAI)
 3. **Multiple Languages** - Additional OCR language support
-4. **Contact Groups** - Organize contacts into categories
-5. **QR Code Support** - Scan QR codes on business cards
-6. **vCard Export** - Export to .vcf format
+4. **Contact Groups** - Organize contacts into categories *(folders exist in app)*
+5. ~~**QR Code Support** - Scan QR codes on business cards~~ — **done** (`QRScan`)
+6. ~~**vCard Export** - Export to .vcf format~~ — **done** (tier-gated)
 7. **Direct Share** - Share to phone contacts
-8. **Duplicate Detection** - Warn when similar contact exists
+8. ~~**Duplicate Detection** - Warn when similar contact exists~~ — **done** (heuristic)
 9. **Business Card Templates** - Recognize common card layouts
 10. **API Integration** - LinkedIn lookup, email verification
+
+Also shipped beyond this list: multi-card scan, log-sheet OCR, Stripe Checkout (webhook fulfillment still open), team workspaces, owner admin.
 
 ---
 
