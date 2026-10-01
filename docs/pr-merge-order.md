@@ -15,7 +15,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 
 ---
 
-## Inventory (#1–#37)
+## Inventory (#1–#38)
 
 | # | Title | Theme | Hot files / notes |
 |---|--------|--------|-------------------|
@@ -54,6 +54,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | 35 | Email password reset on Auth | **P0** auth | Ready for review. `Auth.tsx`, `AuthContext` — **after #5** Auth trust edits; before #28 magic-link |
 | 36 | Synthetic accuracy golden set (30/10) | P0 accuracy | Ready for review. `eval/accuracy/` fixtures + scoring + `HOWTO-REAL-SAMPLES.md` — **after #6** scaffold (Phase A follow-on); separate branch from #6 |
 | 37 | Gemini ops / cost monitoring docs | Meta ops | Ready for review. `GEMINI_OPS.md`, `VERCEL_SETUP.md`, `.env.example` (+ light `api/gemini.ts` / `api/ocr.ts` notes) — **anytime with #1 / #20 / #27**; rebase if OCR API PRs land first |
+| 38 | Landing SEO meta (OG/title/desc) | P0 landing | Ready for review. `Landing.tsx`, `AccuracyGallery.tsx`, `PageMeta.tsx`, `index.html` — **after #24**; PR base is `cursor/landing-accuracy-nav-link-9334` (stacked on #24) |
 
 ---
 
@@ -65,7 +66,7 @@ Ready-for-review (not draft) as of last undraft passes: **#4–#13** P0/P1/claim
 | `src/App.tsx` | +21, 23, 24, 26 | High — landing → gallery → a11y → events |
 | `src/contexts/AuthContext.tsx` | +**35**, 22, 26, 28 | High — Stripe → trust → **password reset** → Sentry → event pack → magic link |
 | `src/pages/Auth.tsx` | +**35**, 21, 23, 24, 28 | High — **#35** after #5 |
-| `src/pages/Landing.tsx` | **#3 ⊂ #24** | Prefer merge **#24** (or #3 then #24); do not also merge #21 |
+| `src/pages/Landing.tsx` | **#3 ⊂ #24 → #38** | Prefer merge **#24** then **#38** SEO; do not also merge #21 |
 | `api/stripe-webhook.ts` / checkout | **#4, #26** | #26 after #4 |
 | `firestore.rules` | +19, 26 | Claims → glossary → events → event-pack |
 | `src/pages/LogScan.tsx` | +23 | Still highest with OCR stack |
@@ -117,7 +118,7 @@ No dedicated conflict-fix branch needed; path overlap is ancestry, not divergent
 Canonical one-liner (matches `docs/go-live-checklist.md`):
 
 ```
-#1 → #4 → #5 → #35 → #33 → #24 → #2 → #32 → #6 → #36
+#1 → #4 → #5 → #35 → #33 → #24 → #38 → #2 → #32 → #6 → #36
 ```
 
 Expanded (meta docs anytime; same product order):
@@ -130,6 +131,7 @@ Expanded (meta docs anytime; same product order):
 → #33 Legal subprocessors + Privacy AI ← after #5 Legal; rebase if #1 already edited TECHNICAL_SPEC
 → #24 Landing + accuracy gallery + nav ← includes #3 + #21; close #21 (and #3 if unused)
    (alt: #3 then #24; still skip standalone #21 merge)
+→ #38 Landing SEO meta                 ← after #24; base branch `cursor/landing-accuracy-nav-link-9334`
 → #2 Tests
 → #32 Stripe webhook Vitest fixtures   ← after #4 handler + #2 Vitest scaffold
 → #6 Accuracy scaffold
@@ -137,6 +139,8 @@ Expanded (meta docs anytime; same product order):
 ```
 
 **#24 note:** Stacked merge of landing (`#3`) + gallery (`#21`) + accuracy nav. See section above.
+
+**#38 note:** SEO title/description/Open Graph for Landing + Accuracy gallery. **Stacks on #24** (PR base `cursor/landing-accuracy-nav-link-9334`). Merge **immediately after #24** onto `main` (or retarget to `main` once #24 lands). Do not merge before #24.
 
 **#32 note:** Lands real webhook handler coverage. Merge **after #4** (needs `api/stripe-webhook.ts`) and **after #2** (Vitest/`TESTING.md` scaffold). If #2 and #32 both touch `package.json` / test setup, rebase #32 onto #2.
 
@@ -205,7 +209,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 
 - **`AuthContext`:** `#4` → `#5` → `#35` → `#10` → `#8` → `#22` → `#28` → `#26`
 - **`Auth.tsx`:** `#5` → `#35` → `#3` → `#21`/`#24` → `#23` → `#28`
-- **`Landing.tsx`:** `#3` → `#24`
+- **`Landing.tsx`:** `#3` → `#24` → `#38`
 - **`App.tsx`:** `#3` → `#16` → `#21`/`#24` → `#23` → `#19` → `#26`
 - **`Settings`:** `#4` → `#5` → `#3` → `#10` → `#34` → `#9` → `#8` → `#16` → `#21` → `#22` → `#25` → `#18` → `#17` → `#19`/`#26`
 - **`LogScan`:** `#3` → `#9` → `#8` → `#11` → `#31` → `#15` → `#14` → `#16` → `#18` → `#17` → `#23`
@@ -232,6 +236,7 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 
 - No automatic merge train without Earl.  
 - **#24** is the landing+gallery stack (**includes #3 + #21**) — never merge #21 separately after #24; close #21 as superseded.  
+- **#38 stacks on #24** — merge SEO meta only after #24 (retarget to `main` once #24 lands if needed).  
 - **#26 stacks on #19 and #4** — never before Stripe lifecycle + event workspaces.  
 - `#14`+`#15` remain the hottest LogScan pair.  
 - Meta docs **#20** / **#27** / **#1** / **#37** (Gemini ops) can merge any time; **#33** still waits on **#5** for `Legal.tsx`. **#37** is mostly ops docs — if `#31`/`#6` already changed `api/ocr.ts`, rebase #37 first.
@@ -241,8 +246,8 @@ Merge **#34** once **#10** (and #5) Settings edits are on `main`, so Advanced OC
 ## Quick reference — one-line order
 
 ```
-Phase A: #1 → #4 → #5 → #35 → #33 → #24 → #2 → #32 → #6 → #36
-  (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21)
+Phase A: #1 → #4 → #5 → #35 → #33 → #24 → #38 → #2 → #32 → #6 → #36
+  (#20/#27/#37 anytime with #1; #24 includes #3+#21 — close #21; #38 after #24)
 → Phase B core: #10 → #9 → #8 → #7 → #11
 → (#34 OCR Advanced → #28 Magic link → #22 Sentry → #31 Friendly OCR errors → #25 Priority support)
 → #12 Claim admin → #13 Follow-up → #16 Help → #15 Guided → #14 Templates
