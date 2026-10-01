@@ -22,15 +22,19 @@ Merge **one at a time**, then smoke the critical path before the next:
 | 8 | **#38** Landing SEO meta | Title/description/OG for Landing + Accuracy — **after #24** (PR base is #24 branch) |
 | 9 | **#44** Competitor comparison | Honest Landing section vs CamCard/ABBYY/Excel+photo — after #24/#38 |
 | 10 | **#47** Public accuracy report | `/accuracy#report` synthetic field metrics — after #24 (same stack base) |
-| 11 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
-| 12 | **#43** Playwright smokes | Mocked e2e auth → scan → save → export — after #2 |
-| 13 | **#45** Playwright CI | GitHub Actions Chromium smoke — after #43 |
-| 14 | **#32** Webhook fixture tests | Vitest coverage for Stripe lifecycle events (after #4/#2) |
-| 15 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
+| 11 | **#49** Sample demo CTA | No-signup “See sample results” → Accuracy gallery — after #24 stack |
+| 12 | **#2** Critical-path tests | Vitest / RTL; aligns with webhook contract |
+| 13 | **#48** Vitest CI | GitHub Actions unit tests — after #2 |
+| 14 | **#43** Playwright smokes | Mocked e2e auth → scan → save → export — after #2 |
+| 15 | **#45** Playwright CI | GitHub Actions Chromium smoke — after #43 |
+| 16 | **#32** Webhook fixture tests | Vitest coverage for Stripe lifecycle events (after #4/#2) |
+| 17 | **#6** Accuracy + monitoring scaffold | Eval harness + observability hooks |
 
 **After #6:** [#36](https://github.com/earlthepearl08/cura.tor/pull/36) expands the eval harness with a synthetic golden set (30 cards + 10 PH log sheets) plus `HOWTO-REAL-SAMPLES.md` for dropping real photos later. It can merge after #6 (eval-only; monitoring stays on #6).
 
 **Accuracy stack:** Prefer merging **#24** only. It already contains landing (**#3**) and the gallery (**#21**). **Close #21** (and skip standalone **#3**) when #24 lands — do **not** merge #3+#21+#24 as three separate feature merges. Details: `docs/pr-merge-order.md`.
+
+**Meta / anytime:** [#50](https://github.com/earlthepearl08/cura.tor/pull/50) is advisory Lighthouse CI for Landing (§8 budgets) — not in the Phase A merge sequence; merge anytime.
 
 **Stop after Phase A** until Stripe webhook + smoke test (below) pass. Then continue P1 (#7–#11 are already ready for review).
 
