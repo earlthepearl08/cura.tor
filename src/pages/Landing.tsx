@@ -115,6 +115,12 @@ const Landing: React.FC = () => {
                         <img src="/logo.svg" alt="Cura.tor" className="h-7" />
                     </a>
                     <nav className="flex items-center gap-2 sm:gap-3">
+                        <Link
+                            to="/accuracy#report"
+                            className="hidden sm:inline text-sm text-slate-400 hover:text-white transition-colors px-2"
+                        >
+                            Accuracy
+                        </Link>
                         <a
                             href="#pricing"
                             className="hidden sm:inline text-sm text-slate-400 hover:text-white transition-colors px-2"
@@ -627,6 +633,8 @@ const Landing: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-4 text-xs text-slate-500">
                         <a href="#pricing" className="hover:text-slate-300 transition-colors">Pricing</a>
+                        <Link to="/accuracy#report" className="hover:text-slate-300 transition-colors">Accuracy report</Link>
+                        <Link to="/accuracy#samples" className="hover:text-slate-300 transition-colors">Samples</Link>
                         <Link to="/legal" className="hover:text-slate-300 transition-colors">Terms & Privacy</Link>
                         <Link to="/auth" className="hover:text-slate-300 transition-colors">
                             {isSignedIn ? 'Account' : 'Sign in'}

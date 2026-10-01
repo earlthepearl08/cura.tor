@@ -784,11 +784,11 @@ const Settings = () => {
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Legal & trust</p>
                     <div className="card-elevated rounded-2xl p-4 space-y-2">
                         <button
-                            onClick={() => navigate('/accuracy')}
+                            onClick={() => navigate('/accuracy#report')}
                             className="w-full flex items-center gap-3 py-2 px-1 rounded-lg hover:bg-white/5 transition-colors"
                         >
                             <Sparkles size={16} className="text-sky-400" />
-                            <span className="text-sm text-slate-300">Accuracy samples</span>
+                            <span className="text-sm text-slate-300">Accuracy report</span>
                         </button>
                         <button
                             onClick={() => navigate('/legal?tab=tos')}

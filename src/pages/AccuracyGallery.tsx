@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
     ArrowRight, BadgeCheck, Camera, FileSpreadsheet, Layers, Sparkles,
 } from 'lucide-react';
@@ -10,6 +10,7 @@ import {
     GallerySampleType,
 } from '@/data/accuracyGallery';
 import PageMeta, { ACCURACY_GALLERY_META } from '@/components/PageMeta';
+import AccuracyReportSection from '@/components/AccuracyReportSection';
 
 type Filter = 'all' | GallerySampleType;
 
@@ -124,6 +125,7 @@ function SampleBlock({ sample }: { sample: GallerySample }) {
 
 const AccuracyGallery: React.FC = () => {
     const [filter, setFilter] = useState<Filter>('all');
+    const location = useLocation();
 
     const samples = useMemo(() => {
         if (filter === 'all') return ACCURACY_GALLERY_SAMPLES;
@@ -132,6 +134,15 @@ const AccuracyGallery: React.FC = () => {
 
     const cardCount = ACCURACY_GALLERY_SAMPLES.filter(s => s.type === 'card').length;
     const sheetCount = ACCURACY_GALLERY_SAMPLES.filter(s => s.type === 'log-sheet').length;
+
+    useEffect(() => {
+        const id = location.hash.replace(/^#/, '');
+        if (!id) return;
+        const el = document.getElementById(id);
+        if (el) {
+            requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        }
+    }, [location.hash, location.pathname]);
 
     return (
         <div className="min-h-screen bg-brand-950 text-slate-200">
@@ -149,6 +160,9 @@ const AccuracyGallery: React.FC = () => {
                         <span className="font-bold text-sm sm:text-base tracking-tight text-slate-100 truncate">Cura.Tor</span>
                     </Link>
                     <div className="flex items-center gap-2 sm:gap-3">
+                        <a href="#report" className="text-xs text-slate-500 hover:text-slate-300 hidden sm:inline">
+                            Report
+                        </a>
                         <Link to="/legal" className="text-xs text-slate-500 hover:text-slate-300 hidden sm:inline">Legal</Link>
                         <Link
                             to="/auth"
@@ -164,31 +178,43 @@ const AccuracyGallery: React.FC = () => {
                 {/* Hero */}
                 <section className="pt-10 sm:pt-14 pb-8 sm:pb-10 space-y-5">
                     <p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-400/90">
-                        <Sparkles size={14} /> Accuracy samples
+                        <Sparkles size={14} /> Accuracy report & samples
                     </p>
                     <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-slate-50 max-w-2xl leading-[1.1]">
                         Cura.Tor
                         <span className="block text-xl sm:text-2xl font-semibold text-slate-400 mt-2">
-                            Before / after extraction for PH trade-show cards & log sheets
+                            Field metrics + before/after PH cards & log sheets
                         </span>
                     </h1>
                     <p className="text-sm sm:text-base text-brand-300 max-w-xl leading-relaxed">
-                        Illustrative examples of what the scanner returns — stacked logos, multi-phone cards,
-                        printed sign-in tables, and messy handwriting. Imagery below is labeled placeholder until
-                        real licensed photos are swapped in.
+                        Published primary-field scores from the synthetic golden set (clearly labeled demo — not
+                        live Gemini F1), plus illustrative before/after extractions. Swap in real photos when ready.
                     </p>
                     <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+                        <a
+                            href="#report"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-200/90 hover:bg-amber-500/15 transition-colors"
+                        >
+                            Synthetic field report
+                        </a>
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-brand-800 bg-brand-900/50">
-                            <Camera size={12} className="text-sky-400" /> {cardCount} cards
+                            <Camera size={12} className="text-sky-400" /> {cardCount} gallery cards
                         </span>
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-brand-800 bg-brand-900/50">
-                            <Layers size={12} className="text-emerald-400" /> {sheetCount} log sheets
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-brand-800 bg-brand-900/50">
-                            Field IDs aligned with internal eval fixtures
+                            <Layers size={12} className="text-emerald-400" /> {sheetCount} gallery sheets
                         </span>
                     </div>
                 </section>
+
+                <div className="mb-10">
+                    <AccuracyReportSection />
+                </div>
+
+                <div id="samples" className="scroll-mt-20 mb-4">
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">
+                        Before / after samples
+                    </h2>
+                </div>
 
                 {/* Filters */}
                 <div className="flex gap-1 p-1 mb-6 rounded-xl border border-brand-800 bg-brand-900/40 w-full sm:w-auto max-w-md">
@@ -222,13 +248,19 @@ const AccuracyGallery: React.FC = () => {
                 <section className="mt-10 rounded-2xl border border-brand-800 bg-brand-900/40 p-5 sm:p-6 space-y-3">
                     <h2 className="text-sm font-bold text-slate-100">About these scores</h2>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                        These are marketing before/after demos, not a published F1 report yet. Internal golden-set
-                        scoring lives under <code className="text-brand-300">eval/accuracy/</code> (when that harness
-                        is merged). Swap real photos via{' '}
-                        <code className="text-brand-300">public/accuracy-samples/README.md</code> without changing
-                        the page layout.
+                        The <a href="#report" className="text-sky-400 hover:text-sky-300">field metrics report</a> is a
+                        synthetic/demo snapshot from <code className="text-brand-300">eval/accuracy/</code> mock eval
+                        (primary fields: name, company, phone, email). It is intentionally not live Gemini F1.
+                        Gallery imagery below remains placeholder until real photos are swapped via{' '}
+                        <code className="text-brand-300">public/accuracy-samples/README.md</code>.
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1">
+                        <a
+                            href="#report"
+                            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
+                        >
+                            View synthetic report
+                        </a>
                         <Link
                             to="/auth"
                             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-sky-500 hover:bg-sky-400 text-white"
@@ -252,7 +284,8 @@ const AccuracyGallery: React.FC = () => {
                         <span className="text-xs text-slate-600">Smart contact curation</span>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-slate-500">
-                        <Link to="/accuracy" className="text-slate-300">Accuracy</Link>
+                        <a href="#report" className="text-slate-300 hover:text-white transition-colors">Report</a>
+                        <a href="#samples" className="hover:text-slate-300 transition-colors">Samples</a>
                         <Link to="/legal" className="hover:text-slate-300 transition-colors">Legal</Link>
                         <Link to="/auth" className="hover:text-slate-300 transition-colors">Sign in</Link>
                     </div>

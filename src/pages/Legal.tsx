@@ -55,10 +55,10 @@ const Legal = () => {
             </div>
 
             <div className="p-4 border-t border-brand-800 text-center">
-                <Link to="/accuracy" className="text-xs text-sky-400 hover:text-sky-300 underline-offset-2 hover:underline">
-                    Accuracy samples
+                <Link to="/accuracy#report" className="text-xs text-sky-400 hover:text-sky-300 underline-offset-2 hover:underline">
+                    Accuracy report
                 </Link>
-                <span className="text-xs text-slate-600"> · public before/after extraction examples</span>
+                <span className="text-xs text-slate-600"> · synthetic field metrics + samples</span>
             </div>
         </div>
     );
