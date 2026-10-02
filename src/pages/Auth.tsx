@@ -2,13 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import {
     Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle,
-<<<<<<< /tmp/meld/28-main-Auth.tsx
     ScanLine, Users as UsersIcon, FileDown, HardDrive, ChevronDown, ShieldCheck,
     ArrowLeft, CheckCircle2,
-=======
     ScanLine, Users as UsersIcon, FileDown, WifiOff, ChevronDown, ShieldCheck,
     Link2, CheckCircle2,
->>>>>>> /tmp/meld/28-pr-Auth.tsx
 } from 'lucide-react';
 import { useAuth, MAGIC_LINK_EMAIL_KEY } from '@/contexts/AuthContext';
 
@@ -35,9 +32,7 @@ const BENEFITS: { icon: React.ComponentType<{ className?: string }>; label: stri
 type AuthMode = 'signin' | 'signup' | 'reset';
 
 const Auth: React.FC = () => {
-<<<<<<< /tmp/meld/28-main-Auth.tsx
     const { user, isLoading, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useAuth();
-=======
     const {
         user,
         isLoading,
@@ -48,7 +43,6 @@ const Auth: React.FC = () => {
         isMagicLinkSignIn,
         completeMagicLinkSignIn,
     } = useAuth();
->>>>>>> /tmp/meld/28-pr-Auth.tsx
     const inAppBrowser = useMemo(() => detectInAppBrowser(), []);
     const [mode, setMode] = useState<AuthMode>('signin');
     const [showEmailForm, setShowEmailForm] = useState(false);
@@ -106,7 +100,6 @@ const Auth: React.FC = () => {
     }, [showEmailForm]);
 
     // Already signed in — redirect to home
-<<<<<<< /tmp/meld/28-main-Auth.tsx
     if (!isLoading && user) {
         return <Navigate to="/app" replace />;
     }
@@ -117,7 +110,6 @@ const Auth: React.FC = () => {
             return mode === 'reset'
                 ? 'If an account exists for that email, a reset link will be sent.'
                 : 'Invalid email or password';
-=======
     if (!isLoading && user && !completingMagicLink) {
         return <Navigate to="/" replace />;
     }
@@ -126,7 +118,6 @@ const Auth: React.FC = () => {
         const code = err.code || '';
         if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
             return 'Invalid email or password';
->>>>>>> /tmp/meld/28-pr-Auth.tsx
         }
         if (code === 'auth/email-already-in-use') {
             return 'An account with this email already exists';
@@ -138,18 +129,15 @@ const Auth: React.FC = () => {
             return 'Please enter a valid email address';
         }
         if (code === 'auth/too-many-requests') {
-<<<<<<< /tmp/meld/28-main-Auth.tsx
             return 'Too many attempts. Please try again later.';
         }
         return err?.message || 'Something went wrong';
-=======
             return 'Too many attempts. Wait a moment and try again.';
         }
         if (code === 'auth/invalid-action-code') {
             return 'This sign-in link is invalid or has expired. Request a new one.';
         }
         return err.message || 'Something went wrong';
->>>>>>> /tmp/meld/28-pr-Auth.tsx
     };
 
     const handleEmailAuth = async (e: React.FormEvent) => {
@@ -159,7 +147,6 @@ const Auth: React.FC = () => {
         setIsSubmitting(true);
 
         try {
-<<<<<<< /tmp/meld/28-main-Auth.tsx
             if (mode === 'reset') {
                 if (!email.trim()) {
                     setError('Please enter your email address');
@@ -168,7 +155,6 @@ const Auth: React.FC = () => {
                 }
                 await resetPassword(email);
                 setInfo('Password reset email sent. Check your inbox for a link to set a new password.');
-=======
             if (emailMethod === 'magic' || needsEmailConfirm) {
                 if (needsEmailConfirm && isMagicLinkSignIn()) {
                     setCompletingMagicLink(true);
@@ -179,7 +165,6 @@ const Auth: React.FC = () => {
                 await sendMagicLink(email);
                 setMagicLinkSent(true);
                 setInfo(`Magic link sent to ${email.trim()}. Open it on this device to sign in.`);
->>>>>>> /tmp/meld/28-pr-Auth.tsx
                 return;
             }
 
@@ -194,7 +179,6 @@ const Auth: React.FC = () => {
                 await signInWithEmail(email, password);
             }
         } catch (err: any) {
-<<<<<<< /tmp/meld/28-main-Auth.tsx
             // Firebase may omit user-not-found for reset to prevent enumeration.
             // Surface a neutral success-style message for that case when resetting.
             if (mode === 'reset' && (err?.code === 'auth/user-not-found' || err?.code === 'auth/invalid-credential')) {
@@ -202,10 +186,8 @@ const Auth: React.FC = () => {
             } else {
                 setError(mapAuthError(err));
             }
-=======
             setError(mapAuthError(err));
             setMagicLinkSent(false);
->>>>>>> /tmp/meld/28-pr-Auth.tsx
         } finally {
             setIsSubmitting(false);
             setCompletingMagicLink(false);
@@ -227,7 +209,6 @@ const Auth: React.FC = () => {
         }
     };
 
-<<<<<<< /tmp/meld/28-main-Auth.tsx
     const switchMode = (next: AuthMode) => {
         setMode(next);
         setError('');
@@ -238,9 +219,7 @@ const Auth: React.FC = () => {
     };
 
     if (isLoading) {
-=======
     if (isLoading || completingMagicLink) {
->>>>>>> /tmp/meld/28-pr-Auth.tsx
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-brand-950 gap-3">
                 <div className="animate-spin h-8 w-8 border-2 border-brand-400 border-t-transparent rounded-full"></div>
@@ -312,7 +291,6 @@ const Auth: React.FC = () => {
                                 </p>
                             </div>
 
-<<<<<<< /tmp/meld/28-main-Auth.tsx
                             {mode === 'reset' ? (
                                 <>
                                     <button
@@ -345,7 +323,6 @@ const Auth: React.FC = () => {
                                     </button>
                                 </div>
                             )}
-=======
                             {/* Mode tabs — password signup still available; magic link covers both */}
                             <div className="flex rounded-xl bg-brand-900 border border-brand-800 p-1 mb-6">
                                 <button
@@ -361,7 +338,6 @@ const Auth: React.FC = () => {
                                     Start free
                                 </button>
                             </div>
->>>>>>> /tmp/meld/28-pr-Auth.tsx
 
                             {/* Error */}
                             {error && (
@@ -371,19 +347,16 @@ const Auth: React.FC = () => {
                                 </div>
                             )}
 
-<<<<<<< /tmp/meld/28-main-Auth.tsx
                             {/* Success / info */}
                             {info && (
                                 <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2">
                                     <CheckCircle2 className="text-emerald-400 shrink-0 mt-0.5" size={16} />
                                     <p className="text-sm text-emerald-400">{info}</p>
-=======
                             {/* Info / magic link sent */}
                             {info && !error && (
                                 <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2">
                                     <CheckCircle2 className="text-emerald-400 shrink-0 mt-0.5" size={16} />
                                     <p className="text-sm text-emerald-300">{info}</p>
->>>>>>> /tmp/meld/28-pr-Auth.tsx
                                 </div>
                             )}
 
@@ -417,7 +390,6 @@ const Auth: React.FC = () => {
                                         Free forever. Upgrade when you need more.
                                     </p>
 
-<<<<<<< /tmp/meld/28-main-Auth.tsx
                                     {/* Divider + email toggle */}
                                     <div className="flex items-center gap-3 my-6">
                                         <div className="flex-1 h-px bg-brand-800"></div>
@@ -437,7 +409,6 @@ const Auth: React.FC = () => {
                             {(showEmailForm || mode === 'reset') && (
                                 <form onSubmit={handleEmailAuth} className="space-y-3 animate-in fade-in">
                                     {mode === 'signup' && (
-=======
                             {/* Email form (collapsed by default) */}
                             {showEmailForm && (
                                 <div className="space-y-3 animate-in fade-in">
@@ -482,7 +453,6 @@ const Auth: React.FC = () => {
                                             </div>
                                         )}
 
->>>>>>> /tmp/meld/28-pr-Auth.tsx
                                         <div className="relative">
                                             <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
                                             <input
@@ -521,7 +491,6 @@ const Auth: React.FC = () => {
                                             </div>
                                         )}
 
-<<<<<<< /tmp/meld/28-main-Auth.tsx
                                     {mode !== 'reset' && (
                                         <div className="relative">
                                             <Lock className="absolute left-3 top-3.5 text-slate-500" size={18} />
@@ -571,7 +540,6 @@ const Auth: React.FC = () => {
                                             'Log in'
                                         ) : (
                                             'Start free'
-=======
                                         <button
                                             type="submit"
                                             disabled={isSubmitting}
@@ -592,7 +560,6 @@ const Auth: React.FC = () => {
                                             <p className="text-[10px] text-slate-500 text-center">
                                                 No password — we email a one-time link. Works for new and returning users (great at events).
                                             </p>
->>>>>>> /tmp/meld/28-pr-Auth.tsx
                                         )}
 
                                         {emailMethod === 'password' && mode === 'signup' && (

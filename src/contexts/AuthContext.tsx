@@ -9,13 +9,10 @@ import {
     updateProfile,
     signOut as firebaseSignOut,
     sendEmailVerification,
-<<<<<<< /tmp/meld/28-main-AuthContext.tsx
     sendPasswordResetEmail,
-=======
     sendSignInLinkToEmail,
     isSignInWithEmailLink,
     signInWithEmailLink,
->>>>>>> /tmp/meld/28-pr-AuthContext.tsx
     GoogleAuthProvider,
     User
 } from 'firebase/auth';
@@ -67,9 +64,7 @@ interface AuthContextType {
     signInWithGoogle: () => Promise<void>;
     signInWithEmail: (email: string, password: string) => Promise<void>;
     signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
-<<<<<<< /tmp/meld/28-main-AuthContext.tsx
     resetPassword: (email: string) => Promise<void>;
-=======
     /** Send a passwordless email sign-in link. Same flow for new and returning users. */
     sendMagicLink: (email: string) => Promise<void>;
     /** True when the current URL is a Firebase email sign-in link. */
@@ -79,7 +74,6 @@ interface AuthContextType {
      * Pass email if localStorage was cleared (e.g. opened on another device).
      */
     completeMagicLinkSignIn: (email?: string) => Promise<void>;
->>>>>>> /tmp/meld/28-pr-AuthContext.tsx
     signOut: () => Promise<void>;
 
     // Tier checks
@@ -242,12 +236,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, []);
 
-<<<<<<< /tmp/meld/28-main-AuthContext.tsx
     const resetPassword = useCallback(async (email: string) => {
         await sendPasswordResetEmail(auth, email.trim(), {
             url: window.location.origin,
         });
-=======
     const sendMagicLink = useCallback(async (email: string) => {
         const trimmed = email.trim().toLowerCase();
         if (!trimmed) throw new Error('Email is required');
@@ -292,7 +284,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch {
             // ignore
         }
->>>>>>> /tmp/meld/28-pr-AuthContext.tsx
     }, []);
 
     const resendVerificationEmail = useCallback(async () => {
@@ -419,13 +410,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             signInWithGoogle,
             signInWithEmail,
             signUpWithEmail,
-<<<<<<< /tmp/meld/28-main-AuthContext.tsx
             resetPassword,
-=======
             sendMagicLink,
             isMagicLinkSignIn,
             completeMagicLinkSignIn,
->>>>>>> /tmp/meld/28-pr-AuthContext.tsx
             signOut,
             canPerformScan,
             canSaveContact,
