@@ -2,6 +2,8 @@
 import { createWorker } from 'tesseract.js';
 import { auth } from '../config/firebase';
 import { reportGeminiHttpError, reportScanFailure } from './observability';
+import { mappingToPromptHint, normalizeParseMeta } from './logSheetMapping';
+import type { LogSheetParseMeta, LogSheetParseOptions } from '../types/logSheet';
 import {
     enrichConfidence,
     extractVisionWords,
@@ -1316,46 +1318,68 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
         return isProperCase || hasNamePattern;
     }
 
-    async parseLogSheet(base64Image: string, options?: { templateHint?: string }): Promise<LogSheetEntry[]> {
+    /**
+     * Parse a log / sign-in sheet. Returns entries plus header metadata so the UI
+     * can confirm column mapping when headers are ambiguous. Optional
+     * `columnMapping` / `templateHint` steer Gemini on later pages or templates.
+     */
+    async parseLogSheet(
+        base64Image: string,
+        options?: LogSheetParseOptions,
+    ): Promise<LogSheetParseResult> {
         console.log('[LogSheet] Parsing log sheet with Gemini...');
+
+        const mappingHint = options?.columnMapping
+            ? `\n\n${mappingToPromptHint(options.columnMapping)}\n`
+            : '';
+        const templateHint = options?.templateHint ? `\n${options.templateHint}\n` : '';
 
         const prompt = `You are an expert data extractor specializing in event log sheets and sign-in sheets. This image is a log sheet / sign-in sheet from an event, conference, or trade show. Each ROW in the sheet represents a DIFFERENT person who signed in.
 
 ## Task
 1. Identify the table/grid structure in the image.
 2. Identify column headers (they may be: Name, Company, Position/Title, Phone, Email, Address, Purpose/Notes, Booth #, Interest, Budget, etc.).
-3. For EACH row (each person), extract the data into the corresponding fields.
-4. ALSO return rawColumns: an array of {header, value} for EVERY non-empty cell in that row, using the exact header text from the sheet (including non-standard columns like Booth #, Interest, Budget).
-5. If a standard field column doesn't exist in the sheet, leave that field as an empty string or empty array.
-6. Skip any empty rows or header rows.
-7. Handle handwritten text as best you can — if unclear, make your best guess AND list that field in uncertainFields.
-8. Each row MUST be a separate entry in the output array.
-9. Do NOT merge data from different rows into one entry.
-
+3. Propose a mapping from each standard field (name, company, position, phone, email, address, notes) to the detected header label. Use "" if that field has no column.
+4. Set headersAmbiguous to true when headers are unclear, nonstandard, possibly swapped, or when you guessed the mapping. List short ambiguityReasons.
+5. For EACH data row (each person), extract values using your mapping into the standard fields.
+6. ALSO return rawColumns: an array of {header, value} for EVERY non-empty cell in that row, using the exact header text from the sheet (including non-standard columns like Booth #, Interest, Budget).
+7. If a standard field column doesn't exist in the sheet, leave that field as an empty string or empty array.
+8. Skip any empty rows or header rows.
+9. Handle handwritten text as best you can — if unclear, make your best guess AND list that field in uncertainFields.
+10. Each row MUST be a separate entry in the entries array.
+11. Do NOT merge data from different rows into one entry.
+${mappingHint}${templateHint}
 ${GEMINI_CORE_RULES}
 
 ${GEMINI_CONFIDENCE_PROMPT}
-${options?.templateHint ? '\n' + options.templateHint : ''}
 
-## Examples
+## Output shape (single JSON object)
 
-### Example 1: Tabular sign-in sheet with handwritten entries
+{
+  "detectedHeaders": ["Name", "Organization", "Mobile", "Purpose"],
+  "suggestedMapping": {
+    "name": "Name",
+    "company": "Organization",
+    "position": "",
+    "phone": "Mobile",
+    "email": "",
+    "address": "",
+    "notes": "Purpose"
+  },
+  "headersAmbiguous": false,
+  "ambiguityReasons": [],
+  "entries": [
+    {"name": "Maria Santos", "company": "Acme Corp", "position": "", "phone": ["+63 917 555 1234"], "email": [], "address": "", "notes": "Booth interest", "rawColumns": [{"header": "Name", "value": "Maria Santos"}, {"header": "Organization", "value": "Acme Corp"}, {"header": "Mobile", "value": "+63 917 555 1234"}, {"header": "Purpose", "value": "Booth interest"}], "uncertainFields": [], "fieldConfidence": {"name": 88, "company": 90, "position": 0, "phone": 80, "email": 0, "address": 0, "notes": 70}}
+  ]
+}
 
-Output:
-[
-  {"name": "Maria Santos", "company": "Acme Corp", "position": "Sales Manager", "phone": ["+63 917 555 1234"], "email": ["maria.santos@acme.com"], "address": "Makati City", "notes": "Booth interest", "rawColumns": [{"header": "Name", "value": "Maria Santos"}, {"header": "Company", "value": "Acme Corp"}, {"header": "Title", "value": "Sales Manager"}, {"header": "Phone", "value": "+63 917 555 1234"}, {"header": "Email", "value": "maria.santos@acme.com"}, {"header": "City", "value": "Makati City"}, {"header": "Interest", "value": "Booth interest"}], "uncertainFields": [], "fieldConfidence": {"name": 88, "company": 90, "position": 85, "phone": 80, "email": 92, "address": 78, "notes": 70}},
-  {"name": "Dr. John Lee, MD", "company": "Health First Inc.", "position": "Medical Director", "phone": ["+63 2 8888 9999", "0917-222-3333"], "email": ["jlee@healthfirst.ph"], "address": "Quezon City", "notes": "", "rawColumns": [{"header": "Name", "value": "Dr. John Lee, MD"}, {"header": "Company", "value": "Health First Inc."}, {"header": "Title", "value": "Medical Director"}, {"header": "Phone", "value": "+63 2 8888 9999 / 0917-222-3333"}, {"header": "Email", "value": "jlee@healthfirst.ph"}, {"header": "City", "value": "Quezon City"}], "uncertainFields": ["name", "phone"], "fieldConfidence": {"name": 55, "company": 82, "position": 75, "phone": 48, "email": 88, "address": 70}}
-]
+### Ambiguous example
+If a header is "Contact" (could be phone or email) or "Affiliation" (company vs school), set headersAmbiguous true and explain in ambiguityReasons.
 
-### Example 2: Stacked logo company name in a row
+### Phone cells
+If a phone cell contains "8703-5284 / 8362-5820", split into ["8703-5284", "8362-5820"].
 
-If a row contains a company written as "KINMO PW" on one visual line and "CORPORATION" on the next inside the same cell, return company as "KINMO PW Corporation" — never just "CORPORATION".
-
-### Example 3: Phone column with multiple numbers separated by "/"
-
-If a phone cell contains "8703-5284 / 8362-5820", split into the array ["8703-5284", "8362-5820"]. Never merge them.
-
-Return ONLY a JSON array of objects. No explanation, no markdown.`;
+Return ONLY the JSON object. No explanation, no markdown.`;
 
         const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
@@ -1372,52 +1396,84 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                 maxOutputTokens: 8192,
                 responseMimeType: 'application/json',
                 responseSchema: {
-                    type: 'ARRAY',
-                    items: {
-                        type: 'OBJECT',
-                        properties: {
-                            name: { type: 'STRING' },
-                            company: { type: 'STRING' },
-                            position: { type: 'STRING' },
-                            phone: { type: 'ARRAY', items: { type: 'STRING' } },
-                            email: { type: 'ARRAY', items: { type: 'STRING' } },
-                            address: { type: 'STRING' },
-                            notes: { type: 'STRING' },
-                            rawColumns: {
-                                type: 'ARRAY',
-                                items: {
-                                    type: 'OBJECT',
-                                    properties: {
-                                        header: { type: 'STRING' },
-                                        value: { type: 'STRING' },
-                                    },
-                                    required: ['header', 'value'],
-                                },
+                    type: 'OBJECT',
+                    properties: {
+                        detectedHeaders: { type: 'ARRAY', items: { type: 'STRING' } },
+                        suggestedMapping: {
+                            type: 'OBJECT',
+                            properties: {
+                                name: { type: 'STRING' },
+                                company: { type: 'STRING' },
+                                position: { type: 'STRING' },
+                                phone: { type: 'STRING' },
+                                email: { type: 'STRING' },
+                                address: { type: 'STRING' },
+                                notes: { type: 'STRING' },
                             },
-                            ...GEMINI_CONFIDENCE_SCHEMA_PROPS,
+                            required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes'],
                         },
-                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes', 'rawColumns', 'uncertainFields']
-                    }
-                }
-            }
+                        headersAmbiguous: { type: 'BOOLEAN' },
+                        ambiguityReasons: { type: 'ARRAY', items: { type: 'STRING' } },
+                        entries: {
+                            type: 'ARRAY',
+                            items: {
+                                type: 'OBJECT',
+                                properties: {
+                                    name: { type: 'STRING' },
+                                    company: { type: 'STRING' },
+                                    position: { type: 'STRING' },
+                                    phone: { type: 'ARRAY', items: { type: 'STRING' } },
+                                    email: { type: 'ARRAY', items: { type: 'STRING' } },
+                                    address: { type: 'STRING' },
+                                    notes: { type: 'STRING' },
+                                    rawColumns: {
+                                        type: 'ARRAY',
+                                        items: {
+                                            type: 'OBJECT',
+                                            properties: {
+                                                header: { type: 'STRING' },
+                                                value: { type: 'STRING' },
+                                            },
+                                            required: ['header', 'value'],
+                                        },
+                                    },
+                                    ...GEMINI_CONFIDENCE_SCHEMA_PROPS,
+                                },
+                                required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes', 'uncertainFields'],
+                            },
+                        },
+                    },
+                    required: ['detectedHeaders', 'suggestedMapping', 'headersAmbiguous', 'ambiguityReasons', 'entries'],
+                },
+            },
         });
 
         const text = await callGeminiWithRetry({ body: requestBody, flowName: 'LogSheet', timeoutMs: 90000 });
         console.log('[LogSheet] Raw response:', text);
 
-        let parsed;
+        let parsed: any;
         try {
             parsed = JSON.parse(text);
         } catch {
             const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-            const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
-            if (!jsonMatch) throw new Error('No JSON array in Gemini response');
-            parsed = JSON.parse(jsonMatch[0]);
+            const objMatch = jsonStr.match(/\{[\s\S]*\}/);
+            const arrMatch = jsonStr.match(/\[[\s\S]*\]/);
+            if (objMatch) {
+                parsed = JSON.parse(objMatch[0]);
+            } else if (arrMatch) {
+                parsed = { entries: JSON.parse(arrMatch[0]) };
+            } else {
+                throw new Error('No JSON in Gemini response');
+            }
         }
 
-        if (!Array.isArray(parsed)) throw new Error('Gemini did not return an array');
+        const rawEntries: any[] = Array.isArray(parsed)
+            ? parsed
+            : (Array.isArray(parsed?.entries) ? parsed.entries : []);
 
-        return parsed
+        if (!Array.isArray(rawEntries)) throw new Error('Gemini did not return entries');
+
+        const entries = rawEntries
             .filter((e: any) => {
                 const hasName = typeof e.name === 'string' && e.name.trim();
                 const hasCompany = typeof e.company === 'string' && e.company.trim();
@@ -1426,6 +1482,10 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                 return hasName || hasCompany || hasPhone || hasEmail;
             })
             .map((e: any) => this.toLogSheetEntry(e, 'gemini'));
+
+        const meta = normalizeParseMeta(Array.isArray(parsed) ? {} : parsed, entries);
+
+        return { entries, meta };
     }
 
     /**
@@ -1567,6 +1627,11 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
             this.worker = null;
         }
     }
+}
+
+export interface LogSheetParseResult {
+    entries: LogSheetEntry[];
+    meta: LogSheetParseMeta;
 }
 
 export interface LogSheetEntry {
