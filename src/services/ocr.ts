@@ -1,12 +1,9 @@
 // @ts-ignore - Types available after npm install
 import { createWorker } from 'tesseract.js';
 import { auth } from '../config/firebase';
-<<<<<<< /tmp/meld/15-main-ocr.ts
 import { reportGeminiHttpError, reportScanFailure } from './observability';
-=======
 import { mappingToPromptHint, normalizeParseMeta } from './logSheetMapping';
 import type { LogSheetParseMeta, LogSheetParseOptions } from '../types/logSheet';
->>>>>>> /tmp/meld/15-pr-ocr.ts
 
 async function authHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
