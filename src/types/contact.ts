@@ -1,3 +1,5 @@
+export type FollowUpStatus = 'claimed' | 'contacted' | 'meeting_set' | 'done';
+
 export interface Contact {
     id: string;
     name: string;
@@ -27,4 +29,9 @@ export interface Contact {
     claimedBy?: string;
     claimedByName?: string;
     claimedAt?: number;
+    /** Pipeline after claim: claimed → contacted → meeting_set → done */
+    followUpStatus?: FollowUpStatus;
+    /** Optional due timestamp for lightweight in-app reminder prompts */
+    followUpDueAt?: number;
+    followUpUpdatedAt?: number;
 }
