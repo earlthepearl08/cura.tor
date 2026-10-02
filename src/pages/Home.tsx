@@ -49,7 +49,7 @@ const Home = () => {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen p-6 page-enter">
             {/* Logo Section */}
-            <div className="mb-12 text-center">
+            <div className="mb-8 text-center">
                 <div className="mb-4 relative">
                     <svg viewBox="0 0 280 80" xmlns="http://www.w3.org/2000/svg" className="w-56 h-auto mx-auto">
                         <defs>
@@ -164,14 +164,14 @@ const Home = () => {
                 </div>
             )}
 
-            {/* Primary differentiators — Log Sheet + Multi-Card */}
+            {/* Primary workflows — Log Sheet + Multi-Card */}
             <div className="w-full max-w-md mb-6">
                 <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Primary workflows</p>
                 <div className="space-y-3">
                     {isBulkLocked ? (
                         <button
                             onClick={() => setUpgradeFeature('bulk-scan')}
-                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20"
+                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/25"
                         >
                             <div className="absolute top-3 right-3 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
                                 <Lock size={8} className="text-amber-400" />
@@ -182,7 +182,7 @@ const Home = () => {
                             </div>
                             <div className="flex-1 min-w-0 pr-10">
                                 <span className="font-bold text-base text-white block">Log Sheet</span>
-                                <span className="text-xs text-slate-400 mt-0.5 block">AI-read sign-in sheets &amp; handwritten leads</span>
+                                <span className="text-xs text-slate-400 mt-0.5 block">Read sign-in sheets &amp; handwritten leads</span>
                             </div>
                             <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
                         </button>
@@ -191,14 +191,14 @@ const Home = () => {
                             to="/log-scan"
                             aria-disabled={!isOnline}
                             title={!isOnline ? 'Log sheet scan requires a network connection' : undefined}
-                            className={`w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20 ${!isOnline ? 'opacity-60' : ''}`}
+                            className={`w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/25 ${!isOnline ? 'opacity-60' : ''}`}
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-amber-500/25 to-orange-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <FileSpreadsheet className="w-7 h-7 text-amber-400" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <span className="font-bold text-base text-white block">Log Sheet</span>
-                                <span className="text-xs text-slate-400 mt-0.5 block">AI-read sign-in sheets &amp; handwritten leads</span>
+                                <span className="text-xs text-slate-400 mt-0.5 block">Read sign-in sheets &amp; handwritten leads</span>
                             </div>
                             <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
                         </Link>
@@ -207,7 +207,7 @@ const Home = () => {
                     {isBulkLocked ? (
                         <button
                             onClick={() => setUpgradeFeature('bulk-scan')}
-                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20"
+                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/25"
                         >
                             <div className="absolute top-3 right-3 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
                                 <Lock size={8} className="text-amber-400" />
@@ -227,7 +227,7 @@ const Home = () => {
                             to="/multi-card"
                             aria-disabled={!isOnline}
                             title={!isOnline ? 'Multi-card scan requires a network connection' : undefined}
-                            className={`w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20 ${!isOnline ? 'opacity-60' : ''}`}
+                            className={`w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/25 ${!isOnline ? 'opacity-60' : ''}`}
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-pink-500/25 to-rose-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <Layers className="w-7 h-7 text-pink-400" />
