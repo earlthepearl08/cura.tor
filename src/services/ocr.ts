@@ -1,7 +1,11 @@
 // @ts-ignore - Types available after npm install
 import { createWorker } from 'tesseract.js';
 import { auth } from '../config/firebase';
+<<<<<<< /tmp/meld/31-main-ocr.ts
+import { reportGeminiHttpError, reportScanFailure } from './observability';
+=======
 import { ScanApiError } from '@/utils/friendlyScanError';
+>>>>>>> /tmp/meld/31-pr-ocr.ts
 
 async function authHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -132,11 +136,33 @@ async function callGeminiWithRetry(opts: {
                 });
                 if (retryable && attempt < MAX_ATTEMPTS - 1) {
                     console.log(`[${opts.flowName}] Transient error ${response.status}, retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+                    reportGeminiHttpError({
+                        flow: opts.flowName,
+                        status: response.status,
+                        message: fullMsg,
+                        reason: typeof errorData.reason === 'string' ? errorData.reason : undefined,
+                        attempt: attempt + 1,
+                        final: false,
+                    });
                     await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
                     lastError = apiError;
                     continue;
                 }
+<<<<<<< /tmp/meld/31-main-ocr.ts
+                reportGeminiHttpError({
+                    flow: opts.flowName,
+                    status: response.status,
+                    message: fullMsg,
+                    reason: typeof errorData.reason === 'string' ? errorData.reason : undefined,
+                    attempt: attempt + 1,
+                    final: true,
+                });
+                const httpErr = new Error(fullMsg) as Error & { __observabilityReported?: boolean };
+                httpErr.__observabilityReported = true;
+                throw httpErr;
+=======
                 throw apiError;
+>>>>>>> /tmp/meld/31-pr-ocr.ts
             }
 
             const data = await response.json();
@@ -152,14 +178,26 @@ async function callGeminiWithRetry(opts: {
             const isMessageRetryable = RETRY_MESSAGE_RE.test(msg);
             if ((isNetworkError || isMessageRetryable) && attempt < MAX_ATTEMPTS - 1) {
                 console.log(`[${opts.flowName}] Transient error "${msg}", retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+                reportGeminiHttpError({
+                    flow: opts.flowName,
+                    status: 0,
+                    message: msg,
+                    attempt: attempt + 1,
+                    final: false,
+                });
                 await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
                 lastError = error;
                 continue;
             }
+            if (!error?.__observabilityReported) {
+                reportScanFailure({ flow: opts.flowName, message: msg });
+            }
             throw error;
         }
     }
-    throw lastError || new Error('Gemini call failed after retries');
+    const finalMsg = lastError?.message || 'Gemini call failed after retries';
+    reportScanFailure({ flow: opts.flowName, message: finalMsg });
+    throw lastError || new Error(finalMsg);
 }
 
 export interface OCRResult {
@@ -177,6 +215,12 @@ export interface OCRResult {
 export type OCREngine = 'tesseract' | 'cloud-vision';
 
 export const getOCREngine = (): OCREngine => {
+    try {
+        const stored = localStorage.getItem('ocr_engine');
+        if (stored === 'tesseract' || stored === 'cloud-vision') return stored;
+    } catch {
+        // Ignore storage errors (private mode, etc.)
+    }
     return 'cloud-vision';
 };
 
