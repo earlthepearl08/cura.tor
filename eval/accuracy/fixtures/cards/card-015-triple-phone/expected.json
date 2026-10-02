@@ -1,0 +1,23 @@
+{
+  "name": "Iris Mendoza",
+  "company": "QuickShip Express Inc.",
+  "position": "Customer Success Lead",
+  "phone": [
+    "+63 917 111 0001",
+    "+63 917 111 0002",
+    "02-8555-1212"
+  ],
+  "email": [
+    "iris.m@quickship.ph"
+  ],
+  "address": "Pasay City",
+  "notes": "",
+  "_meta": {
+    "id": "card-015-triple-phone",
+    "difficulty": "medium",
+    "tags": [
+      "multi-phone",
+      "ph"
+    ]
+  }
+}

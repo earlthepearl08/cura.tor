@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-024-empty-company",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Gina Morales",
+    "Freelance Designer",
+    "0917-666-7777",
+    "gina.morales.design@gmail.com",
+    "Pasig",
+    "portfolio: ginamorales.design"
+  ]
+}

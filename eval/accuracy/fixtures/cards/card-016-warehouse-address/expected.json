@@ -1,0 +1,21 @@
+{
+  "name": "Benito Aquino",
+  "company": "SteelForm Manufacturing",
+  "position": "Plant Manager",
+  "phone": [
+    "046-430-8899"
+  ],
+  "email": [
+    "baquino@steelform.ph"
+  ],
+  "address": "Factory: Carmona, Cavite | Warehouse: Laguna Technopark",
+  "notes": "",
+  "_meta": {
+    "id": "card-016-warehouse-address",
+    "difficulty": "medium",
+    "tags": [
+      "multi-address",
+      "ph"
+    ]
+  }
+}

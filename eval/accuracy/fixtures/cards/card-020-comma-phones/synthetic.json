@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-020-comma-phones",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Pineda Dental Clinic",
+    "Lourdes Pineda",
+    "Clinic Administrator",
+    "02-8899-3344 / 0918-200-3000",
+    "info@pinedadental.ph",
+    "San Juan City"
+  ]
+}
