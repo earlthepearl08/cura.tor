@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Headphones, Mail, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Headphones, Mail, HelpCircle, BookMarked } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
@@ -18,6 +18,7 @@ import { OWNER_EMAILS } from '@/config/firebase';
 import { SUPPORT_EMAIL, PRIORITY_SUPPORT_SLA } from '@/config/support';
 import { trackEvent } from '@/services/observability';
 import { Trash2 } from 'lucide-react';
+import { FieldCorrection } from '@/types/correction';
 
 const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> = {
     free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
@@ -53,6 +54,7 @@ const Settings = () => {
     const [engineSaved, setEngineSaved] = useState(false);
     const { isConnected, user: driveUser, isSyncing, syncProgress, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
     const { user, firebaseUser, signOut, canUseGoogleDrive, scansRemaining, refreshUserProfile } = useAuth();
+    const { storage, mode } = useWorkspace();
 
     const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
     const [isUpgrading, setIsUpgrading] = useState(false);
@@ -60,6 +62,8 @@ const Settings = () => {
     const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled' | 'pending'; text: string } | null>(null);
     const [showDeleteAccount, setShowDeleteAccount] = useState(false);
     const [showSupport, setShowSupport] = useState(false);
+    const [glossary, setGlossary] = useState<FieldCorrection[]>([]);
+    const [glossaryOpen, setGlossaryOpen] = useState(false);
     const upgradeSectionRef = React.useRef<HTMLDivElement>(null);
     const isOwnerAccount = !!user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
 
@@ -143,6 +147,29 @@ const Settings = () => {
         const timer = setTimeout(() => setPaymentMessage(null), ms);
         return () => clearTimeout(timer);
     }, [paymentMessage]);
+
+    // Load OCR correction glossary when Settings opens / workspace changes
+    useEffect(() => {
+        let cancelled = false;
+        storage.getAllCorrections()
+            .then(list => {
+                if (cancelled) return;
+                setGlossary([...list].sort((a, b) => b.updatedAt - a.updatedAt));
+            })
+            .catch(() => {
+                if (!cancelled) setGlossary([]);
+            });
+        return () => { cancelled = true; };
+    }, [storage, mode]);
+
+    const handleDeleteCorrection = async (id: string) => {
+        try {
+            await storage.deleteCorrection(id);
+            setGlossary(prev => prev.filter(c => c.id !== id));
+        } catch (err) {
+            console.error('Failed to delete correction:', err);
+        }
+    };
 
     const handleUpgrade = async (plan: 'pioneer' | 'pro') => {
         if (!user || !firebaseUser) return;
@@ -963,6 +990,64 @@ const Settings = () => {
                         </div>
                         <ChevronRight size={16} className="text-slate-600" />
                     </button>
+                </div>
+
+                {/* Correction glossary */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">
+                        {mode === 'team' ? 'Org glossary' : 'Correction memory'}
+                    </p>
+                    <div className="card-elevated rounded-2xl overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => setGlossaryOpen(o => !o)}
+                            className="w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
+                                <BookMarked className="w-5 h-5 text-sky-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm text-slate-200">
+                                    Saved OCR corrections
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                    {glossary.length === 0
+                                        ? 'Edit company/name on a scan to teach the glossary'
+                                        : `${glossary.length} mapping${glossary.length === 1 ? '' : 's'} · ${mode === 'team' ? 'shared with team' : 'this device'}`}
+                                </p>
+                            </div>
+                            <ChevronRight
+                                size={16}
+                                className={`text-slate-500 transition-transform ${glossaryOpen ? 'rotate-90' : ''}`}
+                            />
+                        </button>
+                        {glossaryOpen && glossary.length > 0 && (
+                            <div className="border-t border-brand-800 divide-y divide-brand-800/80">
+                                {glossary.slice(0, 40).map(c => (
+                                    <div key={c.id} className="px-4 py-3 flex items-start gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+                                                {c.field} · taught {c.learnCount}×
+                                            </p>
+                                            <p className="text-xs text-slate-300 truncate">
+                                                <span className="text-slate-500">{c.from}</span>
+                                                {' → '}
+                                                <span className="font-medium text-slate-200">{c.to}</span>
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteCorrection(c.id)}
+                                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-colors"
+                                            aria-label="Remove correction"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Legal & trust */}
