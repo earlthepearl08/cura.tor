@@ -54,7 +54,15 @@ Note: The `.env` file is gitignored and won't be committed.
 
 See **`GEMINI_OPS.md`** for:
 
+<<<<<<< /tmp/meld/37-main-VERCEL_SETUP.md
+For a prototype/demo, this should be more than enough. If you need more, you can upgrade or implement rate limiting.
+
+## Public SEO files
+
+`public/robots.txt` and `public/sitemap.xml` are copied to the site root on build. They list Landing (`/`, `/welcome`), Accuracy (`/accuracy`), and Legal (`/legal`) using the placeholder origin `https://cura-tor.vercel.app`. See **`public/SEO.md`** to update the host for a custom domain.
+=======
 - Paid Google AI billing checklist (budget alerts, kill-switch)
 - How to watch **429 / 5xx** in Vercel logs
 - Rough **cost-per-scan** notes for `gemini-2.5-flash`
 - Where in-app rate-limit / quota UX surfaces (incl. PR [#31](https://github.com/earlthepearl08/cura.tor/pull/31))
+>>>>>>> /tmp/meld/37-pr-VERCEL_SETUP.md
