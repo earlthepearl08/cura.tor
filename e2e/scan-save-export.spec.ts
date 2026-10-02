@@ -15,10 +15,12 @@ test.describe('Happy path: auth → scan → save → export', () => {
     });
 
     test('mocked upload OCR saves a contact and exports CSV', async ({ page }) => {
-        await page.goto('/');
+        // Home lives at /app after Phase A public landing took over /
+        await page.goto('/app');
 
         // Auth mock should land on Home (not /auth)
         await expect(page).not.toHaveURL(/\/auth/);
+        await expect(page).toHaveURL(/\/app/);
         await expect(page.getByRole('link', { name: /Upload/i })).toBeVisible();
 
         await page.getByRole('link', { name: /Upload/i }).click();
