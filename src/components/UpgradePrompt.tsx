@@ -37,7 +37,7 @@ function getFeatureMessage(feature: string, tier: string): { title: string; mess
     if (feature === 'export') {
         return {
             title: 'Export Locked',
-            message: 'Export features (vCard, CSV, Excel) are available on the Pioneer plan and above.',
+            message: 'Export features (vCard, CSV, Excel, CRM CSV, Google Sheets) are available on the Pioneer plan and above.',
             upgradeTier: 'pioneer',
         };
     }
