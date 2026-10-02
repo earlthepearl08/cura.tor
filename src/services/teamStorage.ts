@@ -63,6 +63,9 @@ export class TeamStorageService {
             email: data.email || [],
             address: data.address || '',
             notes: data.notes || '',
+            customFields: data.customFields && typeof data.customFields === 'object'
+                ? { ...data.customFields }
+                : undefined,
             folder: data.folder,
             rawText: data.rawText || '',
             imageData: '',

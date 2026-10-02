@@ -20,6 +20,7 @@ function contactExportRow(c: Contact, batchMap?: BatchMap) {
         Email: c.email.join('; '),
         Address: c.address,
         Notes: c.notes || '',
+        ...(c.customFields || {}),
         Folder: c.folder || 'Uncategorized',
         Batch: (c.batchId && batchMap?.[c.batchId]) || '',
         ClaimedBy: c.claimedByName || '',
@@ -41,14 +42,18 @@ export const exportService = {
     },
 
     toCSV(contacts: Contact[], batchMap?: BatchMap) {
+        const customKeys = Array.from(
+            new Set(contacts.flatMap(c => Object.keys(c.customFields || {}))),
+        ).sort();
         const headers = [
             'Name', 'Position', 'Company', 'Phone', 'Email', 'Address', 'Notes',
+            ...customKeys,
             'Folder', 'Batch', 'ClaimedBy', 'FollowUpStatus', 'FollowUpDue',
             'ScannedAt', 'UpdatedAt',
         ];
         const rows = contacts.map(c => {
-            const row = contactExportRow(c, batchMap);
-            return headers.map((h) => (row as Record<string, string>)[h] ?? '');
+            const row = contactExportRow(c, batchMap) as Record<string, string>;
+            return headers.map((h) => row[h] ?? c.customFields?.[h] ?? '');
         });
 
         const csvContent = [

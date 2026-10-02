@@ -1,17 +1,24 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Lock } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Lock, Layers } from 'lucide-react';
 import { ocrService, LogSheetEntry, entryNeedsReview, ContactFieldKey } from '@/services/ocr';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { exportService } from '@/services/export';
 import { googleSheets } from '@/services/googleSheets';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
+import { EventTemplate, ColumnMapping } from '@/types/eventTemplate';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import BatchNamingModal from '@/components/BatchNamingModal';
+import ColumnMappingPanel from '@/components/ColumnMappingPanel';
 import { compressForOCR } from '@/utils/compressPhoto';
+import {
+    applyColumnMappingsToAll,
+    buildTemplatePromptHint,
+} from '@/services/columnMapping';
+import { listEventTemplates } from '@/services/eventTemplateStorage';
 
 type ReviewFilter = 'needs-review' | 'all' | 'ready';
 
@@ -55,6 +62,11 @@ const LogScan: React.FC = () => {
     const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
     const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('needs-review');
     const [importWarning, setImportWarning] = useState<string | null>(null);
+    // Event template / column mapping (optional — happy path skips this)
+    const [templates, setTemplates] = useState<EventTemplate[]>([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+    const [activeMappings, setActiveMappings] = useState<ColumnMapping[]>([]);
+    const selectedTemplateRef = useRef<EventTemplate | null>(null);
 
     useEffect(() => {
         const loadFolders = async () => {
@@ -64,7 +76,20 @@ const LogScan: React.FC = () => {
             setFolders(Array.from(new Set([...contactFolders, ...persistedFolders])).sort());
         };
         loadFolders();
+        listEventTemplates().then(setTemplates).catch(() => {});
     }, []);
+
+    const getParseOptions = useCallback(() => {
+        const tmpl = selectedTemplateRef.current;
+        const hint = tmpl ? buildTemplatePromptHint(tmpl.mappings) : '';
+        return hint ? { templateHint: hint } : undefined;
+    }, []);
+
+    const applyMappingsIfAny = useCallback((list: LogSheetEntry[], mappings?: ColumnMapping[]): LogSheetEntry[] => {
+        const maps = mappings ?? selectedTemplateRef.current?.mappings ?? activeMappings;
+        if (!maps || maps.length === 0) return list;
+        return applyColumnMappingsToAll(list, maps);
+    }, [activeMappings]);
 
     const reviewStats = useMemo(() => {
         if (!entries) return { needsReview: 0, ready: 0, total: 0 };
@@ -181,7 +206,7 @@ const LogScan: React.FC = () => {
                 setImageData(data);
                 // 60-second hard timeout per sheet so we never get stuck
                 const results = await withTimeout(
-                    ocrService.parseLogSheet(data),
+                    ocrService.parseLogSheet(data, getParseOptions()),
                     60000,
                     `Sheet ${i + 1}`
                 );
@@ -214,7 +239,7 @@ const LogScan: React.FC = () => {
                 try {
                     const data = await compressForOCR(files[idx]);
                     const results = await withTimeout(
-                        ocrService.parseLogSheet(data),
+                        ocrService.parseLogSheet(data, getParseOptions()),
                         60000,
                         `Sheet ${idx + 1} retry ${attempt}`
                     );
@@ -293,7 +318,7 @@ const LogScan: React.FC = () => {
         const MAX_SILENT_RETRIES = 2;
         for (let attempt = 0; attempt <= MAX_SILENT_RETRIES; attempt++) {
             try {
-                return await withTimeout(ocrService.parseLogSheet(base64Image), 60000, `Sheet attempt ${attempt + 1}`);
+                return await withTimeout(ocrService.parseLogSheet(base64Image, getParseOptions()), 60000, `Sheet attempt ${attempt + 1}`);
             } catch (err) {
                 console.log(`[LogScan] Attempt ${attempt + 1} failed:`, err);
                 if (attempt < MAX_SILENT_RETRIES) {
@@ -323,7 +348,8 @@ const LogScan: React.FC = () => {
             } else {
                 await incrementScanCount();
                 const prevEntries = entries || [];
-                const combined = [...prevEntries, ...results];
+                const mappedNew = applyMappingsIfAny(results);
+                const combined = [...prevEntries, ...mappedNew];
                 setEntries(combined);
                 setSheetCount(prev => prev + 1);
                 await checkEntriesForDuplicates(combined);
@@ -350,13 +376,14 @@ const LogScan: React.FC = () => {
 
         try {
             const results = await parseWithRetry(base64Image);
-            setEntries(results);
-            if (results.length === 0) {
+            const mapped = applyMappingsIfAny(results);
+            setEntries(mapped);
+            if (mapped.length === 0) {
                 setError('No entries found. Make sure the log sheet is clearly visible.');
             } else {
                 await incrementScanCount();
                 setSheetCount(1);
-                await checkEntriesForDuplicates(results);
+                await checkEntriesForDuplicates(mapped);
                 const timestamp = Date.now();
                 setScanTimestamp(timestamp);
                 setShowBatchNaming(true);
@@ -379,6 +406,9 @@ const LogScan: React.FC = () => {
             email: e.email,
             address: e.address,
             notes: e.notes,
+            customFields: e.customFields && Object.keys(e.customFields).length > 0
+                ? { ...e.customFields }
+                : undefined,
             folder: importFolder || 'Uncategorized',
             rawText: '',
             imageData: '',
@@ -493,7 +523,12 @@ const LogScan: React.FC = () => {
         setCurrentBatchId(null);
         setReviewFilter('needs-review');
         setImportWarning(null);
+            // Keep selected template for the next scan; clear ephemeral mappings only if no template
+        if (!selectedTemplateId) {
+            setActiveMappings([]);
+        }
     };
+
 
     const openEntryEdit = (index: number) => {
         setEditingIndex(index);
@@ -558,6 +593,23 @@ const LogScan: React.FC = () => {
                 : 'border-brand-700'
         }`;
 
+
+
+    const handleTemplateSelected = (template: EventTemplate | null) => {
+        selectedTemplateRef.current = template;
+        setSelectedTemplateId(template?.id ?? null);
+        if (template) {
+            setActiveMappings(template.mappings);
+            listEventTemplates().then(setTemplates).catch(() => {});
+        }
+    };
+
+    const handleApplyMappings = () => {
+        if (!entries || activeMappings.length === 0) return;
+        const mapped = applyColumnMappingsToAll(entries, activeMappings);
+        setEntries(mapped);
+        checkEntriesForDuplicates(mapped);
+    };
 
     const deleteEntry = (index: number) => {
         if (!entries) return;
@@ -638,6 +690,35 @@ const LogScan: React.FC = () => {
                         <input ref={galRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
 
                         <div className="w-full max-w-sm space-y-3">
+                            <div className="glass border border-brand-800 rounded-xl p-3 text-left">
+                                <label className="flex items-center gap-1.5 text-[10px] text-brand-500 uppercase tracking-wider font-bold mb-1.5">
+                                    <Layers size={11} />
+                                    Event template (optional)
+                                </label>
+                                <select
+                                    value={selectedTemplateId || ''}
+                                    onChange={(e) => {
+                                        const id = e.target.value;
+                                        if (!id) {
+                                            handleTemplateSelected(null);
+                                            setActiveMappings([]);
+                                            return;
+                                        }
+                                        const t = templates.find(x => x.id === id) || null;
+                                        handleTemplateSelected(t);
+                                    }}
+                                    className="w-full glass border border-brand-800 rounded-lg py-2 px-3 text-sm bg-brand-900"
+                                >
+                                    <option value="">None — default OCR mapping</option>
+                                    {templates.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[10px] text-slate-500 mt-1.5">
+                                    Reuse a saved column map for this event. You can also map columns after the scan.
+                                </p>
+                            </div>
+
                             <button
                                 onClick={() => camRef.current?.click()}
                                 className="w-full flex items-center justify-center gap-3 py-4 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-2xl transition-colors active:scale-95"
@@ -801,6 +882,16 @@ const LogScan: React.FC = () => {
                                     </select>
                                 </div>
 
+                                {/* Column mapping / event templates — optional */}
+                                <ColumnMappingPanel
+                                    entries={entries}
+                                    mappings={activeMappings}
+                                    onMappingsChange={setActiveMappings}
+                                    selectedTemplateId={selectedTemplateId}
+                                    onTemplateSelected={handleTemplateSelected}
+                                    onApply={handleApplyMappings}
+                                />
+
                                 {importWarning && (
                                     <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/40">
                                         <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
@@ -929,6 +1020,19 @@ const LogScan: React.FC = () => {
                                                         {e.phone.length > 0 && <p className={`text-xs truncate ${fieldNeedsReview(e, 'phone') ? 'text-amber-300' : 'text-slate-500'}`}>{e.phone.join(', ')}</p>}
                                                         {e.email.length > 0 && <p className={`text-xs truncate ${fieldNeedsReview(e, 'email') ? 'text-amber-300' : 'text-slate-500'}`}>{e.email.join(', ')}</p>}
                                                         {e.notes && <p className="text-xs text-amber-400/70 truncate mt-1">{e.notes}</p>}
+                                                        {e.customFields && Object.keys(e.customFields).length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-1.5">
+                                                                {Object.entries(e.customFields).map(([k, v]) => (
+                                                                    <span
+                                                                        key={k}
+                                                                        className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400/90 border border-sky-500/20 truncate max-w-full"
+                                                                        title={`${k}: ${v}`}
+                                                                    >
+                                                                        {k}: {v}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div className="flex flex-col gap-1 flex-shrink-0">
                                                         {needs && (
