@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Check, X, User, Building2, Briefcase, Phone, Mail, MapPin, Save, StickyNote, AlertTriangle, Edit3, FileText, ChevronDown, ChevronUp, RotateCcw, Sparkles, Folder, FolderPlus, MessageCircle, Download, Camera, Users, Lock, Trash2 } from 'lucide-react';
-import { OCRResult, ocrService } from '@/services/ocr';
+import { OCRResult, ocrService, ContactFieldKey } from '@/services/ocr';
 import { Contact } from '@/types/contact';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
@@ -26,6 +26,16 @@ const NOTE_CONTEXTS = [
     'Referral', 'Meeting', 'Exhibition'
 ];
 
+const FIELD_LABELS: Record<ContactFieldKey, string> = {
+    name: 'Name',
+    company: 'Company',
+    position: 'Position',
+    phone: 'Phone',
+    email: 'Email',
+    address: 'Address',
+    notes: 'Notes',
+};
+
 const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, onDelete, reviewOnly, initialNotes, initialFolder }) => {
     const { canExportVCard } = useAuth();
     const { storage } = useWorkspace();
@@ -40,6 +50,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         folder: initialFolder ?? 'Uncategorized',
     });
 
+    const [clearedReviewFields, setClearedReviewFields] = useState<Set<ContactFieldKey>>(new Set());
     const [duplicateWarning, setDuplicateWarning] = useState<DuplicateResult | null>(null);
     const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
     const [isEditMode, setIsEditMode] = useState(true);
@@ -103,6 +114,26 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         const debounce = setTimeout(checkForDuplicates, 500);
         return () => clearTimeout(debounce);
     }, [formData.name, formData.email, formData.phone, formData.company]);
+
+    const activeReviewFields = (ocrResult.needsReviewFields || []).filter(f => !clearedReviewFields.has(f));
+
+    const touchField = (field: ContactFieldKey, value: string) => {
+        setClearedReviewFields(prev => new Set(prev).add(field));
+        if (field === 'name') setFormData({ ...formData, name: value });
+        else if (field === 'position') setFormData({ ...formData, position: value });
+        else if (field === 'company') setFormData({ ...formData, company: value });
+        else if (field === 'phone') setFormData({ ...formData, phone: value });
+        else if (field === 'email') setFormData({ ...formData, email: value });
+        else if (field === 'address') setFormData({ ...formData, address: value });
+        else if (field === 'notes') setFormData({ ...formData, notes: value });
+    };
+
+    const fieldClass = (field: ContactFieldKey, extra = '') => {
+        const needs = activeReviewFields.includes(field);
+        return `w-full glass border rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${
+            needs ? 'border-amber-500/60 ring-1 ring-amber-500/25 bg-amber-500/5' : 'border-brand-800'
+        } ${!isEditMode ? 'opacity-75 cursor-default' : ''} ${extra}`;
+    };
 
     const handleReparse = async () => {
         if (!rawText.trim()) return;
@@ -250,7 +281,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
 
                 {/* Confidence + Raw Text Toggle */}
                 <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                             ocrResult.confidence >= 80
                                 ? 'bg-emerald-500/20 text-emerald-400'
@@ -260,6 +291,11 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         }`}>
                             OCR Confidence {Math.round(ocrResult.confidence)}%
                         </span>
+                        {ocrResult.confidenceSource && (
+                            <span className="text-[9px] font-medium text-slate-500 uppercase tracking-wider">
+                                via {ocrResult.confidenceSource}
+                            </span>
+                        )}
                     </div>
                     <button
                         onClick={() => setShowRawText(!showRawText)}
@@ -270,6 +306,20 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         {showRawText ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                     </button>
                 </div>
+
+                {activeReviewFields.length > 0 && (
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                        <AlertTriangle size={14} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                            <p className="text-xs text-amber-200 font-medium">
+                                Review highlighted fields
+                            </p>
+                            <p className="text-[10px] text-amber-400/80 mt-0.5">
+                                {activeReviewFields.map(f => FIELD_LABELS[f]).join(', ')} — edit to clear the flag
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Raw OCR Text - Editable with Reparse */}
                 {showRawText && (
@@ -313,10 +363,10 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         <input
                             type="text"
                             value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            onChange={(e) => touchField('name', e.target.value)}
                             placeholder="Full Name"
                             readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            className={fieldClass('name')}
                         />
                     </div>
 
@@ -325,10 +375,10 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         <input
                             type="text"
                             value={formData.position}
-                            onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                            onChange={(e) => touchField('position', e.target.value)}
                             placeholder="Job Title"
                             readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            className={fieldClass('position')}
                         />
                     </div>
 
@@ -337,10 +387,10 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         <input
                             type="text"
                             value={formData.company}
-                            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                            onChange={(e) => touchField('company', e.target.value)}
                             placeholder="Company Name"
                             readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            className={fieldClass('company')}
                         />
                     </div>
 
@@ -349,10 +399,10 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         <input
                             type="text"
                             value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            onChange={(e) => touchField('phone', e.target.value)}
                             placeholder="Phone Numbers (comma separated)"
                             readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            className={fieldClass('phone')}
                         />
                     </div>
 
@@ -361,10 +411,10 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         <input
                             type="text"
                             value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            onChange={(e) => touchField('email', e.target.value)}
                             placeholder="Email Addresses (comma separated)"
                             readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            className={fieldClass('email')}
                         />
                     </div>
 
@@ -372,11 +422,11 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         <MapPin className="absolute left-3 top-3 text-brand-500" size={18} />
                         <textarea
                             value={formData.address}
-                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                            onChange={(e) => touchField('address', e.target.value)}
                             placeholder="Office Address"
                             rows={2}
                             readOnly={!isEditMode}
-                            className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                            className={fieldClass('address', 'resize-none')}
                         />
                     </div>
 
@@ -390,7 +440,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                                         type="button"
                                         onClick={() => {
                                             const prefix = formData.notes ? formData.notes + ' | ' : '';
-                                            setFormData({ ...formData, notes: prefix + ctx });
+                                            touchField('notes', prefix + ctx);
                                         }}
                                         className="px-3 py-1 text-xs font-medium glass border border-brand-700 rounded-full hover:bg-brand-500/10 hover:border-brand-500/30 transition-colors text-brand-400"
                                     >
@@ -403,11 +453,11 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             <StickyNote className="absolute left-3 top-3 text-brand-500" size={18} />
                             <textarea
                                 value={formData.notes}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                onChange={(e) => touchField('notes', e.target.value)}
                                 placeholder="Where did you meet? What did you discuss?"
                                 rows={3}
                                 readOnly={!isEditMode}
-                                className={`w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 resize-none ${!isEditMode ? 'opacity-75 cursor-default' : ''}`}
+                                className={fieldClass('notes', 'resize-none')}
                             />
                         </div>
                     </div>
