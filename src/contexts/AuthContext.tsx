@@ -10,6 +10,9 @@ import {
     signOut as firebaseSignOut,
     sendEmailVerification,
     sendPasswordResetEmail,
+    sendSignInLinkToEmail,
+    isSignInWithEmailLink,
+    signInWithEmailLink,
     GoogleAuthProvider,
     User
 } from 'firebase/auth';
@@ -47,6 +50,9 @@ function createE2EMockProfile(): UserProfile {
     };
 }
 
+/** localStorage key for email awaiting magic-link completion (Firebase recommendation). */
+export const MAGIC_LINK_EMAIL_KEY = 'cura_email_for_sign_in';
+
 interface AuthContextType {
     user: UserProfile | null;
     firebaseUser: User | null;
@@ -59,6 +65,15 @@ interface AuthContextType {
     signInWithEmail: (email: string, password: string) => Promise<void>;
     signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
     resetPassword: (email: string) => Promise<void>;
+    /** Send a passwordless email sign-in link. Same flow for new and returning users. */
+    sendMagicLink: (email: string) => Promise<void>;
+    /** True when the current URL is a Firebase email sign-in link. */
+    isMagicLinkSignIn: () => boolean;
+    /**
+     * Complete magic-link sign-in from the return URL.
+     * Pass email if localStorage was cleared (e.g. opened on another device).
+     */
+    completeMagicLinkSignIn: (email?: string) => Promise<void>;
     signOut: () => Promise<void>;
 
     // Tier checks
@@ -225,6 +240,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await sendPasswordResetEmail(auth, email.trim(), {
             url: window.location.origin,
         });
+    const sendMagicLink = useCallback(async (email: string) => {
+        const trimmed = email.trim().toLowerCase();
+        if (!trimmed) throw new Error('Email is required');
+
+        const actionCodeSettings = {
+            // Must be an Authorized domain in Firebase Console → Authentication → Settings
+            url: `${window.location.origin}/auth`,
+            handleCodeInApp: true,
+        };
+
+        await sendSignInLinkToEmail(auth, trimmed, actionCodeSettings);
+        window.localStorage.setItem(MAGIC_LINK_EMAIL_KEY, trimmed);
+    }, []);
+
+    const isMagicLinkSignIn = useCallback((): boolean => {
+        if (typeof window === 'undefined') return false;
+        return isSignInWithEmailLink(auth, window.location.href);
+    }, []);
+
+    const completeMagicLinkSignIn = useCallback(async (email?: string) => {
+        if (!isSignInWithEmailLink(auth, window.location.href)) {
+            throw new Error('Not a valid sign-in link');
+        }
+
+        const stored = window.localStorage.getItem(MAGIC_LINK_EMAIL_KEY) || '';
+        const resolved = (email || stored).trim().toLowerCase();
+        if (!resolved) {
+            const err = new Error('Confirm your email to finish signing in');
+            (err as any).code = 'auth/missing-email';
+            throw err;
+        }
+
+        await signInWithEmailLink(auth, resolved, window.location.href);
+        window.localStorage.removeItem(MAGIC_LINK_EMAIL_KEY);
+
+        // Drop oobCode params from the URL without a full reload
+        try {
+            const clean = new URL(window.location.href);
+            clean.search = '';
+            clean.hash = '';
+            window.history.replaceState({}, document.title, clean.pathname);
+        } catch {
+            // ignore
+        }
     }, []);
 
     const resendVerificationEmail = useCallback(async () => {
@@ -352,6 +411,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             signInWithEmail,
             signUpWithEmail,
             resetPassword,
+            sendMagicLink,
+            isMagicLinkSignIn,
+            completeMagicLinkSignIn,
             signOut,
             canPerformScan,
             canSaveContact,
