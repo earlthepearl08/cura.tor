@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-<<<<<<< /tmp/meld/18-main-Settings.tsx
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff } from 'lucide-react';
-=======
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, Languages } from 'lucide-react';
->>>>>>> /tmp/meld/18-pr-Settings.tsx
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Languages } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import {
     OCR_LANGUAGE_OPTIONS,
@@ -58,14 +54,11 @@ const Settings = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { theme, toggleTheme } = useTheme();
     const [ocrEngine, setOcrEngineState] = useState<OCREngine>(getOCREngine());
-<<<<<<< /tmp/meld/18-main-Settings.tsx
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [engineSaved, setEngineSaved] = useState(false);
-=======
     const [ocrLangs, setOcrLangs] = useState<OcrLanguageId[]>(() => getSelectedOcrLanguageIds());
     const [uiLocale, setUiLocaleState] = useState<UiLocale>(() => getUiLocale());
     const [saved, setSaved] = useState(false);
->>>>>>> /tmp/meld/18-pr-Settings.tsx
     const { isConnected, user: driveUser, isSyncing, syncProgress, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
     const { user, firebaseUser, signOut, canUseGoogleDrive, scansRemaining, refreshUserProfile } = useAuth();
 
@@ -602,9 +595,7 @@ const Settings = () => {
                     </div>
                 </div>
 
-<<<<<<< /tmp/meld/18-main-Settings.tsx
                 {/* Advanced — OCR engine (power users) */}
-=======
                 {/* OCR Languages — primary multi-language control */}
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">
@@ -667,7 +658,6 @@ const Settings = () => {
                 </div>
 
                 {/* OCR Engine */}
->>>>>>> /tmp/meld/18-pr-Settings.tsx
                 <div className="space-y-3">
                     <button
                         type="button"

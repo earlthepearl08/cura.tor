@@ -1,15 +1,12 @@
 // @ts-ignore - Types available after npm install
 import { createWorker } from 'tesseract.js';
 import { auth } from '../config/firebase';
-<<<<<<< /tmp/meld/18-main-ocr.ts
 import { reportGeminiHttpError, reportScanFailure } from './observability';
-=======
 import {
     buildGeminiLanguagePromptSection,
     getTesseractLangString,
     getVisionLanguageHints,
 } from '../i18n';
->>>>>>> /tmp/meld/18-pr-ocr.ts
 
 async function authHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
