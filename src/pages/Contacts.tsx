@@ -12,6 +12,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
+import OfflineStatusBanner from '@/components/OfflineStatusBanner';
 
 const Contacts: React.FC = () => {
     const { storage, mode: workspaceMode, organization } = useWorkspace();
@@ -939,6 +940,7 @@ const Contacts: React.FC = () => {
             </div>
 
             <div className="flex-1 p-4 space-y-6">
+                <OfflineStatusBanner context="contacts" />
                 {isLoading ? (
                     <div className="flex items-center justify-center h-64">
                         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-400"></div>
