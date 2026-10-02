@@ -27,8 +27,8 @@ npm run test:e2e:ui
 
 | Spec | Path |
 |------|------|
-| `e2e/auth-gate.spec.ts` | Unauthenticated `/` → `/auth`; `/legal` stays public |
-| `e2e/scan-save-export.spec.ts` | Mock auth → Upload → mocked Gemini OCR → save → CSV export |
+| `e2e/auth-gate.spec.ts` | Public `/` landing stays open; protected `/app` → `/auth`; `/legal` stays public |
+| `e2e/scan-save-export.spec.ts` | Mock auth → `/app` Home → Upload → mocked Gemini OCR → save → CSV export |
 
 ## How mocks work
 
