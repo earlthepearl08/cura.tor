@@ -1,16 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers, Clock, CalendarClock } from 'lucide-react';
 import { exportService } from '@/services/export';
-import { Contact } from '@/types/contact';
+import { Contact, FollowUpStatus } from '@/types/contact';
 import { Batch } from '@/types/batch';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { TeamStorageService } from '@/services/teamStorage';
 import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
+import {
+    FOLLOW_UP_STATUSES,
+    FOLLOW_UP_LABELS,
+    DUE_PRESETS,
+    duePresetTimestamp,
+    effectiveFollowUpStatus,
+    formatDueLabel,
+    isFollowUpOverdue,
+    isFollowUpDueToday,
+    summarizeMyFollowUps,
+} from '@/services/followUp';
 
 const Contacts: React.FC = () => {
     const { storage, mode: workspaceMode, organization } = useWorkspace();
@@ -57,7 +69,10 @@ const Contacts: React.FC = () => {
     // Team filters
     const [selectedScanner, setSelectedScanner] = useState<string>('all'); // 'all' or uid
     const [claimFilter, setClaimFilter] = useState<'all' | 'mine' | 'unclaimed' | 'theirs'>('all');
+    const [followUpFilter, setFollowUpFilter] = useState<'all' | 'overdue' | 'due_today' | FollowUpStatus>('all');
     const [claimActionId, setClaimActionId] = useState<string | null>(null); // contact id currently being claimed/released
+    const [followUpActionId, setFollowUpActionId] = useState<string | null>(null);
+    const [dismissedReminder, setDismissedReminder] = useState(false);
     const [moveTargetFolder, setMoveTargetFolder] = useState('Uncategorized');
     const [moveNewFolder, setMoveNewFolder] = useState('');
     const [editPersonPhoto, setEditPersonPhoto] = useState<string | null>(null);
@@ -220,17 +235,26 @@ const Contacts: React.FC = () => {
         loadContacts();
     };
 
-    const handleExport = (type: 'csv' | 'excel' | 'vcard') => {
+    const handleExport = (type: 'csv' | 'excel' | 'vcard' | 'unclaimed-csv') => {
         // Check tier permissions
-        if (type === 'csv' && !canExportCSV()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
+        if ((type === 'csv' || type === 'unclaimed-csv') && !canExportCSV()) {
+            setShowUpgradePrompt(true); setShowExportOptions(false); return;
+        }
         if (type === 'excel' && !canExportExcel()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
         if (type === 'vcard' && !canExportBulkVCard()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
+
+        const batchMap: Record<string, string> = {};
+        for (const b of batches) { batchMap[b.id] = b.name; }
+
+        if (type === 'unclaimed-csv') {
+            exportService.toUnclaimedCSV(contacts, batchMap);
+            setShowExportOptions(false);
+            return;
+        }
 
         const toExport = selectedIds.size > 0
             ? contacts.filter(c => selectedIds.has(c.id))
             : filteredContacts;
-        const batchMap: Record<string, string> = {};
-        for (const b of batches) { batchMap[b.id] = b.name; }
         if (type === 'csv') exportService.toCSV(toExport, batchMap);
         else if (type === 'excel') exportService.toExcel(toExport, batchMap);
         else if (type === 'vcard') exportService.toVCardAll(toExport);
@@ -375,6 +399,22 @@ const Contacts: React.FC = () => {
         }
     };
 
+    const handleFollowUpUpdate = async (
+        contact: Contact,
+        patch: { followUpStatus?: FollowUpStatus; followUpDueAt?: number | null }
+    ) => {
+        if (!isTeamMode || !(storage instanceof TeamStorageService)) return;
+        setFollowUpActionId(contact.id);
+        try {
+            await storage.updateFollowUp(contact.id, patch);
+            await loadContacts();
+        } catch (err: any) {
+            alert(err.message || 'Failed to update follow-up');
+        } finally {
+            setFollowUpActionId(null);
+        }
+    };
+
     const filteredContacts = contacts.filter(c => {
         const q = searchQuery.toLowerCase();
         const matchesSearch = !q ||
@@ -392,8 +432,16 @@ const Contacts: React.FC = () => {
             || (claimFilter === 'mine' && c.claimedBy === currentUid)
             || (claimFilter === 'unclaimed' && !c.claimedBy)
             || (claimFilter === 'theirs' && !!c.claimedBy && c.claimedBy !== currentUid);
-        return matchesSearch && matchesFolder && matchesBatch && matchesScanner && matchesClaim;
+        const status = effectiveFollowUpStatus(c);
+        const matchesFollowUp = !isTeamMode || followUpFilter === 'all'
+            || (followUpFilter === 'overdue' && isFollowUpOverdue(c))
+            || (followUpFilter === 'due_today' && isFollowUpDueToday(c))
+            || (FOLLOW_UP_STATUSES.includes(followUpFilter as FollowUpStatus) && status === followUpFilter);
+        return matchesSearch && matchesFolder && matchesBatch && matchesScanner && matchesClaim && matchesFollowUp;
     });
+
+    const myFollowUps = summarizeMyFollowUps(contacts, currentUid);
+    const unclaimedCount = contacts.filter((c) => !c.claimedBy).length;
 
     // Collect unique scanners from current contact list for the filter dropdown
     const uniqueScanners = Array.from(
@@ -469,7 +517,7 @@ const Contacts: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Team attribution + claim pills (team mode only) */}
+                    {/* Team attribution + claim / follow-up pills (team mode only) */}
                     {isTeamMode && (contact.createdByName || contact.claimedByName) && (
                         <div className="flex flex-wrap gap-1.5 mb-3">
                             {contact.createdByName && (
@@ -485,8 +533,60 @@ const Contacts: React.FC = () => {
                                         : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                                 }`}>
                                     <CheckSquare size={10} />
-                                    Claimed by {contact.claimedBy === currentUid ? 'you' : contact.claimedByName}
+                                    {FOLLOW_UP_LABELS[effectiveFollowUpStatus(contact) || 'claimed']}
+                                    {' · '}
+                                    {contact.claimedBy === currentUid ? 'you' : contact.claimedByName}
                                 </span>
+                            )}
+                            {contact.claimedBy && formatDueLabel(contact.followUpDueAt) && effectiveFollowUpStatus(contact) !== 'done' && (
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                                    isFollowUpOverdue(contact)
+                                        ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                        : isFollowUpDueToday(contact)
+                                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                                            : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                }`}>
+                                    <Clock size={10} />
+                                    {formatDueLabel(contact.followUpDueAt)}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Follow-up pipeline controls — claimer only */}
+                    {!selectMode && isTeamMode && organization?.claimsEnabled !== false && contact.claimedBy === currentUid && (
+                        <div className="mb-3 space-y-2 rounded-xl border border-brand-800/60 bg-brand-950/40 p-2.5">
+                            <div className="flex items-center gap-2">
+                                <CalendarClock size={12} className="text-brand-500 shrink-0" />
+                                <select
+                                    value={effectiveFollowUpStatus(contact) || 'claimed'}
+                                    disabled={followUpActionId === contact.id}
+                                    onChange={(e) => handleFollowUpUpdate(contact, {
+                                        followUpStatus: e.target.value as FollowUpStatus,
+                                    })}
+                                    className="flex-1 bg-brand-900 border border-brand-800 rounded-lg py-1.5 px-2 text-xs outline-none focus:border-emerald-500 disabled:opacity-50"
+                                >
+                                    {FOLLOW_UP_STATUSES.map((s) => (
+                                        <option key={s} value={s}>{FOLLOW_UP_LABELS[s]}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {effectiveFollowUpStatus(contact) !== 'done' && (
+                                <div className="flex flex-wrap gap-1">
+                                    {DUE_PRESETS.map((preset) => (
+                                        <button
+                                            key={preset.label}
+                                            type="button"
+                                            disabled={followUpActionId === contact.id}
+                                            onClick={() => handleFollowUpUpdate(contact, {
+                                                followUpDueAt: duePresetTimestamp(preset.offsetMs) ?? null,
+                                            })}
+                                            className="text-[10px] px-2 py-1 rounded-md bg-brand-800/70 hover:bg-brand-700 border border-brand-700 text-brand-300 disabled:opacity-50"
+                                        >
+                                            {preset.label}
+                                        </button>
+                                    ))}
+                                </div>
                             )}
                         </div>
                     )}
@@ -625,7 +725,7 @@ const Contacts: React.FC = () => {
                                 <Download size={20} />
                             </button>
                             {showExportOptions && (
-                                <div className="absolute right-0 mt-2 w-48 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden">
+                                <div className="absolute right-0 mt-2 w-56 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden">
                                     {selectedIds.size > 0 && (
                                         <div className="px-4 py-2 text-xs text-brand-400 border-b border-brand-800 bg-brand-500/10">
                                             {selectedIds.size} contact{selectedIds.size > 1 ? 's' : ''} selected
@@ -652,6 +752,15 @@ const Contacts: React.FC = () => {
                                         Export as vCard (.vcf)
                                         {!canExportBulkVCard() && <Lock size={12} className="text-amber-400" />}
                                     </button>
+                                    {isTeamMode && organization?.claimsEnabled !== false && (
+                                        <button
+                                            onClick={() => handleExport('unclaimed-csv')}
+                                            className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportCSV() ? 'opacity-60' : ''}`}
+                                        >
+                                            <span>Export unclaimed leads ({unclaimedCount})</span>
+                                            {!canExportCSV() && <Lock size={12} className="text-amber-400" />}
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -804,7 +913,7 @@ const Contacts: React.FC = () => {
                     </div>
                 )}
 
-                {/* Team filters: Scanner + Claim status (team mode only) */}
+                {/* Team filters: Scanner + Claim + Follow-up (team mode only) */}
                 {isTeamMode && (
                     <div className="flex gap-2 flex-wrap">
                         {uniqueScanners.length > 0 && (
@@ -822,17 +931,98 @@ const Contacts: React.FC = () => {
                             </select>
                         )}
                         {organization?.claimsEnabled !== false && (
-                            <select
-                                value={claimFilter}
-                                onChange={(e) => setClaimFilter(e.target.value as typeof claimFilter)}
-                                className="flex-1 min-w-[140px] bg-brand-900/50 border border-brand-800 rounded-xl py-2 px-3 text-sm hover:bg-brand-900/70 transition-all outline-none focus:border-sky-500"
-                            >
-                                <option value="all">All claims</option>
-                                <option value="mine">Claimed by me</option>
-                                <option value="unclaimed">Unclaimed</option>
-                                <option value="theirs">Claimed by others</option>
-                            </select>
+                            <>
+                                <select
+                                    value={claimFilter}
+                                    onChange={(e) => setClaimFilter(e.target.value as typeof claimFilter)}
+                                    className="flex-1 min-w-[140px] bg-brand-900/50 border border-brand-800 rounded-xl py-2 px-3 text-sm hover:bg-brand-900/70 transition-all outline-none focus:border-sky-500"
+                                >
+                                    <option value="all">All claims</option>
+                                    <option value="mine">Claimed by me</option>
+                                    <option value="unclaimed">Unclaimed ({unclaimedCount})</option>
+                                    <option value="theirs">Claimed by others</option>
+                                </select>
+                                <select
+                                    value={followUpFilter}
+                                    onChange={(e) => setFollowUpFilter(e.target.value as typeof followUpFilter)}
+                                    className="flex-1 min-w-[140px] bg-brand-900/50 border border-brand-800 rounded-xl py-2 px-3 text-sm hover:bg-brand-900/70 transition-all outline-none focus:border-sky-500"
+                                >
+                                    <option value="all">All follow-ups</option>
+                                    <option value="overdue">Overdue ({myFollowUps.overdue.length})</option>
+                                    <option value="due_today">Due today ({myFollowUps.dueToday.length})</option>
+                                    {FOLLOW_UP_STATUSES.map((s) => (
+                                        <option key={s} value={s}>{FOLLOW_UP_LABELS[s]}</option>
+                                    ))}
+                                </select>
+                            </>
                         )}
+                    </div>
+                )}
+
+                {/* Lightweight follow-up reminders — no jobs infra; computed client-side */}
+                {isTeamMode && organization?.claimsEnabled !== false && !dismissedReminder && (myFollowUps.overdue.length > 0 || myFollowUps.dueToday.length > 0) && (
+                    <div className={`rounded-xl border px-3 py-2.5 flex items-start gap-2 ${
+                        myFollowUps.overdue.length > 0
+                            ? 'bg-red-950/40 border-red-800/50'
+                            : 'bg-amber-950/30 border-amber-800/40'
+                    }`}>
+                        <AlertCircle size={16} className={`mt-0.5 shrink-0 ${myFollowUps.overdue.length > 0 ? 'text-red-400' : 'text-amber-400'}`} />
+                        <div className="flex-1 min-w-0 text-xs">
+                            <p className="font-medium text-slate-100">
+                                {myFollowUps.overdue.length > 0
+                                    ? `${myFollowUps.overdue.length} follow-up${myFollowUps.overdue.length > 1 ? 's' : ''} overdue`
+                                    : `${myFollowUps.dueToday.length} follow-up${myFollowUps.dueToday.length > 1 ? 's' : ''} due today`}
+                            </p>
+                            {myFollowUps.overdue.length > 0 && myFollowUps.dueToday.length > 0 && (
+                                <p className="text-slate-400 mt-0.5">{myFollowUps.dueToday.length} more due today</p>
+                            )}
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {myFollowUps.overdue.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setClaimFilter('mine');
+                                            setFollowUpFilter('overdue');
+                                        }}
+                                        className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30"
+                                    >
+                                        Show overdue
+                                    </button>
+                                )}
+                                {myFollowUps.dueToday.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setClaimFilter('mine');
+                                            setFollowUpFilter('due_today');
+                                        }}
+                                        className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-200 border border-amber-500/30"
+                                    >
+                                        Show due today
+                                    </button>
+                                )}
+                                {unclaimedCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setClaimFilter('unclaimed');
+                                            setFollowUpFilter('all');
+                                        }}
+                                        className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-brand-800/80 text-brand-300 border border-brand-700"
+                                    >
+                                        {unclaimedCount} unclaimed
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setDismissedReminder(true)}
+                            className="text-slate-500 hover:text-white p-0.5"
+                            aria-label="Dismiss reminder"
+                        >
+                            <X size={14} />
+                        </button>
                     </div>
                 )}
             </div>
