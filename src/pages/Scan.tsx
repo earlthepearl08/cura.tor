@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff, Layers } from 'lucide-react';
+import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff, Layers, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useOCR } from '@/hooks/useOCR';
 import ContactReview from '@/components/ContactReview';
@@ -21,6 +21,12 @@ const Scanner: React.FC = () => {
     const navigate = useNavigate();
     const { canPerformScan, incrementScanCount, user, scansRemaining } = useAuth();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const atScanLimit = !canPerformScan();
+    const lowOnScans =
+        user?.tier === 'free' &&
+        typeof scansRemaining === 'number' &&
+        scansRemaining > 0 &&
+        scansRemaining <= 2;
 
     useEffect(() => {
         if (errorKind === 'quota') setShowUpgradePrompt(true);
@@ -126,6 +132,37 @@ const Scanner: React.FC = () => {
                     <Layers size={20} />
                 </button>
             </div>
+
+            {(atScanLimit || lowOnScans) && !showReview && (
+                <div className={`mx-4 mt-2 p-3 rounded-xl text-xs flex items-start gap-2 ${
+                    atScanLimit
+                        ? 'bg-amber-500/15 border border-amber-500/30 text-amber-300'
+                        : 'bg-sky-500/10 border border-sky-500/25 text-sky-300'
+                }`}>
+                    <Zap size={14} className="mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                        {atScanLimit ? (
+                            <>
+                                <p className="font-semibold mb-0.5">No card scans left</p>
+                                <p className="text-[11px] opacity-90">
+                                    Upgrade for more, or use QR scan / manual entry (no scan credit).
+                                </p>
+                                <button
+                                    onClick={() => setShowUpgradePrompt(true)}
+                                    className="mt-2 text-[11px] font-bold underline underline-offset-2"
+                                >
+                                    See upgrade options
+                                </button>
+                            </>
+                        ) : (
+                            <p>
+                                {scansRemaining} card scan{scansRemaining === 1 ? '' : 's'} left this period.
+                                QR codes and manual entry stay free.
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
                 {!imgSrc ? (

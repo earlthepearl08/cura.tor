@@ -29,13 +29,14 @@ const PIONEER_FEATURES = [
     'HubSpot CRM export',
     'CRM-ready CSV & Google Sheets',
     'Google Drive sync',
+    'QR scan & manual entry',
 ];
 
 const PRO_FEATURES = [
     'Everything in Pioneer',
+    'Unlimited contact storage',
     'Multi-Card Scan',
     'Log Sheet Scan',
-    'Priority support',
 ];
 
 const Settings = () => {
@@ -53,10 +54,12 @@ const Settings = () => {
     const [upgradeError, setUpgradeError] = useState('');
     const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled' | 'pending'; text: string } | null>(null);
     const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+    const upgradeSectionRef = React.useRef<HTMLDivElement>(null);
     const isOwnerAccount = !!user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
 
     const tierBadge = TIER_BADGES[user?.tier || 'free'];
     const limits = TIER_LIMITS[user?.tier || 'free'];
+    const highlightPlan = searchParams.get('upgrade'); // 'pioneer' | 'pro' | null
 
     // Handle payment callback from Stripe — confirm upgrade from Firestore, not redirect alone
     useEffect(() => {
@@ -68,7 +71,7 @@ const Settings = () => {
         setSearchParams(next, { replace: true });
 
         if (payment === 'canceled') {
-            setPaymentMessage({ type: 'canceled', text: 'Payment was canceled. No changes were made.' });
+            setPaymentMessage({ type: 'canceled', text: 'Checkout canceled. No charges were made.' });
             return;
         }
 
@@ -78,7 +81,7 @@ const Settings = () => {
         const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
         (async () => {
-            setPaymentMessage({ type: 'pending', text: 'Confirming your upgrade…' });
+            setPaymentMessage({ type: 'pending', text: 'Checkout complete. Confirming your plan…' });
             const deadline = Date.now() + 45_000;
 
             while (!cancelled && Date.now() < deadline) {
@@ -91,7 +94,7 @@ const Settings = () => {
                     if (!cancelled) {
                         setPaymentMessage({
                             type: 'success',
-                            text: `You're on ${label}! Your plan is active.`,
+                            text: `You're on ${label}. Thanks for upgrading.`,
                         });
                     }
                     return;
@@ -102,20 +105,31 @@ const Settings = () => {
             if (!cancelled) {
                 setPaymentMessage({
                     type: 'pending',
-                    text: 'Payment received — plan activation is taking longer than usual. Refresh this page in a moment.',
+                    text: 'Payment received. Your plan will update once billing confirms — refresh Settings in a minute.',
                 });
             }
         })();
 
         return () => { cancelled = true; };
+        // Intentionally once on mount for the payment redirect
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Auto-dismiss settled payment messages (keep pending visible)
+    // Deep-link from UpgradePrompt (?upgrade=pioneer|pro) → scroll to pricing
     useEffect(() => {
-        if (paymentMessage && paymentMessage.type !== 'pending') {
-            const timer = setTimeout(() => setPaymentMessage(null), 8000);
-            return () => clearTimeout(timer);
-        }
+        if (!highlightPlan) return;
+        const timer = setTimeout(() => {
+            upgradeSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
+        return () => clearTimeout(timer);
+    }, [highlightPlan]);
+
+    // Auto-dismiss settled payment messages (keep pending visible longer)
+    useEffect(() => {
+        if (!paymentMessage) return;
+        const ms = paymentMessage.type === 'pending' ? 12000 : 8000;
+        const timer = setTimeout(() => setPaymentMessage(null), ms);
+        return () => clearTimeout(timer);
     }, [paymentMessage]);
 
     const handleUpgrade = async (plan: 'pioneer' | 'pro') => {
@@ -450,7 +464,7 @@ const Settings = () => {
 
                 {/* Upgrade Plans (for non-Pro users without active Stripe subscription) */}
                 {showPricing && (
-                    <div className="space-y-3">
+                    <div className="space-y-3" ref={upgradeSectionRef} id="upgrade-plans">
                         <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Upgrade</p>
                         <div className="card-elevated rounded-2xl p-4 space-y-4">
                             {/* Billing interval toggle */}
@@ -480,7 +494,11 @@ const Settings = () => {
                             <div className={`grid gap-3 ${showPioneerCard ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                 {/* Pioneer card */}
                                 {showPioneerCard && (
-                                    <div className="glass border border-brand-700 rounded-xl p-4 space-y-3">
+                                    <div className={`glass rounded-xl p-4 space-y-3 ${
+                                        highlightPlan === 'pioneer'
+                                            ? 'border-2 border-amber-400 ring-2 ring-amber-400/20'
+                                            : 'border border-brand-700'
+                                    }`}>
                                         <div>
                                             <h3 className="font-bold text-amber-400">Pioneer</h3>
                                             <p className="text-xl font-bold mt-1">
@@ -512,7 +530,11 @@ const Settings = () => {
                                 )}
 
                                 {/* Pro card */}
-                                <div className={`glass border border-emerald-600/50 rounded-xl p-4 space-y-3 ${!showPioneerCard ? 'max-w-sm mx-auto w-full' : ''}`}>
+                                <div className={`glass rounded-xl p-4 space-y-3 ${!showPioneerCard ? 'max-w-sm mx-auto w-full' : ''} ${
+                                    highlightPlan === 'pro' || (!showPioneerCard && highlightPlan)
+                                        ? 'border-2 border-emerald-400 ring-2 ring-emerald-400/20'
+                                        : 'border border-emerald-600/50'
+                                }`}>
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h3 className="font-bold text-emerald-400">Pro</h3>
@@ -740,7 +762,21 @@ const Settings = () => {
                                     <Lock className="w-5 h-5 text-slate-500" />
                                 </div>
                                 <p className="font-semibold text-sm mb-1">Pioneer Feature</p>
-                                <p className="text-xs text-slate-500">Google Drive sync is available on the Pioneer plan and above</p>
+                                <p className="text-xs text-slate-500 mb-4">
+                                    Google Drive sync unlocks on Pioneer and above. Contacts stay on this device until you upgrade.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const next = new URLSearchParams(searchParams);
+                                        next.set('upgrade', user?.tier === 'early_access' ? 'pro' : 'pioneer');
+                                        setSearchParams(next);
+                                        upgradeSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }}
+                                    className="px-4 py-2 bg-amber-500 text-brand-950 rounded-xl text-xs font-bold"
+                                >
+                                    See upgrade options
+                                </button>
                             </div>
                         ) : isConnected ? (
                             <>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers, Lock } from 'lucide-react';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,6 +13,7 @@ import UpgradePrompt from '@/components/UpgradePrompt';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 const Home = () => {
+    const navigate = useNavigate();
     const [contactCount, setContactCount] = useState(0);
     const [weekCount, setWeekCount] = useState(0);
     const [folderCount, setFolderCount] = useState(0);
@@ -124,6 +125,35 @@ const Home = () => {
             <div className="w-full max-w-md mb-4">
                 <OfflineStatusBanner context="home" />
             </div>
+
+            {user?.tier === 'free' && scansRemaining === 0 && (
+                <div className="w-full max-w-md mb-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs">
+                    <p className="font-semibold mb-1">Monthly card scans used up</p>
+                    <p className="text-[11px] text-amber-200/80 mb-2">
+                        QR scan and manual entry still work. Upgrade for unlimited card scans, exports, and Drive sync.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => navigate('/settings?upgrade=pioneer')}
+                            className="px-3 py-1.5 bg-amber-500 text-brand-950 rounded-lg text-[11px] font-bold"
+                        >
+                            Upgrade
+                        </button>
+                        <Link
+                            to="/qr-scan"
+                            className="px-3 py-1.5 glass border border-brand-700 rounded-lg text-[11px] font-medium text-slate-300"
+                        >
+                            Scan QR
+                        </Link>
+                        <Link
+                            to="/manual"
+                            className="px-3 py-1.5 glass border border-brand-700 rounded-lg text-[11px] font-medium text-slate-300"
+                        >
+                            Add manually
+                        </Link>
+                    </div>
+                </div>
+            )}
 
             {/* Workspace Switcher — only visible for enterprise users */}
             {canSwitchWorkspace && (

@@ -38,9 +38,19 @@ const Uploader: React.FC = () => {
     const [duplicateIds, setDuplicateIds] = useState<Map<string, string>>(new Map()); // id -> reason
     const [qrIds, setQrIds] = useState<Set<string>>(new Set()); // items decoded as QR codes
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [upgradeFeature, setUpgradeFeature] = useState<'scan' | 'storage'>('scan');
+    const [storageContactCount, setStorageContactCount] = useState(0);
     const navigate = useNavigate();
-    const { canPerformScan, canSaveContact, incrementScanCount, user, scansRemaining } = useAuth();
+    const { canPerformScan, canSaveContact, incrementScanCount, user } = useAuth();
     const { storage } = useWorkspace();
+
+    const atScanLimit = !canPerformScan();
+    const scansUsed = user?.tier === 'early_access'
+        ? (user.scanUsage.lifetimeCount || 0)
+        : (user?.scanUsage.count || 0);
+    const scansLimit = user?.tier === 'early_access'
+        ? (user.scanUsage.lifetimeLimit || 0)
+        : 5;
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const newFiles: QueuedFile[] = [];
@@ -132,6 +142,7 @@ const Uploader: React.FC = () => {
 
         // Check if user has at least 1 scan remaining (some images may be QR codes and won't cost a scan)
         if (!canPerformScan(1)) {
+            setUpgradeFeature('scan');
             setShowUpgradePrompt(true);
             return;
         }
@@ -251,6 +262,8 @@ const Uploader: React.FC = () => {
         let savedCount = existingContacts.length;
         for (const item of completed) {
             if (!canSaveContact(savedCount)) {
+                setStorageContactCount(savedCount);
+                setUpgradeFeature('storage');
                 setShowUpgradePrompt(true);
                 break;
             }
@@ -322,6 +335,21 @@ const Uploader: React.FC = () => {
                 <h1 className="text-lg font-semibold gradient-text">Upload Cards</h1>
                 <div className="w-10" />
             </div>
+
+            {atScanLimit && (
+                <div className="mx-4 mt-2 p-3 rounded-xl text-xs bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                    <p className="font-semibold mb-0.5">No card scans left this period</p>
+                    <p className="text-[11px] opacity-90 mb-2">
+                        QR images still decode for free. Upgrade for more card OCR, or add contacts manually.
+                    </p>
+                    <button
+                        onClick={() => { setUpgradeFeature('scan'); setShowUpgradePrompt(true); }}
+                        className="text-[11px] font-bold underline underline-offset-2"
+                    >
+                        See upgrade options
+                    </button>
+                </div>
+            )}
 
             <div className="flex-1 p-6 max-w-2xl mx-auto w-full">
                 {/* Dropzone */}
@@ -531,10 +559,12 @@ const Uploader: React.FC = () => {
 
             {showUpgradePrompt && (
                 <UpgradePrompt
-                    feature="scan"
+                    feature={upgradeFeature}
                     onDismiss={() => setShowUpgradePrompt(false)}
-                    scansUsed={user?.tier === 'early_access' ? (user.scanUsage.lifetimeCount || 0) : (user?.scanUsage.count || 0)}
-                    scansLimit={user?.tier === 'early_access' ? (user.scanUsage.lifetimeLimit || 30) : 5}
+                    scansUsed={upgradeFeature === 'scan' ? scansUsed : undefined}
+                    scansLimit={upgradeFeature === 'scan' ? (scansLimit || undefined) : undefined}
+                    contactCount={upgradeFeature === 'storage' ? storageContactCount : undefined}
+                    contactLimit={upgradeFeature === 'storage' ? (user?.contactLimit ?? undefined) : undefined}
                 />
             )}
 
