@@ -651,6 +651,19 @@ const Contacts: React.FC = () => {
                                 <span className="truncate">{contact.notes}</span>
                             </div>
                         )}
+                        {contact.customFields && Object.keys(contact.customFields).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                                {Object.entries(contact.customFields).slice(0, 4).map(([k, v]) => (
+                                    <span
+                                        key={k}
+                                        className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400/80 border border-sky-500/20 truncate max-w-[9rem]"
+                                        title={`${k}: ${v}`}
+                                    >
+                                        {k}: {v}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                         {contact.batchId && batches.find(b => b.id === contact.batchId) && (
                             <div className="flex items-center gap-2 text-violet-400/70">
                                 <Layers size={12} className="text-violet-500/50" />
