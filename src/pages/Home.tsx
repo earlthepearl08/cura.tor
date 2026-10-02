@@ -42,11 +42,12 @@ const Home = () => {
     }, [workspaceMode]);
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-6 page-enter">
+        <main id="main-content" className="flex flex-col items-center justify-center min-h-screen p-6 page-enter">
             {/* Logo Section */}
-            <div className="mb-12 text-center">
+            <header className="mb-12 text-center">
                 <div className="mb-4 relative">
-                    <svg viewBox="0 0 280 80" xmlns="http://www.w3.org/2000/svg" className="w-56 h-auto mx-auto">
+                    <svg viewBox="0 0 280 80" xmlns="http://www.w3.org/2000/svg" className="w-56 h-auto mx-auto" role="img" aria-label="Cura.tor">
+                        <title>Cura.tor</title>
                         <defs>
                             <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                                 <stop offset="0%" style={{stopColor:'#38bdf8'}} />
@@ -66,7 +67,7 @@ const Home = () => {
                             </filter>
                         </defs>
                         {/* Icon */}
-                        <g transform="translate(0, 10)" filter="url(#glow)">
+                        <g transform="translate(0, 10)" filter="url(#glow)" aria-hidden="true">
                             <path d="M28 5 A22 22 0 1 0 28 49" stroke="url(#logoGrad)" strokeWidth="5" fill="none" strokeLinecap="round"/>
                             <rect x="14" y="18" width="26" height="17" rx="3" fill="url(#cardGrad)"/>
                             <rect x="18" y="24" width="14" height="2" rx="1" fill="white" opacity="0.9"/>
@@ -77,8 +78,8 @@ const Home = () => {
                         <text x="138" y="42" fontFamily="Inter, sans-serif" fontSize="28" fontWeight="800" fill="url(#logoGrad)" letterSpacing="-1">.TOR</text>
                     </svg>
                 </div>
-                <p className="text-slate-500 text-xs tracking-widest uppercase">Smart Contact Curation</p>
-            </div>
+                <p className="text-slate-400 text-xs tracking-widest uppercase">Smart Contact Curation</p>
+            </header>
 
             {/* User Greeting */}
             <div className="w-full max-w-md mb-6">
@@ -86,7 +87,7 @@ const Home = () => {
                     {user?.photoURL ? (
                         <img src={user.photoURL} alt="" className="w-10 h-10 rounded-xl object-cover" />
                     ) : (
-                        <div className="w-10 h-10 rounded-xl bg-brand-700 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-brand-700 flex items-center justify-center" aria-hidden="true">
                             <Users className="w-5 h-5 text-brand-400" />
                         </div>
                     )}
@@ -128,8 +129,61 @@ const Home = () => {
             <div className="w-full max-w-md mb-6">
                 <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Primary workflows</p>
                 <div className="space-y-3">
+            {/* Primary Actions */}
+            <nav className="w-full max-w-md mb-6" aria-label="Quick actions">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">Quick Actions</p>
+                <div className="grid grid-cols-2 gap-3">
+                    <Link
+                        to="/scan"
+                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        aria-label="Scan Card with OCR camera"
+                    >
+                        <div className="w-12 h-12 bg-gradient-to-br from-sky-500/20 to-blue-600/20 rounded-xl flex items-center justify-center">
+                            <Camera className="w-5 h-5 text-sky-400" />
+                        </div>
+                        <span className="font-semibold text-sm text-white">Scan Card</span>
+                        <span className="text-[10px] text-slate-500">OCR Camera</span>
+                    </Link>
+
+                    <Link
+                        to="/qr-scan"
+                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        aria-label="QR Scan"
+                    >
+                        <div className="w-12 h-12 bg-gradient-to-br from-rose-500/20 to-pink-600/20 rounded-xl flex items-center justify-center">
+                            <QrCode className="w-5 h-5 text-rose-400" />
+                        </div>
+                        <span className="font-semibold text-sm text-white">QR Scan</span>
+                        <span className="text-[10px] text-slate-500">QR Codes</span>
+                    </Link>
+
+                    <Link
+                        to="/upload"
+                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        aria-label="Upload images"
+                    >
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-xl flex items-center justify-center">
+                            <Upload className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <span className="font-semibold text-sm text-white">Upload</span>
+                        <span className="text-[10px] text-slate-500">Images</span>
+                    </Link>
+
+                    <Link
+                        to="/manual"
+                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        aria-label="Manual contact entry"
+                    >
+                        <div className="w-12 h-12 bg-gradient-to-br from-violet-500/20 to-purple-600/20 rounded-xl flex items-center justify-center">
+                            <PenLine className="w-5 h-5 text-violet-400" />
+                        </div>
+                        <span className="font-semibold text-sm text-white">Manual</span>
+                        <span className="text-[10px] text-slate-500">Entry</span>
+                    </Link>
+
                     {isBulkLocked ? (
                         <button
+                            type="button"
                             onClick={() => setUpgradeFeature('bulk-scan')}
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20"
                         >
@@ -143,6 +197,15 @@ const Home = () => {
                             <div className="flex-1 min-w-0 pr-10">
                                 <span className="font-bold text-base text-white block">Log Sheet</span>
                                 <span className="text-xs text-slate-400 mt-0.5 block">AI-read sign-in sheets &amp; handwritten leads</span>
+                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 relative opacity-60"
+                            aria-label="Log Sheet scan — Pro feature, upgrade required"
+                        >
+                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                <Lock size={8} className="text-amber-400" aria-hidden="true" />
+                                <span className="text-[8px] font-bold text-amber-400">PRO</span>
+                            </div>
+                            <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-orange-600/20 rounded-xl flex items-center justify-center">
+                                <FileSpreadsheet className="w-5 h-5 text-amber-400" aria-hidden="true" />
                             </div>
                             <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
                         </button>
@@ -150,6 +213,8 @@ const Home = () => {
                         <Link
                             to="/log-scan"
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20"
+                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            aria-label="Log Sheet scan"
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-amber-500/25 to-orange-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <FileSpreadsheet className="w-7 h-7 text-amber-400" />
@@ -164,6 +229,7 @@ const Home = () => {
 
                     {isBulkLocked ? (
                         <button
+                            type="button"
                             onClick={() => setUpgradeFeature('bulk-scan')}
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20"
                         >
@@ -173,6 +239,15 @@ const Home = () => {
                             </div>
                             <div className="w-14 h-14 bg-gradient-to-br from-pink-500/25 to-rose-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <Layers className="w-7 h-7 text-pink-400" />
+                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 relative opacity-60"
+                            aria-label="Multi-Card scan — Pro feature, upgrade required"
+                        >
+                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                <Lock size={8} className="text-amber-400" aria-hidden="true" />
+                                <span className="text-[8px] font-bold text-amber-400">PRO</span>
+                            </div>
+                            <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-rose-600/20 rounded-xl flex items-center justify-center">
+                                <Layers className="w-5 h-5 text-pink-400" aria-hidden="true" />
                             </div>
                             <div className="flex-1 min-w-0 pr-10">
                                 <span className="font-bold text-base text-white block">Multi-Card</span>
@@ -184,6 +259,8 @@ const Home = () => {
                         <Link
                             to="/multi-card"
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20"
+                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            aria-label="Multi-Card scan"
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-pink-500/25 to-rose-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <Layers className="w-7 h-7 text-pink-400" />
@@ -196,7 +273,7 @@ const Home = () => {
                         </Link>
                     )}
                 </div>
-            </div>
+            </nav>
 
             {/* Single-card capture */}
             <div className="w-full max-w-md mb-6">
@@ -255,12 +332,13 @@ const Home = () => {
             </div>
 
             {/* Secondary Actions */}
-            <div className="w-full max-w-md mb-8">
-                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Manage</p>
+            <nav className="w-full max-w-md mb-8" aria-label="Manage">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">Manage</p>
                 <div className="grid grid-cols-2 gap-3">
                     <Link
                         to="/contacts"
                         className="card-elevated rounded-2xl p-4 flex items-center justify-between hover:scale-[1.01] active:scale-[0.99] transition-all"
+                        aria-label={`Contacts, ${contactCount} saved`}
                     >
                         <div className="flex items-center gap-4">
                             <div className="w-11 h-11 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-xl flex items-center justify-center">
@@ -277,6 +355,7 @@ const Home = () => {
                     <Link
                         to="/settings"
                         className="card-elevated rounded-2xl p-4 flex items-center justify-between hover:scale-[1.01] active:scale-[0.99] transition-all"
+                        aria-label="Settings"
                     >
                         <div className="flex items-center gap-4">
                             <div className="w-11 h-11 bg-gradient-to-br from-amber-500/20 to-orange-600/20 rounded-xl flex items-center justify-center">
@@ -290,12 +369,12 @@ const Home = () => {
                         <ChevronRight className="w-4 h-4 text-slate-600" />
                     </Link>
                 </div>
-            </div>
+            </nav>
 
             {/* Activity Stats */}
             {contactCount > 0 && (
-                <div className="w-full max-w-md mb-6">
-                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Activity</p>
+                <section className="w-full max-w-md mb-6" aria-label="Activity">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">Activity</p>
                     <div className="grid grid-cols-3 gap-3 mb-4">
                         <div className="card-elevated rounded-2xl p-3 text-center">
                             <p className="text-xl font-bold gradient-text">{contactCount}</p>
@@ -312,19 +391,20 @@ const Home = () => {
                     </div>
                     {recentContacts.length > 0 && (
                         <div className="space-y-2">
-                            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Recently Added</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Recently Added</p>
                             {recentContacts.map(c => (
                                 <Link
                                     key={c.id}
                                     to="/contacts"
                                     className="flex items-center gap-3 card-elevated rounded-xl p-3 hover:scale-[1.01] active:scale-[0.99] transition-all"
+                                    aria-label={`Open contacts, recent: ${c.name || 'Unknown'}${c.company ? `, ${c.company}` : ''}`}
                                 >
                                     {c.imageData ? (
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-brand-800 flex-shrink-0">
                                             <img src={c.imageData} alt="" className="w-full h-full object-cover" />
                                         </div>
                                     ) : (
-                                        <div className="w-10 h-10 rounded-lg bg-brand-800 flex items-center justify-center flex-shrink-0">
+                                        <div className="w-10 h-10 rounded-lg bg-brand-800 flex items-center justify-center flex-shrink-0" aria-hidden="true">
                                             <Users className="w-4 h-4 text-slate-500" />
                                         </div>
                                     )}
@@ -332,19 +412,19 @@ const Home = () => {
                                         <p className="text-sm font-medium text-white truncate">{c.name || 'Unknown'}</p>
                                         <p className="text-[10px] text-slate-500 truncate">{c.company}</p>
                                     </div>
-                                    <ChevronRight className="w-3 h-3 text-slate-600 flex-shrink-0" />
+                                    <ChevronRight className="w-3 h-3 text-slate-500 flex-shrink-0" aria-hidden="true" />
                                 </Link>
                             ))}
                         </div>
                     )}
-                </div>
+                </section>
             )}
 
             {/* Status Bar */}
-            <div className="w-full max-w-md card-elevated rounded-2xl p-4">
+            <div className="w-full max-w-md card-elevated rounded-2xl p-4" role="status" aria-live="polite">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-slate-500'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-slate-500'}`} aria-hidden="true"></div>
                         <div>
                             <p className="text-xs font-medium text-slate-300">
                                 {isConnected ? 'Synced to Google Drive' : 'Local Storage'}
@@ -362,7 +442,7 @@ const Home = () => {
             {upgradeFeature && (
                 <UpgradePrompt feature={upgradeFeature} onDismiss={() => setUpgradeFeature(null)} />
             )}
-        </div>
+        </main>
     );
 };
 

@@ -31,6 +31,60 @@ body {
   margin: 0 auto;
 }
 
+/* Skip link — first focusable control for keyboard users */
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  background: #0ea5e9;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transform: translateY(-150%);
+  transition: transform 0.15s ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid #f8fafc;
+  outline-offset: 2px;
+}
+
+/* Visible keyboard focus without changing mouse click chrome */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Custom Utilities */
 .glass {
   background: rgba(15, 23, 42, 0.7);
@@ -60,12 +114,19 @@ body {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+.card-elevated:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35), 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
 .section-label {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #64748b;
+  /* #94a3b8 — stronger than #64748b for WCAG on dark bg */
+  color: #94a3b8;
 }
 
 .page-enter {
@@ -149,12 +210,12 @@ body {
 [data-theme="light"] .bg-brand-950 { background-color: #f1f5f9; }
 [data-theme="light"] .bg-brand-900 { background-color: #e2e8f0; }
 
-/* Text colors */
+/* Text colors — keep body/support text at usable contrast */
 [data-theme="light"] .text-slate-200 { color: #1e293b; }
 [data-theme="light"] .text-slate-300 { color: #334155; }
 [data-theme="light"] .text-slate-400 { color: #475569; }
-[data-theme="light"] .text-slate-500 { color: #64748b; }
-[data-theme="light"] .text-slate-600 { color: #94a3b8; }
+[data-theme="light"] .text-slate-500 { color: #475569; }
+[data-theme="light"] .text-slate-600 { color: #64748b; }
 [data-theme="light"] .text-brand-400 { color: #334155; }
 [data-theme="light"] .text-brand-500 { color: #475569; }
 [data-theme="light"] .text-brand-600 { color: #64748b; }
@@ -201,6 +262,11 @@ body {
   border-color: rgba(0, 0, 0, 0.1);
 }
 
+[data-theme="light"] .card-elevated:focus-visible {
+  border-color: rgba(14, 165, 233, 0.55);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.35), 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 /* Gradient text - light */
 [data-theme="light"] .gradient-text {
   background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
@@ -210,3 +276,21 @@ body {
 
 /* Hover states */
 [data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(0, 0, 0, 0.05); }
+
+[data-theme="light"] .section-label {
+  color: #475569;
+}
+
+[data-theme="light"] :focus-visible {
+  outline-color: #0284c7;
+}
+[data-theme="light"] button:focus-visible,
+[data-theme="light"] a:focus-visible,
+[data-theme="light"] [role="button"]:focus-visible {
+  outline-color: #0284c7;
+}
+[data-theme="light"] input:focus-visible,
+[data-theme="light"] select:focus-visible,
+[data-theme="light"] textarea:focus-visible {
+  outline-color: #0284c7;
+}
