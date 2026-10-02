@@ -735,7 +735,7 @@ const Landing: React.FC = () => {
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <img src="/logo.svg" alt="Cura.tor" className="h-6 opacity-80" />
-                        <span className="text-xs text-slate-600">Smart contact curation</span>
+                        <span className="text-xs text-slate-600">Smart contact curation · paid beta</span>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-slate-500">
                         <a href="#pricing" className="hover:text-slate-300 transition-colors">Pricing</a>

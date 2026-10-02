@@ -538,6 +538,11 @@ const Settings = () => {
                                 <ExternalLink size={14} />
                                 {isUpgrading ? 'Opening...' : 'Manage Subscription'}
                             </button>
+                            <p className="text-[11px] text-slate-500 leading-relaxed">
+                                Cancel or update billing in the Stripe portal. Paid beta refunds: email{' '}
+                                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-sky-400 hover:underline">{SUPPORT_EMAIL}</a>
+                                {' '}within 7 days of a charge (see Terms).
+                            </p>
                             {upgradeError && <p className="text-xs text-red-400">{upgradeError}</p>}
                         </div>
                     </div>
