@@ -77,7 +77,7 @@ const Li: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const TermsOfService = () => (
     <div>
         <h1 className="text-xl font-bold text-white mb-1">Terms of Service</h1>
-        <p className="text-[10px] text-slate-600 mb-6">Last updated: March 16, 2026</p>
+        <p className="text-[10px] text-slate-600 mb-6">Last updated: October 1, 2026</p>
 
         <P>
             Welcome to Cura.tor ("Service"), a business card scanning and contact management application
@@ -93,20 +93,23 @@ const TermsOfService = () => (
             technology. The Service includes:
         </P>
         <ul>
-            <Li>Business card scanning via camera or photo upload</Li>
-            <Li>AI-powered text extraction and contact parsing</Li>
-            <Li>Contact storage and management</Li>
+            <Li>Business card scanning via camera or photo upload (online AI processing)</Li>
+            <Li>AI-powered text extraction and contact parsing via Google Gemini and Google Cloud Vision</Li>
+            <Li>Contact storage and management (on-device; optional cloud backup)</Li>
             <Li>Export functionality (vCard, CSV, Excel)</Li>
             <Li>Optional cloud backup via Google Drive</Li>
             <Li>QR code scanning</Li>
             <Li>Log sheet scanning and multi-card batch processing (premium features)</Li>
+            <Li>Optional on-device OCR (Tesseract) for offline single-card scanning with reduced accuracy</Li>
         </ul>
 
         <SectionTitle>2. Account Registration</SectionTitle>
         <P>
-            To use the Service, you must create an account using Google Sign-In. By creating an account, you
-            represent that you are at least 13 years of age and that the information you provide is accurate
-            and complete. You are responsible for maintaining the security of your account credentials.
+            To use the Service, you must create an account using Google Sign-In or email and password.
+            By creating an account, you represent that you are at least 13 years of age and that the
+            information you provide is accurate and complete. You are responsible for maintaining the
+            security of your account credentials. Email/password accounts can reset their password via
+            the in-app reset flow.
         </P>
 
         <SectionTitle>3. Service Tiers</SectionTitle>
@@ -114,7 +117,8 @@ const TermsOfService = () => (
         <ul>
             <Li><strong className="text-slate-300">Free:</strong> Limited to 5 scans per month, 25 contact storage, and basic features.</Li>
             <Li><strong className="text-slate-300">Pioneer:</strong> Unlimited scans, 50 contact storage, and access to export and cloud sync features.</Li>
-            <Li><strong className="text-slate-300">Pro:</strong> Unlimited scans and storage with access to all features.</Li>
+            <Li><strong className="text-slate-300">Pro:</strong> Unlimited scans and storage with access to all features, including log sheet and multi-card scanning.</Li>
+            <Li><strong className="text-slate-300">Enterprise:</strong> Team workspace features under separate commercial terms.</Li>
         </ul>
         <P>
             We reserve the right to modify tier benefits, pricing, and limits at any time. Changes to paid
@@ -142,15 +146,19 @@ const TermsOfService = () => (
 
         <SectionTitle>6. AI and OCR Processing</SectionTitle>
         <P>
-            The Service uses third-party AI and OCR services (including Google Cloud Vision and Google Gemini)
-            to process business card images. While we strive for accuracy, we do not guarantee that the
-            extracted information will be error-free. You are responsible for verifying the accuracy of all
-            parsed contact data before relying on it.
+            By default, scanning uses online AI: card, multi-card, and log-sheet images are transmitted
+            through our application servers to Google Gemini (and, where used, Google Cloud Vision) for
+            extraction and structuring. An optional Advanced setting enables on-device Tesseract OCR for
+            single-card scans without sending the image to Google AI; quality is typically lower.
+            While we strive for accuracy, we do not guarantee that the extracted information will be
+            error-free. You are responsible for verifying the accuracy of all parsed contact data before
+            relying on it.
         </P>
         <P>
-            Images submitted for scanning are processed in real-time and are not permanently stored on our
-            servers. However, they are temporarily transmitted to third-party AI services for processing
-            as described in our Privacy Policy.
+            Images submitted for online AI scanning are processed in real-time and are not permanently
+            stored on our servers. They are temporarily transmitted to third-party AI services for
+            processing as described in our Privacy Policy. Saved contacts remain available to view, edit,
+            and export offline on your device.
         </P>
 
         <SectionTitle>7. Intellectual Property</SectionTitle>
@@ -173,8 +181,9 @@ const TermsOfService = () => (
 
         <SectionTitle>9. Third-Party Services</SectionTitle>
         <P>
-            The Service integrates with third-party services including Google Cloud Platform, Firebase, and
-            Google Drive. Your use of these services is subject to their respective terms and privacy policies.
+            The Service integrates with third-party services including Google Cloud Platform (Gemini and
+            Cloud Vision), Firebase, Google Drive, Stripe (for paid subscriptions), and our hosting
+            provider. Your use of these services is subject to their respective terms and privacy policies.
             We are not responsible for the availability or performance of third-party services.
         </P>
 
@@ -221,7 +230,6 @@ const TermsOfService = () => (
         </P>
         <P>
             <strong className="text-slate-300">Kinmo PW Corporation</strong><br />
-            {/* TODO: Replace with real support email before launch */}
             Email: support@curator-app.com
         </P>
     </div>
@@ -231,7 +239,7 @@ const TermsOfService = () => (
 const PrivacyPolicy = () => (
     <div>
         <h1 className="text-xl font-bold text-white mb-1">Privacy Policy</h1>
-        <p className="text-[10px] text-slate-600 mb-6">Last updated: March 16, 2026</p>
+        <p className="text-[10px] text-slate-600 mb-6">Last updated: October 1, 2026</p>
 
         <P>
             Kinmo PW Corporation ("Company", "we", "us", or "our") operates the Cura.tor application
@@ -244,7 +252,9 @@ const PrivacyPolicy = () => (
         <SubTitle>1.1 Account Information</SubTitle>
         <P>
             When you sign in with Google, we receive and store your name, email address, and profile photo
-            URL. This information is stored in our Firebase database to manage your account and service tier.
+            URL. When you sign up with email and password, we store the email and display name you provide
+            (passwords are handled by Firebase Authentication; we do not store plaintext passwords). This
+            information is stored in our Firebase database to manage your account and service tier.
         </P>
 
         <SubTitle>1.2 Contact Data</SubTitle>
@@ -252,14 +262,18 @@ const PrivacyPolicy = () => (
             When you scan business cards, upload images, or manually enter contacts, the resulting contact
             information (names, phone numbers, email addresses, companies, job titles, addresses, notes) is
             stored locally on your device using browser storage (IndexedDB). If you enable Google Drive
-            sync, this data is also stored in your personal Google Drive account.
+            sync, this data is also stored in your personal Google Drive account. Contact records remain
+            available to view and edit offline on the device where they are stored.
         </P>
 
         <SubTitle>1.3 Images</SubTitle>
         <P>
-            Business card images and photos you capture or upload are processed temporarily to extract contact
-            information. Images are sent to Google Cloud Vision and Google Gemini AI for processing. Images
-            are not permanently stored on our servers after processing is complete.
+            Business card, multi-card, and log-sheet images you capture or upload are processed temporarily
+            to extract contact information. For the default online AI path, images are transmitted through
+            our application servers to Google Gemini and, where used, Google Cloud Vision. Images are not
+            permanently stored on our servers after processing is complete. If you enable the optional
+            on-device Tesseract OCR mode in Advanced settings, single-card images are processed locally and
+            are not sent to Google AI for that scan.
         </P>
 
         <SubTitle>1.4 Usage Data</SubTitle>
@@ -289,10 +303,12 @@ const PrivacyPolicy = () => (
         <SectionTitle>3. Third-Party Services</SectionTitle>
         <P>The Service uses the following third-party services that may process your data:</P>
         <ul>
-            <Li><strong className="text-slate-300">Google Cloud Vision API:</strong> Processes business card images for text extraction. Images are transmitted to Google's servers for processing. Subject to Google Cloud's data processing terms.</Li>
-            <Li><strong className="text-slate-300">Google Gemini AI:</strong> Processes extracted text to identify and structure contact information. Subject to Google's AI terms of service.</Li>
-            <Li><strong className="text-slate-300">Firebase (Google):</strong> Handles user authentication and stores user profile data (tier, usage counts). Subject to Firebase's terms of service.</Li>
+            <Li><strong className="text-slate-300">Google Gemini AI:</strong> Receives card, multi-card, and log-sheet images (and, in some flows, OCR text) to extract and structure contact fields. Subject to Google's AI / Cloud data processing terms.</Li>
+            <Li><strong className="text-slate-300">Google Cloud Vision API:</strong> Where used, processes images for text extraction. Images are transmitted to Google's servers for processing. Subject to Google Cloud's data processing terms.</Li>
+            <Li><strong className="text-slate-300">Firebase (Google):</strong> Handles user authentication (Google and email/password) and stores user profile data (tier, usage counts). Subject to Firebase's terms of service.</Li>
             <Li><strong className="text-slate-300">Google Drive:</strong> Optional cloud backup for contact data, stored in your personal Google Drive application data folder. Subject to Google Drive's terms of service.</Li>
+            <Li><strong className="text-slate-300">Stripe:</strong> Processes payment information for paid subscriptions. We do not store full payment card numbers on our servers.</Li>
+            <Li><strong className="text-slate-300">Hosting (e.g. Vercel):</strong> Application and API requests (including image payloads for online AI scans) transit our hosting provider's infrastructure.</Li>
         </ul>
 
         <SectionTitle>4. Data Storage and Security</SectionTitle>
@@ -313,9 +329,10 @@ const PrivacyPolicy = () => (
 
         <SubTitle>4.3 Server-Side</SubTitle>
         <P>
-            User profile data (email, name, tier, scan usage) is stored in Google Firestore. We do not store
-            business card images or contact data on our servers. Image processing happens via direct API calls
-            to Google Cloud services.
+            User profile data (email, name, tier, scan usage) is stored in Google Firestore. We do not
+            permanently store business card images or contact data on our servers. For online AI scans,
+            images are temporarily transmitted through our API to Google Gemini and/or Cloud Vision for
+            processing and are not retained as a durable image archive after the request completes.
         </P>
 
         <SubTitle>4.4 Security</SubTitle>
@@ -391,7 +408,6 @@ const PrivacyPolicy = () => (
         </P>
         <P>
             <strong className="text-slate-300">Kinmo PW Corporation</strong><br />
-            {/* TODO: Replace with real support email before launch */}
             Email: support@curator-app.com
         </P>
     </div>

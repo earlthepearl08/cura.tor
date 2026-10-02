@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
@@ -41,7 +41,8 @@ const Settings = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { theme, toggleTheme } = useTheme();
     const [ocrEngine, setOcrEngineState] = useState<OCREngine>(getOCREngine());
-    const [saved, setSaved] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [engineSaved, setEngineSaved] = useState(false);
     const { isConnected, user: driveUser, isSyncing, syncProgress, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
     const { user, firebaseUser, signOut, canUseGoogleDrive, scansRemaining, refreshUserProfile } = useAuth();
 
@@ -170,6 +171,13 @@ const Settings = () => {
             await signOut();
             navigate('/auth');
         }
+    };
+
+    const handleOcrEngineChange = (engine: OCREngine) => {
+        setOCREngine(engine);
+        setOcrEngineState(engine);
+        setEngineSaved(true);
+        window.setTimeout(() => setEngineSaved(false), 2000);
     };
 
     const hasStripeSubscription = !!user?.stripe?.subscriptionId;
@@ -571,23 +579,94 @@ const Settings = () => {
                     </div>
                 </div>
 
-                {/* OCR Engine */}
+                {/* Advanced — OCR engine (power users) */}
                 <div className="space-y-3">
-                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">OCR Engine</p>
-                    <div className="card-elevated rounded-2xl p-4">
-                        <div className="flex items-center gap-4">
-                            <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-sky-500/20">
-                                <Sparkles className="w-5 h-5 text-sky-400" />
-                            </div>
-                            <div className="flex-1">
+                    <button
+                        type="button"
+                        onClick={() => setShowAdvanced(v => !v)}
+                        className="w-full flex items-center justify-between px-1"
+                    >
+                        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Advanced</p>
+                        <ChevronDown
+                            size={14}
+                            className={`text-slate-600 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+                        />
+                    </button>
+                    {showAdvanced && (
+                        <div className="card-elevated rounded-2xl p-4 space-y-4">
+                            <div>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <p className="font-semibold text-sm">Cloud Vision + Gemini AI</p>
-                                    <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">ACTIVE</span>
+                                    <p className="font-semibold text-sm">Scan engine</p>
+                                    {engineSaved && (
+                                        <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
+                                            Saved
+                                        </span>
+                                    )}
                                 </div>
-                                <p className="text-xs text-slate-500">Google Cloud Vision for text extraction, Gemini AI for intelligent parsing</p>
+                                <p className="text-xs text-slate-500 mb-3">
+                                    Default scanning uses online AI. Offline Tesseract is best-effort and typically less accurate — especially on stylized cards and handwriting.
+                                </p>
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={() => handleOcrEngineChange('cloud-vision')}
+                                className={`w-full text-left p-3 rounded-xl border transition-colors ${
+                                    ocrEngine === 'cloud-vision'
+                                        ? 'border-sky-500/50 bg-sky-500/10'
+                                        : 'border-brand-800 hover:bg-white/5'
+                                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="w-9 h-9 rounded-lg bg-sky-500/20 flex items-center justify-center shrink-0">
+                                        <Sparkles className="w-4 h-4 text-sky-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-medium text-sm text-white">Online AI (Gemini)</p>
+                                            {ocrEngine === 'cloud-vision' && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
+                                                    ACTIVE
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Sends card images to Google Gemini for extraction. Recommended.
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleOcrEngineChange('tesseract')}
+                                className={`w-full text-left p-3 rounded-xl border transition-colors ${
+                                    ocrEngine === 'tesseract'
+                                        ? 'border-amber-500/50 bg-amber-500/10'
+                                        : 'border-brand-800 hover:bg-white/5'
+                                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                                        <WifiOff className="w-4 h-4 text-amber-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-medium text-sm text-white">Offline (Tesseract)</p>
+                                            {ocrEngine === 'tesseract' && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">
+                                                    ACTIVE
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            On-device OCR for single cards when offline. Lower quality; log sheet and multi-card still need online AI.
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Google Drive Sync */}
@@ -745,7 +824,7 @@ const Settings = () => {
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">About</p>
                     <div className="card-elevated rounded-2xl p-4 text-center">
-                        <p className="text-xs text-slate-500">Cura.tor v1.0 Beta</p>
+                        <p className="text-xs text-slate-500">Cura.tor v1.0.0</p>
                     </div>
                 </div>
             </div>
