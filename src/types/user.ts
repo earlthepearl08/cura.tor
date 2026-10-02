@@ -25,6 +25,8 @@ export interface UserProfile {
     };
     organizationId?: string;
     orgRole?: 'admin' | 'member';
+    /** Lightweight event workspace memberships (trade-show packs). Independent of enterprise org. */
+    eventIds?: string[];
     // Trial/grant expiry. When set and elapsed, the user is auto-downgraded to
     // 'free' on next sign-in (see api/check-tier-expiry). null = no expiry.
     expiresAt?: number | null;
