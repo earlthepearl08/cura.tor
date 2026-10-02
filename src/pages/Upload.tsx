@@ -316,7 +316,7 @@ const Uploader: React.FC = () => {
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
             <div className="flex items-center justify-between p-4 glass sticky top-0 z-10">
-                <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">Upload Cards</h1>

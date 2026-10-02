@@ -1,0 +1,22 @@
+{
+  "name": "Arch. Elena Gomez",
+  "company": "Horizon Design Studio",
+  "position": "Principal Architect",
+  "phone": [
+    "+63 917 600 7000"
+  ],
+  "email": [
+    "elena@horizondesign.ph"
+  ],
+  "address": "Main Office: Quezon City | Showroom: BGC",
+  "notes": "instagram.com/horizondesignph",
+  "_meta": {
+    "id": "card-009-arch-prefix",
+    "difficulty": "medium",
+    "tags": [
+      "credentials",
+      "multi-address",
+      "ph"
+    ]
+  }
+}

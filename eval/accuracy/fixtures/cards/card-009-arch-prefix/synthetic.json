@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-009-arch-prefix",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Horizon Design Studio",
+    "Arch. Elena Gomez",
+    "Principal Architect",
+    "+63 917 600 7000",
+    "elena@horizondesign.ph",
+    "Main Office: Quezon City | Showroom: BGC",
+    "instagram.com/horizondesignph"
+  ]
+}

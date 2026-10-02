@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-014-no-position",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Flores Family Farms",
+    "Diego Flores",
+    "0919-222-3333",
+    "diego@floresfarms.ph",
+    "Batangas",
+    "Organic produce"
+  ]
+}

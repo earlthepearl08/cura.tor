@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-025-iii-suffix",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Santos Realty Corporation",
+    "Roberto Santos III",
+    "Broker",
+    "+63 922 333 4444",
+    "rsantos3@santosrealty.ph",
+    "Main Office: Quezon City | Branch: Antipolo"
+  ]
+}

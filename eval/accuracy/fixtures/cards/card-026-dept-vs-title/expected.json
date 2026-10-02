@@ -1,0 +1,21 @@
+{
+  "name": "Patricia Uy",
+  "company": "Northwind Retail Inc.",
+  "position": "Marketing Manager",
+  "phone": [
+    "02-8777-5555"
+  ],
+  "email": [
+    "patricia.uy@northwind.ph"
+  ],
+  "address": "Ortigas, Pasig",
+  "notes": "",
+  "_meta": {
+    "id": "card-026-dept-vs-title",
+    "difficulty": "medium",
+    "tags": [
+      "ph"
+    ],
+    "notes": "Card shows Marketing on one line and Manager on next — must combine to position."
+  }
+}
