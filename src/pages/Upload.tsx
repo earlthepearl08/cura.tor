@@ -11,6 +11,7 @@ import { tryDecodeQR } from '@/services/qrDetect';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { compressForOCR } from '@/utils/compressPhoto';
+import { friendlyScanErrorMessage } from '@/utils/friendlyScanError';
 
 interface QueuedFile {
     id: string;
@@ -24,19 +25,9 @@ interface QueuedFile {
     editedFolder?: string;
 }
 
-
 const MAX_SILENT_RETRIES = 2;
 
-const friendlyError = (err: unknown): string => {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('timed out') || msg.includes('abort'))
-        return 'Server took too long. It will retry automatically next time.';
-    if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
-        return 'Server is busy. Try again in a moment.';
-    if (msg.includes('500') || msg.includes('503'))
-        return 'Temporary server issue. Try again shortly.';
-    return 'Processing failed. Tap to retry.';
-};
+const friendlyError = (err: unknown): string => friendlyScanErrorMessage(err);
 
 const Uploader: React.FC = () => {
     const [queue, setQueue] = useState<QueuedFile[]>([]);

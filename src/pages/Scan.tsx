@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -17,10 +17,14 @@ const Scanner: React.FC = () => {
     const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
     const [batchMode, setBatchMode] = useState(false);
     const [batchCount, setBatchCount] = useState(0);
-    const { isProcessing, processImage, result, error, reset } = useOCR();
+    const { isProcessing, processImage, result, error, errorKind, reset } = useOCR();
     const navigate = useNavigate();
     const { canPerformScan, incrementScanCount, user, scansRemaining } = useAuth();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+
+    useEffect(() => {
+        if (errorKind === 'quota') setShowUpgradePrompt(true);
+    }, [errorKind]);
 
     const capture = useCallback(async () => {
         // Send the full uncropped camera frame to OCR. Earlier versions cropped
@@ -255,21 +259,40 @@ const Scanner: React.FC = () => {
                     )}
                 </div>
 
-                <p className="mt-8 text-sm text-brand-400 text-center max-w-xs leading-relaxed">
-                    {error
-                        ? <span className="text-red-400">
-                            {error.toLowerCase().includes('fetch') || error.toLowerCase().includes('network')
-                                ? 'No internet connection. Please check your network and try again.'
-                                : error.toLowerCase().includes('api key') || error.toLowerCase().includes('unregistered')
-                                    ? 'Service temporarily unavailable. Please try again later.'
-                                    : `Processing failed: ${error}`}
-                          </span>
-                        : isProcessing
-                            ? "Extracting information using OCR..."
-                            : !imgSrc
-                                ? cameraError ? "" : "Align the card within the frame. Tap anywhere to focus."
-                                : "Preview confirmed. Tap the checkmark to start OCR processing."}
-                </p>
+                <div className="mt-8 text-sm text-brand-400 text-center max-w-xs leading-relaxed">
+                    {error ? (
+                        <div className="space-y-2">
+                            <p className="text-red-400">{error}</p>
+                            {errorKind === 'quota' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowUpgradePrompt(true)}
+                                    className="text-xs font-medium text-amber-400 underline underline-offset-2"
+                                >
+                                    View upgrade options
+                                </button>
+                            ) : errorKind === 'auth' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/settings')}
+                                    className="text-xs font-medium text-brand-300 underline underline-offset-2"
+                                >
+                                    Open Settings
+                                </button>
+                            ) : errorKind === 'rate_limit' ? (
+                                <p className="text-xs text-brand-500">Wait a moment, then tap the checkmark to retry</p>
+                            ) : (
+                                <p className="text-xs text-brand-500">Tap the checkmark to retry</p>
+                            )}
+                        </div>
+                    ) : isProcessing ? (
+                        "Extracting information using OCR..."
+                    ) : !imgSrc ? (
+                        cameraError ? "" : "Align the card within the frame. Tap anywhere to focus."
+                    ) : (
+                        "Preview confirmed. Tap the checkmark to start OCR processing."
+                    )}
+                </div>
 
                 {showReview && result && imgSrc && (
                     <ContactReview

@@ -2,6 +2,7 @@
 import { createWorker } from 'tesseract.js';
 import { auth } from '../config/firebase';
 import { reportGeminiHttpError, reportScanFailure } from './observability';
+import { ScanApiError } from '@/utils/friendlyScanError';
 
 async function authHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -83,6 +84,7 @@ function computeHeuristicConfidence(entry: {
 // network errors) with exponential backoff (1s, 2s, 4s — 3 attempts total).
 // Flows that don't use this helper (anything directly calling /api/gemini)
 // will fall back to the rule-based parser on the first failure.
+// User-facing copy is applied via classifyScanError / friendlyScanErrorMessage.
 async function callGeminiWithRetry(opts: {
     body: string;
     flowName: string;
@@ -90,7 +92,7 @@ async function callGeminiWithRetry(opts: {
 }): Promise<any> {
     const timeoutMs = opts.timeoutMs ?? 90000;
     const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
-    const RETRY_MESSAGE_RE = /high demand|overloaded|temporarily unavailable|try again later/i;
+    const RETRY_MESSAGE_RE = /high demand|overloaded|temporarily unavailable|try again later|resource.?exhausted/i;
     const MAX_ATTEMPTS = 3;
     const BACKOFF_MS = [1000, 2000, 4000];
 
@@ -112,11 +114,23 @@ async function callGeminiWithRetry(opts: {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 const nestedMsg = errorData.details?.error?.message; // Google upstream error shape
-                const flatDetails = typeof errorData.details === 'string' ? errorData.details : null; // our own server error shape
-                const baseMsg = nestedMsg || errorData.error || `Gemini API error: ${response.status}`;
-                const parts = [baseMsg, flatDetails, errorData.reason ? `[${errorData.reason}]` : null].filter(Boolean);
-                const fullMsg = parts.join(' — ');
-                const retryable = RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg);
+                const flatDetails = typeof errorData.details === 'string' ? errorData.details : null;
+                const reason = typeof errorData.reason === 'string' ? errorData.reason : undefined;
+                // Keep internals in logs; throw a short structured error for the UI layer.
+                console.warn(
+                    `[${opts.flowName}] API ${response.status}`,
+                    { reason, nestedMsg, flatDetails, error: errorData.error }
+                );
+                const publicMsg = errorData.error || `Gemini API error: ${response.status}`;
+                const logMsg = [nestedMsg, flatDetails, reason ? `[${reason}]` : null].filter(Boolean).join(' — ');
+                const retryable =
+                    // Don't auto-retry tier quota — user must upgrade / wait for reset
+                    reason !== 'quota-exceeded' &&
+                    (RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(logMsg || publicMsg));
+                const apiError = new ScanApiError(publicMsg, {
+                    status: response.status,
+                    reason,
+                });
                 if (retryable && attempt < MAX_ATTEMPTS - 1) {
                     console.log(`[${opts.flowName}] Transient error ${response.status}, retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
                     reportGeminiHttpError({
@@ -128,7 +142,7 @@ async function callGeminiWithRetry(opts: {
                         final: false,
                     });
                     await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
-                    lastError = new Error(fullMsg);
+                    lastError = apiError;
                     continue;
                 }
                 reportGeminiHttpError({
@@ -142,6 +156,7 @@ async function callGeminiWithRetry(opts: {
                 const httpErr = new Error(fullMsg) as Error & { __observabilityReported?: boolean };
                 httpErr.__observabilityReported = true;
                 throw httpErr;
+                throw apiError;
             }
 
             const data = await response.json();
@@ -150,6 +165,8 @@ async function callGeminiWithRetry(opts: {
             return text;
         } catch (error: any) {
             clearTimeout(timeout);
+            // Structured API errors already decided retry vs throw above
+            if (error instanceof ScanApiError) throw error;
             const msg = error?.message || String(error);
             const isNetworkError = error?.name === 'AbortError' || /failed to fetch|network|timeout/i.test(msg);
             const isMessageRetryable = RETRY_MESSAGE_RE.test(msg);
@@ -404,9 +421,18 @@ export class OCRService {
                 const errorData = await response.json().catch(() => ({}));
                 const nestedMsg = errorData.details?.error?.message;
                 const flatDetails = typeof errorData.details === 'string' ? errorData.details : null;
-                const baseMsg = nestedMsg || errorData.error || `Cloud Vision API error: ${response.status}`;
-                const parts = [baseMsg, flatDetails, errorData.reason ? `[${errorData.reason}]` : null].filter(Boolean);
-                throw new Error(parts.join(' — '));
+                const reason = typeof errorData.reason === 'string' ? errorData.reason : undefined;
+                console.warn('[Cloud Vision] API error', {
+                    status: response.status,
+                    reason,
+                    nestedMsg,
+                    flatDetails,
+                    error: errorData.error,
+                });
+                throw new ScanApiError(errorData.error || `Cloud Vision API error: ${response.status}`, {
+                    status: response.status,
+                    reason,
+                });
             }
 
             const data = await response.json();

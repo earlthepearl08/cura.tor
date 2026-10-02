@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 import { ocrService, OCRResult } from '@/services/ocr';
+import { classifyScanError, type ScanErrorKind } from '@/utils/friendlyScanError';
 
 interface OCRState {
     isProcessing: boolean;
     progress: number;
     error: string | null;
+    errorKind: ScanErrorKind | null;
     result: OCRResult | null;
 }
 
@@ -13,28 +15,31 @@ export const useOCR = () => {
         isProcessing: false,
         progress: 0,
         error: null,
+        errorKind: null,
         result: null,
     });
 
     const processImage = useCallback(async (imageSrc: string) => {
-        setState(prev => ({ ...prev, isProcessing: true, error: null, progress: 10 }));
+        setState(prev => ({ ...prev, isProcessing: true, error: null, errorKind: null, progress: 10 }));
 
         try {
-            // Small delay to simulate progress if needed, but Tesseract has its own events
-            // For now, we just call the service
             const result = await ocrService.processImage(imageSrc);
             setState({
                 isProcessing: false,
                 progress: 100,
                 error: null,
+                errorKind: null,
                 result
             });
             return result;
         } catch (err) {
+            console.error('[OCR] processImage failed:', err);
+            const friendly = classifyScanError(err);
             setState(prev => ({
                 ...prev,
                 isProcessing: false,
-                error: err instanceof Error ? err.message : 'failed to process image'
+                error: friendly.message,
+                errorKind: friendly.kind,
             }));
             return null;
         }
@@ -45,6 +50,7 @@ export const useOCR = () => {
             isProcessing: false,
             progress: 0,
             error: null,
+            errorKind: null,
             result: null
         });
     }, []);
