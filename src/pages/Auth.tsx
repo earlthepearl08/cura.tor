@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import {
     Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle,
-    ScanLine, Users as UsersIcon, FileDown, HardDrive, WifiOff, ChevronDown, ShieldCheck,
-    ArrowLeft, CheckCircle2,
+    ScanLine, Users as UsersIcon, FileDown, WifiOff, ChevronDown, ShieldCheck,
+    ArrowLeft, CheckCircle2, Link2,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, MAGIC_LINK_EMAIL_KEY } from '@/contexts/AuthContext';
 
 function detectInAppBrowser(): string | null {
     const ua = navigator.userAgent || '';
@@ -30,10 +30,22 @@ const BENEFITS: { icon: React.ComponentType<{ className?: string }>; label: stri
 type AuthMode = 'signin' | 'signup' | 'reset';
 
 const Auth: React.FC = () => {
-    const { user, isLoading, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useAuth();
+    const {
+        user,
+        isLoading,
+        signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
+        resetPassword,
+        sendMagicLink,
+        isMagicLinkSignIn,
+        completeMagicLinkSignIn,
+    } = useAuth();
     const inAppBrowser = useMemo(() => detectInAppBrowser(), []);
     const [mode, setMode] = useState<AuthMode>('signin');
     const [showEmailForm, setShowEmailForm] = useState(false);
+    /** Password form vs passwordless magic link (email section only). */
+    const [emailMethod, setEmailMethod] = useState<'password' | 'magic'>('magic');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [displayName, setDisplayName] = useState('');
@@ -41,9 +53,52 @@ const Auth: React.FC = () => {
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [magicLinkSent, setMagicLinkSent] = useState(false);
+    const [completingMagicLink, setCompletingMagicLink] = useState(false);
+    const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
+
+    // Complete magic-link sign-in when user returns from email
+    useEffect(() => {
+        if (!isMagicLinkSignIn()) return;
+
+        setShowEmailForm(true);
+        setEmailMethod('magic');
+        setCompletingMagicLink(true);
+        setError('');
+        setInfo('');
+
+        const finish = async () => {
+            try {
+                await completeMagicLinkSignIn();
+                // onAuthStateChanged will set user → Navigate home
+            } catch (err: any) {
+                if (err.code === 'auth/missing-email') {
+                    setNeedsEmailConfirm(true);
+                    setInfo('Confirm the email you used for the link to finish signing in.');
+                } else if (err.code === 'auth/invalid-action-code') {
+                    setError('This sign-in link is invalid or has expired. Request a new one.');
+                } else {
+                    setError(err.message || 'Could not complete sign-in from email link');
+                }
+            } finally {
+                setCompletingMagicLink(false);
+            }
+        };
+
+        void finish();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Prefill email from magic-link storage when opening the form
+    useEffect(() => {
+        if (!showEmailForm) return;
+        const stored = window.localStorage.getItem(MAGIC_LINK_EMAIL_KEY);
+        if (stored && !email) setEmail(stored);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showEmailForm]);
 
     // Already signed in — redirect to home
-    if (!isLoading && user) {
+    if (!isLoading && user && !completingMagicLink) {
         return <Navigate to="/app" replace />;
     }
 
@@ -66,6 +121,9 @@ const Auth: React.FC = () => {
         if (code === 'auth/too-many-requests') {
             return 'Too many attempts. Please try again later.';
         }
+        if (code === 'auth/invalid-action-code') {
+            return 'This sign-in link is invalid or has expired. Request a new one.';
+        }
         return err?.message || 'Something went wrong';
     };
 
@@ -87,6 +145,24 @@ const Auth: React.FC = () => {
                 return;
             }
 
+            if (emailMethod === 'magic' || needsEmailConfirm) {
+                if (!email.trim()) {
+                    setError('Please enter your email address');
+                    setIsSubmitting(false);
+                    return;
+                }
+                if (needsEmailConfirm && isMagicLinkSignIn()) {
+                    setCompletingMagicLink(true);
+                    await completeMagicLinkSignIn(email);
+                    setNeedsEmailConfirm(false);
+                    return;
+                }
+                await sendMagicLink(email);
+                setMagicLinkSent(true);
+                setInfo(`Magic link sent to ${email.trim()}. Open it on this device to sign in.`);
+                return;
+            }
+
             if (mode === 'signup') {
                 if (!displayName.trim()) {
                     setError('Please enter your name');
@@ -105,8 +181,10 @@ const Auth: React.FC = () => {
             } else {
                 setError(mapAuthError(err));
             }
+            setMagicLinkSent(false);
         } finally {
             setIsSubmitting(false);
+            setCompletingMagicLink(false);
         }
     };
 
@@ -129,15 +207,19 @@ const Auth: React.FC = () => {
         setMode(next);
         setError('');
         setInfo('');
+        setMagicLinkSent(false);
         if (next === 'reset') {
             setShowEmailForm(true);
         }
     };
 
-    if (isLoading) {
+    if (isLoading || completingMagicLink) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-brand-950">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-brand-950 gap-3">
                 <div className="animate-spin h-8 w-8 border-2 border-brand-400 border-t-transparent rounded-full"></div>
+                {completingMagicLink && (
+                    <p className="text-sm text-slate-400">Signing you in from email link…</p>
+                )}
             </div>
         );
     }
@@ -256,7 +338,7 @@ const Auth: React.FC = () => {
                             {inAppBrowser && mode !== 'reset' && (
                                 <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
                                     <p className="text-xs text-amber-300">
-                                        For Google sign-in, tap the menu and choose "Open in Chrome" or "Open in Safari". Email sign-in works here.
+                                        For Google sign-in, tap the menu and choose "Open in Chrome" or "Open in Safari". Email or magic link works here.
                                     </p>
                                 </div>
                             )}
@@ -299,93 +381,130 @@ const Auth: React.FC = () => {
 
                             {/* Email form */}
                             {(showEmailForm || mode === 'reset') && (
-                                <form onSubmit={handleEmailAuth} className="space-y-3 animate-in fade-in">
-                                    {mode === 'signup' && (
+                                <div className="space-y-3 animate-in fade-in">
+                                    {mode !== 'reset' && !needsEmailConfirm && (
+                                        <div className="flex rounded-xl bg-brand-900/80 border border-brand-800 p-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => { setEmailMethod('magic'); setError(''); setMagicLinkSent(false); }}
+                                                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                                                    emailMethod === 'magic' ? 'bg-sky-500/20 text-sky-300' : 'text-slate-500 hover:text-slate-300'
+                                                }`}
+                                            >
+                                                <Link2 size={12} />
+                                                Magic link
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setEmailMethod('password'); setError(''); setInfo(''); setMagicLinkSent(false); }}
+                                                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                                                    emailMethod === 'password' ? 'bg-sky-500/20 text-sky-300' : 'text-slate-500 hover:text-slate-300'
+                                                }`}
+                                            >
+                                                <Lock size={12} />
+                                                Password
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <form onSubmit={handleEmailAuth} className="space-y-3">
+                                        {emailMethod === 'password' && mode === 'signup' && (
+                                            <div className="relative">
+                                                <User className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                                <input
+                                                    type="text"
+                                                    value={displayName}
+                                                    onChange={(e) => setDisplayName(e.target.value)}
+                                                    placeholder="Full name"
+                                                    autoComplete="name"
+                                                    className="w-full bg-brand-900 border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
+                                                />
+                                            </div>
+                                        )}
+
                                         <div className="relative">
-                                            <User className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                            <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
                                             <input
-                                                type="text"
-                                                value={displayName}
-                                                onChange={(e) => setDisplayName(e.target.value)}
-                                                placeholder="Full name"
-                                                autoComplete="name"
+                                                type="email"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                placeholder="Email address"
+                                                required
+                                                autoComplete="email"
+                                                inputMode="email"
                                                 className="w-full bg-brand-900 border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
                                             />
                                         </div>
-                                    )}
 
-                                    <div className="relative">
-                                        <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
-                                        <input
-                                            type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            placeholder="Email address"
-                                            required
-                                            autoComplete="email"
-                                            inputMode="email"
-                                            className="w-full bg-brand-900 border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
-                                        />
-                                    </div>
-
-                                    {mode !== 'reset' && (
-                                        <div className="relative">
-                                            <Lock className="absolute left-3 top-3.5 text-slate-500" size={18} />
-                                            <input
-                                                type={showPassword ? 'text' : 'password'}
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                placeholder="Password"
-                                                required
-                                                minLength={6}
-                                                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                                                className="w-full bg-brand-900 border border-brand-800 rounded-xl py-3 pl-10 pr-10 text-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300"
-                                                tabIndex={-1}
-                                            >
-                                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {mode === 'signin' && (
-                                        <div className="flex justify-end">
-                                            <button
-                                                type="button"
-                                                onClick={() => switchMode('reset')}
-                                                className="text-xs text-slate-500 hover:text-sky-400 transition-colors"
-                                            >
-                                                Forgot password?
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    <button
-                                        type="submit"
-                                        disabled={isSubmitting}
-                                        className="w-full py-3 bg-sky-500 hover:bg-sky-400 active:scale-[0.99] text-white rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        {isSubmitting ? (
-                                            <Loader2 className="animate-spin" size={18} />
-                                        ) : mode === 'reset' ? (
-                                            'Send reset link'
-                                        ) : mode === 'signin' ? (
-                                            'Log in'
-                                        ) : (
-                                            'Start free'
+                                        {mode !== 'reset' && emailMethod === 'password' && !needsEmailConfirm && (
+                                            <div className="relative">
+                                                <Lock className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                                <input
+                                                    type={showPassword ? 'text' : 'password'}
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    placeholder="Password"
+                                                    required
+                                                    minLength={6}
+                                                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                                                    className="w-full bg-brand-900 border border-brand-800 rounded-xl py-3 pl-10 pr-10 text-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300"
+                                                    tabIndex={-1}
+                                                >
+                                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
                                         )}
-                                    </button>
 
-                                    {mode === 'signup' && (
-                                        <p className="text-[10px] text-slate-500 text-center">
-                                            We'll send a verification link to confirm your email.
-                                        </p>
-                                    )}
-                                </form>
+                                        {mode === 'signin' && emailMethod === 'password' && (
+                                            <div className="flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => switchMode('reset')}
+                                                    className="text-xs text-slate-500 hover:text-sky-400 transition-colors"
+                                                >
+                                                    Forgot password?
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        <button
+                                            type="submit"
+                                            disabled={isSubmitting}
+                                            className="w-full py-3 bg-sky-500 hover:bg-sky-400 active:scale-[0.99] text-white rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {isSubmitting ? (
+                                                <Loader2 className="animate-spin" size={18} />
+                                            ) : mode === 'reset' ? (
+                                                'Send reset link'
+                                            ) : needsEmailConfirm ? (
+                                                'Confirm email & sign in'
+                                            ) : emailMethod === 'magic' ? (
+                                                magicLinkSent ? 'Resend magic link' : 'Email me a magic link'
+                                            ) : mode === 'signin' ? (
+                                                'Log in'
+                                            ) : (
+                                                'Start free'
+                                            )}
+                                        </button>
+
+                                        {mode !== 'reset' && emailMethod === 'magic' && !needsEmailConfirm && (
+                                            <p className="text-[10px] text-slate-500 text-center">
+                                                No password — we email a one-time link. Works for new and returning users (great at events).
+                                            </p>
+                                        )}
+
+                                        {emailMethod === 'password' && mode === 'signup' && (
+                                            <p className="text-[10px] text-slate-500 text-center">
+                                                We'll send a verification link to confirm your email.
+                                            </p>
+                                        )}
+                                    </form>
+                                </div>
                             )}
                         </div>
                     </div>
