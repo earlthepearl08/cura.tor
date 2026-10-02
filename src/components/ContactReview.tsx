@@ -9,6 +9,13 @@ import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
+import { CorrectionSuggestionChip, CorrectionAppliedBanner } from '@/components/CorrectionHint';
+import {
+    applyCorrectionsToRecord,
+    learnFromFieldDiffs,
+    recordCorrectionHit,
+} from '@/services/correctionMemory';
+import { AppliedCorrection, CorrectionSuggestion, CorrectionField } from '@/types/correction';
 
 interface ContactReviewProps {
     ocrResult: OCRResult;
@@ -38,8 +45,8 @@ const FIELD_LABELS: Record<ContactFieldKey, string> = {
 };
 
 const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, onDelete, reviewOnly, initialNotes, initialFolder }) => {
-    const { canExportVCard } = useAuth();
-    const { storage } = useWorkspace();
+    const { canExportVCard, user } = useAuth();
+    const { storage, mode } = useWorkspace();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const [formData, setFormData] = useState({
         name: ocrResult.name,
@@ -66,6 +73,10 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
     const [personPhoto, setPersonPhoto] = useState<string | null>(null);
     const [locationPhoto, setLocationPhoto] = useState<string | null>(null);
     const [photoSheet, setPhotoSheet] = useState<'person' | 'location' | null>(null);
+    const [appliedCorrections, setAppliedCorrections] = useState<AppliedCorrection[]>([]);
+    const [suggestions, setSuggestions] = useState<CorrectionSuggestion[]>([]);
+    const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
+    const glossaryAppliedRef = useRef(false);
     const newFolderInputRef = useRef<HTMLInputElement>(null);
     const personCamRef = useRef<HTMLInputElement>(null);
     const personGalRef = useRef<HTMLInputElement>(null);
@@ -91,6 +102,45 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         };
         loadFolders();
     }, []);
+
+    // Apply / suggest glossary corrections against original OCR fields (once)
+    useEffect(() => {
+        if (glossaryAppliedRef.current) return;
+        glossaryAppliedRef.current = true;
+        let cancelled = false;
+        (async () => {
+            try {
+                const corrections = await storage.getAllCorrections();
+                if (cancelled || corrections.length === 0) return;
+                const { record, applied, suggestions: nextSuggestions } = applyCorrectionsToRecord(
+                    {
+                        name: ocrResult.name,
+                        position: ocrResult.position,
+                        company: ocrResult.company,
+                    },
+                    corrections
+                );
+                if (applied.length > 0) {
+                    setFormData(prev => ({
+                        ...prev,
+                        name: record.name,
+                        position: record.position,
+                        company: record.company,
+                    }));
+                    setAppliedCorrections(applied);
+                    for (const a of applied) {
+                        await recordCorrectionHit(storage, a.correctionId);
+                    }
+                }
+                if (nextSuggestions.length > 0) {
+                    setSuggestions(nextSuggestions);
+                }
+            } catch (err) {
+                console.warn('Glossary apply failed:', err);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [ocrResult, storage]);
 
     // Check for duplicates when form data changes
     useEffect(() => {
@@ -163,11 +213,66 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
         setIsReparsing(false);
     };
 
+    const acceptSuggestion = async (suggestion: CorrectionSuggestion) => {
+        setFormData(prev => ({ ...prev, [suggestion.field]: suggestion.to }));
+        setSuggestions(prev => prev.filter(s => s.correctionId !== suggestion.correctionId));
+        setAppliedCorrections(prev => [
+            ...prev.filter(a => a.field !== suggestion.field),
+            {
+                field: suggestion.field,
+                from: suggestion.from,
+                to: suggestion.to,
+                correctionId: suggestion.correctionId,
+                autoApplied: false,
+            },
+        ]);
+        try {
+            await recordCorrectionHit(storage, suggestion.correctionId);
+        } catch { /* non-blocking */ }
+    };
+
+    const dismissSuggestion = (suggestion: CorrectionSuggestion) => {
+        setDismissedSuggestions(prev => new Set(prev).add(suggestion.correctionId));
+        setSuggestions(prev => prev.filter(s => s.correctionId !== suggestion.correctionId));
+    };
+
+    const undoApplied = (field: CorrectionField) => {
+        const entry = appliedCorrections.find(a => a.field === field);
+        if (!entry) return;
+        setFormData(prev => ({ ...prev, [field]: entry.from }));
+        setAppliedCorrections(prev => prev.filter(a => a.field !== field));
+    };
+
+    const suggestionFor = (field: CorrectionField) =>
+        suggestions.find(s => s.field === field && !dismissedSuggestions.has(s.correctionId));
+
     const handleSave = async (forceSave: boolean = false) => {
         // Show warning if duplicate detected and not forcing save
         if (duplicateWarning && !forceSave) {
             setShowDuplicateWarning(true);
             return;
+        }
+
+        try {
+            await learnFromFieldDiffs(
+                storage,
+                {
+                    name: ocrResult.name,
+                    position: ocrResult.position,
+                    company: ocrResult.company,
+                },
+                {
+                    name: formData.name,
+                    position: formData.position,
+                    company: formData.company,
+                },
+                {
+                    scope: mode === 'team' ? 'org' : 'user',
+                    createdBy: user?.uid,
+                }
+            );
+        } catch (err) {
+            console.warn('Failed to learn corrections:', err);
         }
 
         const contact: Contact = {
@@ -323,6 +428,13 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                     </div>
                 )}
 
+                {appliedCorrections.length > 0 && (
+                    <CorrectionAppliedBanner
+                        applied={appliedCorrections}
+                        onUndo={undoApplied}
+                    />
+                )}
+
                 {/* Raw OCR Text - Editable with Reparse */}
                 {showRawText && (
                     <div className="space-y-2">
@@ -371,6 +483,13 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             className={fieldClass('name')}
                         />
                     </div>
+                    {suggestionFor('name') && (
+                        <CorrectionSuggestionChip
+                            suggestion={suggestionFor('name')!}
+                            onAccept={() => acceptSuggestion(suggestionFor('name')!)}
+                            onDismiss={() => dismissSuggestion(suggestionFor('name')!)}
+                        />
+                    )}
 
                     <div className="relative">
                         <Briefcase className="absolute left-3 top-3 text-brand-500" size={18} />
@@ -383,6 +502,13 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             className={fieldClass('position')}
                         />
                     </div>
+                    {suggestionFor('position') && (
+                        <CorrectionSuggestionChip
+                            suggestion={suggestionFor('position')!}
+                            onAccept={() => acceptSuggestion(suggestionFor('position')!)}
+                            onDismiss={() => dismissSuggestion(suggestionFor('position')!)}
+                        />
+                    )}
 
                     <div className="relative">
                         <Building2 className="absolute left-3 top-3 text-brand-500" size={18} />
@@ -395,6 +521,13 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             className={fieldClass('company')}
                         />
                     </div>
+                    {suggestionFor('company') && (
+                        <CorrectionSuggestionChip
+                            suggestion={suggestionFor('company')!}
+                            onAccept={() => acceptSuggestion(suggestionFor('company')!)}
+                            onDismiss={() => dismissSuggestion(suggestionFor('company')!)}
+                        />
+                    )}
 
                     <div className="relative">
                         <Phone className="absolute left-3 top-3 text-brand-500" size={18} />

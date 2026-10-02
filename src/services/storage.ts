@@ -1,12 +1,14 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
+import { FieldCorrection } from '@/types/correction';
 
 const DB_PREFIX = 'CardScannerDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE_NAME = 'contacts';
 const FOLDERS_STORE = 'folders';
 const BATCHES_STORE = 'batches';
+const CORRECTIONS_STORE = 'corrections';
 
 export class StorageService {
     private db: Promise<IDBPDatabase>;
@@ -39,6 +41,11 @@ export class StorageService {
                 if (oldVersion < 3) {
                     if (!db.objectStoreNames.contains(BATCHES_STORE)) {
                         db.createObjectStore(BATCHES_STORE, { keyPath: 'id' });
+                    }
+                }
+                if (oldVersion < 4) {
+                    if (!db.objectStoreNames.contains(CORRECTIONS_STORE)) {
+                        db.createObjectStore(CORRECTIONS_STORE, { keyPath: 'id' });
                     }
                 }
             },
@@ -244,6 +251,23 @@ export class StorageService {
             total: contacts.length,
             verified: contacts.filter(c => c.isVerified).length,
         };
+    }
+
+    /** OCR correction glossary (personal workspace) */
+    async getAllCorrections(): Promise<FieldCorrection[]> {
+        const db = await this.db;
+        if (!db.objectStoreNames.contains(CORRECTIONS_STORE)) return [];
+        return db.getAll(CORRECTIONS_STORE);
+    }
+
+    async saveCorrection(correction: FieldCorrection): Promise<void> {
+        const db = await this.db;
+        await db.put(CORRECTIONS_STORE, correction);
+    }
+
+    async deleteCorrection(id: string): Promise<void> {
+        const db = await this.db;
+        await db.delete(CORRECTIONS_STORE, id);
     }
 }
 

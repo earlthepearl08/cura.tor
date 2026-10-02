@@ -24,6 +24,10 @@ import type { LogSheetColumnMapping, LogSheetParseMeta } from '@/types/logSheet'
 import ColumnMappingConfirm from '@/components/ColumnMappingConfirm';
 import LogSheetGuidedCamera from '@/components/LogSheetGuidedCamera';
 import LogSheetFramingOverlay from '@/components/LogSheetFramingOverlay';
+import {
+    enrichEntriesWithGlossary,
+    learnFromFieldDiffs,
+} from '@/services/correctionMemory';
 
 type ReviewFilter = 'needs-review' | 'all' | 'ready';
 
@@ -43,8 +47,8 @@ const LogScan: React.FC = () => {
     const galRef = useRef<HTMLInputElement>(null);
     const addMoreCamRef = useRef<HTMLInputElement>(null);
     const addMoreGalRef = useRef<HTMLInputElement>(null);
-    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canExportGoogleSheets, canUseBulkScan } = useAuth();
-    const { storage } = useWorkspace();
+    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canExportGoogleSheets, canUseBulkScan, user } = useAuth();
+    const { storage, mode } = useWorkspace();
 
     const [imageData, setImageData] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -146,7 +150,8 @@ const LogScan: React.FC = () => {
         append: boolean,
         opts?: { promptAddNext?: boolean; openBatchNaming?: boolean },
     ) => {
-        const mapped = applyMappingsIfAny(nextEntries);
+        const { entries: enriched } = await enrichEntriesWithGlossary(storage, nextEntries);
+        const mapped = applyMappingsIfAny(enriched);
         if (append) {
             const combined = [...(entries || []), ...mapped];
             setEntries(combined);
@@ -702,6 +707,17 @@ const LogScan: React.FC = () => {
         setEntries(updated);
         setEditingIndex(null);
         setImportWarning(null);
+        const snapshot = {
+            name: original.name,
+            company: original.company,
+            position: original.position,
+        };
+        void learnFromFieldDiffs(
+            storage,
+            snapshot,
+            { name: editForm.name, company: editForm.company, position: editForm.position },
+            { scope: mode === 'team' ? 'org' : 'user', createdBy: user?.uid }
+        ).catch(err => console.warn('Failed to learn corrections:', err));
     };
 
     const editInputClass = (entry: LogSheetEntry, field: ContactFieldKey) =>

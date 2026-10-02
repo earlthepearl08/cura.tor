@@ -14,13 +14,17 @@ import BatchNamingModal from '@/components/BatchNamingModal';
 import ScanTipsOnboarding from '@/components/ScanTipsOnboarding';
 import { useScanOnboarding } from '@/hooks/useScanOnboarding';
 import { compressForOCR } from '@/utils/compressPhoto';
+import {
+    enrichEntriesWithGlossary,
+    learnFromFieldDiffs,
+} from '@/services/correctionMemory';
 
 const MultiCardScan: React.FC = () => {
     const navigate = useNavigate();
     const camRef = useRef<HTMLInputElement>(null);
     const galRef = useRef<HTMLInputElement>(null);
-    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canExportGoogleSheets, canUseBulkScan } = useAuth();
-    const { storage } = useWorkspace();
+    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canExportGoogleSheets, canUseBulkScan, user } = useAuth();
+    const { storage, mode } = useWorkspace();
     const { open: showScanTips, dismiss: dismissScanTips, reopen: reopenScanTips } = useScanOnboarding(canUseBulkScan());
 
     const [imageData, setImageData] = useState<string | null>(null);
@@ -76,12 +80,14 @@ const MultiCardScan: React.FC = () => {
             const data = await compressForOCR(file);
             setImageData(data);
             const results = await parseWithRetry(data);
-            setEntries(results);
             if (results.length === 0) {
+                setEntries(results);
                 setError('No cards detected. Make sure cards are spread out and clearly visible.');
             } else {
+                const { entries: enriched } = await enrichEntriesWithGlossary(storage, results);
+                setEntries(enriched);
                 await incrementScanCount();
-                await checkEntriesForDuplicates(results);
+                await checkEntriesForDuplicates(enriched);
                 const timestamp = Date.now();
                 setScanTimestamp(timestamp);
                 setShowBatchNaming(true);
@@ -290,6 +296,17 @@ const MultiCardScan: React.FC = () => {
         };
         setEntries(updated);
         setEditingIndex(null);
+        const snapshot = {
+            name: original.name,
+            company: original.company,
+            position: original.position,
+        };
+        void learnFromFieldDiffs(
+            storage,
+            snapshot,
+            { name: editForm.name, company: editForm.company, position: editForm.position },
+            { scope: mode === 'team' ? 'org' : 'user', createdBy: user?.uid }
+        ).catch(err => console.warn('Failed to learn corrections:', err));
     };
 
     const deleteEntry = (index: number) => {
