@@ -30,8 +30,15 @@ import {
 } from '@/services/followUp';
 
 const Contacts: React.FC = () => {
-    const { storage, mode: workspaceMode, organization, isAdmin } = useWorkspace();
-    const isTeamMode = workspaceMode === 'team';
+    const { storage, mode: workspaceMode, organization, event, isSharedMode, isAdmin } = useWorkspace();
+    /** Shared enterprise team OR lightweight event workspace */
+    const isTeamMode = isSharedMode;
+    const claimsEnabled = workspaceMode === 'event'
+        ? event?.claimsEnabled !== false
+        : organization?.claimsEnabled !== false;
+    const sharedLabel = workspaceMode === 'event'
+        ? (event?.name || 'Event')
+        : (organization?.name || 'Team');
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -709,7 +716,7 @@ const Contacts: React.FC = () => {
                     )}
 
                     {/* Follow-up pipeline controls — claimer only */}
-                    {!selectMode && isTeamMode && organization?.claimsEnabled !== false && contact.claimedBy === currentUid && (
+                    {!selectMode && isTeamMode && claimsEnabled && contact.claimedBy === currentUid && (
                         <div className="mb-3 space-y-2 rounded-xl border border-brand-800/60 bg-brand-950/40 p-2.5">
                             <div className="flex items-center gap-2">
                                 <CalendarClock size={12} className="text-brand-500 shrink-0" />
@@ -799,7 +806,7 @@ const Contacts: React.FC = () => {
                             <span className="text-xs font-medium text-red-400">Delete</span>
                         </button>
                         {/* Claim / Release — only in team mode, only if org has claims enabled */}
-                        {isTeamMode && organization?.claimsEnabled !== false && (
+                        {isTeamMode && claimsEnabled && (
                             contact.claimedBy === currentUid ? (
                                 <button
                                     onClick={() => handleReleaseClaim(contact)}
@@ -883,10 +890,14 @@ const Contacts: React.FC = () => {
                     </button>
                     <div className="text-center">
                         <h1 className="text-lg font-semibold gradient-text">
-                            {isTeamMode ? 'Team Contacts' : 'My Contacts'}
+                            {isTeamMode
+                                ? (workspaceMode === 'event' ? 'Event Contacts' : 'Team Contacts')
+                                : 'My Contacts'}
                         </h1>
-                        {isTeamMode && organization && (
-                            <p className="text-[10px] text-sky-400/70 mt-0.5">{organization.name}</p>
+                        {isTeamMode && (
+                            <p className={`text-[10px] mt-0.5 ${workspaceMode === 'event' ? 'text-amber-400/70' : 'text-sky-400/70'}`}>
+                                {sharedLabel}
+                            </p>
                         )}
                     </div>
                     <div className="flex items-center gap-1">
@@ -974,7 +985,7 @@ const Contacts: React.FC = () => {
                                         Salesforce CSV
                                         {!canExportCSV() && <Lock size={12} className="text-amber-400" />}
                                     </button>
-                                    {isTeamMode && organization?.claimsEnabled !== false && (
+                                    {isTeamMode && claimsEnabled && (
                                         <button
                                             onClick={() => handleExport('unclaimed-csv')}
                                             className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportCSV() ? 'opacity-60' : ''}`}
@@ -1201,7 +1212,7 @@ const Contacts: React.FC = () => {
                                 ))}
                             </select>
                         )}
-                        {organization?.claimsEnabled !== false && (
+                        {claimsEnabled && (
                             <>
                                 <select
                                     value={claimFilter}
@@ -1231,7 +1242,7 @@ const Contacts: React.FC = () => {
                 )}
 
                 {/* Lightweight follow-up reminders — no jobs infra; computed client-side */}
-                {isTeamMode && organization?.claimsEnabled !== false && !dismissedReminder && (myFollowUps.overdue.length > 0 || myFollowUps.dueToday.length > 0) && (
+                {isTeamMode && claimsEnabled && !dismissedReminder && (myFollowUps.overdue.length > 0 || myFollowUps.dueToday.length > 0) && (
                     <div className={`rounded-xl border px-3 py-2.5 flex items-start gap-2 ${
                         myFollowUps.overdue.length > 0
                             ? 'bg-red-950/40 border-red-800/50'
