@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Headphones, Mail } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
@@ -12,7 +12,9 @@ import AccessCodeInput from '@/components/AccessCodeInput';
 import RequestTeamAccessCard from '@/components/RequestTeamAccessCard';
 import RedeemTeamCodeCard from '@/components/RedeemTeamCodeCard';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
+import ContactSupportModal from '@/components/ContactSupportModal';
 import { OWNER_EMAILS } from '@/config/firebase';
+import { SUPPORT_EMAIL, PRIORITY_SUPPORT_SLA } from '@/config/support';
 import { Trash2 } from 'lucide-react';
 
 const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> = {
@@ -37,6 +39,7 @@ const PRO_FEATURES = [
     'Unlimited contact storage',
     'Multi-Card Scan',
     'Log Sheet Scan',
+    `Priority support (${SUPPORT_EMAIL})`,
 ];
 
 const Settings = () => {
@@ -54,12 +57,14 @@ const Settings = () => {
     const [upgradeError, setUpgradeError] = useState('');
     const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled' | 'pending'; text: string } | null>(null);
     const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+    const [showSupport, setShowSupport] = useState(false);
     const upgradeSectionRef = React.useRef<HTMLDivElement>(null);
     const isOwnerAccount = !!user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
 
     const tierBadge = TIER_BADGES[user?.tier || 'free'];
     const limits = TIER_LIMITS[user?.tier || 'free'];
     const highlightPlan = searchParams.get('upgrade'); // 'pioneer' | 'pro' | null
+    const hasPrioritySupport = user?.tier === 'pro' || user?.tier === 'enterprise';
 
     // Handle payment callback from Stripe — confirm upgrade from Firestore, not redirect alone
     useEffect(() => {
@@ -558,6 +563,9 @@ const Settings = () => {
                                             </div>
                                         ))}
                                     </div>
+                                    <p className="text-[10px] text-emerald-400/80 leading-relaxed">
+                                        Priority support: email {SUPPORT_EMAIL} — we aim to reply within 1 business day.
+                                    </p>
                                     <button
                                         onClick={() => handleUpgrade('pro')}
                                         disabled={isUpgrading}
@@ -572,6 +580,55 @@ const Settings = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Priority / contact support */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Support</p>
+                    <div className="card-elevated rounded-2xl p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                hasPrioritySupport ? 'bg-emerald-500/20' : 'bg-sky-500/20'
+                            }`}>
+                                <Headphones className={`w-5 h-5 ${hasPrioritySupport ? 'text-emerald-400' : 'text-sky-400'}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-semibold text-sm">
+                                        {hasPrioritySupport ? 'Priority support' : 'Contact support'}
+                                    </p>
+                                    {hasPrioritySupport && (
+                                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
+                                            {user?.tier === 'enterprise' ? 'ENTERPRISE' : 'PRO'}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                    {hasPrioritySupport
+                                        ? PRIORITY_SUPPORT_SLA
+                                        : `Reach us at ${SUPPORT_EMAIL}. Upgrade to Pro for priority in the queue.`}
+                                </p>
+                                <a
+                                    href={`mailto:${SUPPORT_EMAIL}`}
+                                    className="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 mt-1.5"
+                                >
+                                    <Mail size={12} />
+                                    {SUPPORT_EMAIL}
+                                </a>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowSupport(true)}
+                            className={`w-full py-2.5 rounded-xl text-sm font-bold transition-colors active:scale-95 ${
+                                hasPrioritySupport
+                                    ? 'bg-emerald-500 hover:bg-emerald-400 text-brand-950'
+                                    : 'bg-brand-800 hover:bg-brand-700 text-brand-200'
+                            }`}
+                        >
+                            Contact support
+                        </button>
+                    </div>
+                </div>
 
                 {/* Access Code (only for free users) */}
                 {user?.tier === 'free' && (
@@ -934,6 +991,15 @@ const Settings = () => {
             </div>
 
             {showDeleteAccount && <DeleteAccountModal onClose={() => setShowDeleteAccount(false)} />}
+
+            <ContactSupportModal
+                isOpen={showSupport}
+                onClose={() => setShowSupport(false)}
+                userEmail={user?.email || firebaseUser?.email}
+                userName={user?.displayName || firebaseUser?.displayName}
+                tier={user?.tier}
+                priority={hasPrioritySupport}
+            />
         </div>
     );
 };
