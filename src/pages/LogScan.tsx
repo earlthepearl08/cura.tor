@@ -776,31 +776,33 @@ const LogScan: React.FC = () => {
         return (
             <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
                 <div className="flex items-center justify-between glass sticky top-0 z-10 p-4">
-                    <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                        <ArrowLeft size={24} />
+                    <button type="button" onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Back to home">
+                        <ArrowLeft size={24} aria-hidden="true" />
                     </button>
                     <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
                     <button
+                        type="button"
                         onClick={() => navigate('/help?clip=log-sheet')}
                         className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-500 hover:text-brand-300"
                         aria-label="Help"
                     >
-                        <HelpCircle size={20} />
+                        <HelpCircle size={20} aria-hidden="true" />
                     </button>
                 </div>
-                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                    <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mb-4">
+                <main id="main-content" className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                    <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mb-4" aria-hidden="true">
                         <Lock className="w-8 h-8 text-amber-400" />
                     </div>
                     <h2 className="text-xl font-bold mb-2">Premium Feature</h2>
                     <p className="text-sm text-slate-400 mb-6 max-w-xs">Log Sheet Scan is available for Pioneer and Pro users. Enter an access code to unlock.</p>
                     <button
+                        type="button"
                         onClick={() => navigate('/settings')}
                         className="px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-600 text-white rounded-xl text-sm font-semibold"
                     >
                         Go to Settings
                     </button>
-                </div>
+                </main>
             </div>
         );
     }
@@ -809,21 +811,22 @@ const LogScan: React.FC = () => {
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
             <div className="flex items-center justify-between glass sticky top-0 z-10 p-4">
-                <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                    <ArrowLeft size={24} />
+                <button type="button" onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Back to home">
+                    <ArrowLeft size={24} aria-hidden="true" />
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
                 <button
+                    type="button"
                     onClick={() => navigate('/help?clip=log-sheet')}
                     className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-500 hover:text-brand-300"
                     title="Help: log sheet scan"
                     aria-label="Help"
                 >
-                    <HelpCircle size={20} />
+                    <HelpCircle size={20} aria-hidden="true" />
                 </button>
             </div>
 
-            <div className="flex-1 p-4">
+            <main id="main-content" className="flex-1 p-4">
                 {/* Stage 1: Capture with framing guide */}
                 {!imageData && (
                     <div className="flex flex-col items-center justify-center gap-5 py-8">
@@ -858,13 +861,13 @@ const LogScan: React.FC = () => {
                             </div>
                         </div>
 
-                        <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelect} />
-                        <input ref={galRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
+                        <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelect} aria-hidden="true" tabIndex={-1} />
+                        <input ref={galRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} aria-hidden="true" tabIndex={-1} />
 
                         <div className="w-full max-w-sm space-y-3">
                             <div className="glass border border-brand-800 rounded-xl p-3 text-left">
                                 <label className="flex items-center gap-1.5 text-[10px] text-brand-500 uppercase tracking-wider font-bold mb-1.5">
-                                    <Layers size={11} />
+                                    <Layers size={11} aria-hidden="true" />
                                     Event template (optional)
                                 </label>
                                 <select
@@ -889,24 +892,30 @@ const LogScan: React.FC = () => {
                             </div>
 
                             <button
+                                type="button"
                                 onClick={() => openGuidedCamera(false)}
                                 className="w-full flex items-center justify-center gap-3 py-4 bg-gradient-to-r from-brand-500/20 to-emerald-500/15 hover:from-brand-500/30 hover:to-emerald-500/25 border border-brand-400/40 rounded-2xl transition-colors active:scale-95"
+                                aria-label="Take photo of log sheet with guided camera"
                             >
-                                <Camera size={22} className="text-emerald-400" />
+                                <Camera size={22} className="text-emerald-400" aria-hidden="true" />
                                 <span className="font-semibold text-brand-100">Guided camera</span>
                             </button>
                             <button
+                                type="button"
                                 onClick={() => camRef.current?.click()}
                                 className="w-full flex items-center justify-center gap-3 py-3.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-2xl transition-colors active:scale-95"
+                                aria-label="Take photo of log sheet"
                             >
-                                <Camera size={20} className="text-brand-400" />
+                                <Camera size={20} className="text-brand-400" aria-hidden="true" />
                                 <span className="font-semibold text-brand-300">System camera</span>
                             </button>
                             <button
+                                type="button"
                                 onClick={() => galRef.current?.click()}
                                 className="w-full flex items-center justify-center gap-3 py-3.5 bg-brand-800/50 hover:bg-brand-800 border border-brand-800 rounded-2xl transition-colors active:scale-95"
+                                aria-label="Choose log sheet images from gallery"
                             >
-                                <ImageIcon size={20} className="text-brand-400" />
+                                <ImageIcon size={20} className="text-brand-400" aria-hidden="true" />
                                 <span className="font-semibold text-brand-300">Gallery (multi-page OK)</span>
                             </button>
                         </div>
@@ -924,12 +933,12 @@ const LogScan: React.FC = () => {
 
                 {/* Stage 2: Processing */}
                 {imageData && isProcessing && (
-                    <div className="flex flex-col items-center gap-6 py-8">
+                    <div className="flex flex-col items-center gap-6 py-8" role="status" aria-live="polite" aria-busy="true">
                         <div className="w-full max-w-sm rounded-2xl overflow-hidden border border-brand-800">
-                            <img src={imageData} alt="Log sheet" className="w-full object-contain max-h-48" />
+                            <img src={imageData} alt="Log sheet being analyzed" className="w-full object-contain max-h-48" />
                         </div>
                         <div className="flex flex-col items-center gap-3">
-                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-400" />
+                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-400" aria-hidden="true" />
                             <p className="text-sm text-brand-400 font-medium">{processingProgress || 'Analyzing log sheet...'}</p>
                             <p className="text-xs text-brand-600">This may take a moment for large sheets</p>
                         </div>
@@ -937,8 +946,8 @@ const LogScan: React.FC = () => {
                 )}
 
                 {/* Hidden inputs for "Add More Sheet" */}
-                <input ref={addMoreCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddMoreImage} />
-                <input ref={addMoreGalRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddMoreImage} />
+                <input ref={addMoreCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddMoreImage} aria-hidden="true" tabIndex={-1} />
+                <input ref={addMoreGalRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddMoreImage} aria-hidden="true" tabIndex={-1} />
 
                 {/* Stage 3: Results */}
                 {imageData && !isProcessing && (entries || error || pendingMapping) && (
@@ -961,12 +970,12 @@ const LogScan: React.FC = () => {
                             const isPartial = error.startsWith('partial:');
                             const displayMsg = isPartial ? error.slice(8) : error;
                             return (
-                                <div className={`flex items-center gap-3 p-4 rounded-xl ${isPartial ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
-                                    <AlertTriangle size={20} className={`flex-shrink-0 ${isPartial ? 'text-amber-400' : 'text-red-400'}`} />
+                                <div className={`flex items-center gap-3 p-4 rounded-xl ${isPartial ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-red-500/10 border border-red-500/30'}`} role={isPartial ? 'status' : 'alert'}>
+                                    <AlertTriangle size={20} className={`flex-shrink-0 ${isPartial ? 'text-amber-400' : 'text-red-400'}`} aria-hidden="true" />
                                     <div>
                                         <p className={`text-sm ${isPartial ? 'text-amber-300' : 'text-red-300'}`}>{displayMsg}</p>
                                         {!isPartial && (
-                                            <button onClick={() => entries && entries.length > 0 ? processLogSheetAppend(imageData!) : processLogSheet(imageData!)} className="text-xs text-red-400 underline mt-1">
+                                            <button type="button" onClick={() => entries && entries.length > 0 ? processLogSheetAppend(imageData!) : processLogSheet(imageData!)} className="text-xs text-red-400 underline mt-1">
                                                 Retry
                                             </button>
                                         )}
@@ -980,7 +989,7 @@ const LogScan: React.FC = () => {
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm font-medium text-brand-300">
+                                            <p className="text-sm font-medium text-brand-300" aria-live="polite">
                                                 {entries.length} entr{entries.length === 1 ? 'y' : 'ies'} found
                                                 {sheetCount > 1 && <span className="text-brand-500"> from {sheetCount} sheets</span>}
                                             </p>
@@ -990,8 +999,8 @@ const LogScan: React.FC = () => {
                                                 </p>
                                             )}
                                         </div>
-                                        <button onClick={reset} className="flex items-center gap-1 text-xs text-brand-500 hover:text-brand-400">
-                                            <RotateCcw size={12} />
+                                        <button type="button" onClick={reset} className="flex items-center gap-1 text-xs text-brand-500 hover:text-brand-400" aria-label="Start over">
+                                            <RotateCcw size={12} aria-hidden="true" />
                                             Start Over
                                         </button>
                                     </div>
@@ -1036,17 +1045,21 @@ const LogScan: React.FC = () => {
 
                                     <div className="flex gap-2">
                                         <button
+                                            type="button"
                                             onClick={() => openGuidedCamera(true)}
                                             className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl transition-colors text-sm font-medium text-emerald-300 active:scale-95"
+                                            aria-label="Add another sheet via guided camera"
                                         >
-                                            <Camera size={15} />
+                                            <Camera size={15} aria-hidden="true" />
                                             Guided add
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => addMoreGalRef.current?.click()}
                                             className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300 active:scale-95"
+                                            aria-label="Add another sheet from gallery"
                                         >
-                                            <ImageIcon size={15} />
+                                            <ImageIcon size={15} aria-hidden="true" />
                                             Add via Gallery
                                         </button>
                                     </div>
@@ -1054,8 +1067,10 @@ const LogScan: React.FC = () => {
 
                                 {/* Folder picker */}
                                 <div className="relative">
-                                    <Folder className="absolute left-3 top-3 text-brand-500" size={18} />
+                                    <label htmlFor="logscan-folder" className="sr-only">Import folder</label>
+                                    <Folder className="absolute left-3 top-3 text-brand-500" size={18} aria-hidden="true" />
                                     <select
+                                        id="logscan-folder"
                                         value={importFolder}
                                         onChange={(e) => setImportFolder(e.target.value)}
                                         className="w-full glass border border-brand-800 rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-1 focus:ring-brand-500 bg-brand-900"
@@ -1101,15 +1116,15 @@ const LogScan: React.FC = () => {
                                 )}
 
                                 {/* Entry list — uncertain first via displayedIndices */}
-                                <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+                                <ul className="space-y-2 max-h-[45vh] overflow-y-auto" aria-label="Parsed log sheet entries">
                                     {displayedIndices.length === 0 && (
-                                        <div className="text-center py-8 text-sm text-brand-500">
+                                        <li className="text-center py-8 text-sm text-brand-500 list-none">
                                             {reviewFilter === 'needs-review'
                                                 ? 'No rows need review — ready to import.'
                                                 : reviewFilter === 'ready'
                                                 ? 'No ready rows yet — fix uncertain fields first.'
                                                 : 'No entries.'}
-                                        </div>
+                                        </li>
                                     )}
                                     {displayedIndices.map((i) => {
                                         const e = entries[i];
@@ -1120,9 +1135,9 @@ const LogScan: React.FC = () => {
                                             .map(f => FIELD_LABELS[f])
                                             .filter(Boolean);
                                         return (
-                                        <div
+                                        <li
                                             key={i}
-                                            className={`glass border rounded-xl p-3 transition-all ${
+                                            className={`glass border rounded-xl p-3 transition-all list-none ${
                                                 needs
                                                     ? 'border-amber-500/50 bg-amber-500/[0.04]'
                                                     : isDup && !isSelected
@@ -1133,46 +1148,66 @@ const LogScan: React.FC = () => {
                                             }`}
                                         >
                                             {editingIndex === i ? (
-                                                <div className="space-y-2">
+                                                <div className="space-y-2" role="group" aria-label={`Edit entry ${i + 1}`}>
                                                     <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80">
                                                         Correct uncertain fields, then save
                                                     </p>
-                                                    <input type="text" value={editForm.name} onChange={(ev) => setEditForm({...editForm, name: ev.target.value})} placeholder="Name" className={editInputClass(e, 'name')} />
-                                                    <input type="text" value={editForm.company} onChange={(ev) => setEditForm({...editForm, company: ev.target.value})} placeholder="Company" className={editInputClass(e, 'company')} />
-                                                    <input type="text" value={editForm.position} onChange={(ev) => setEditForm({...editForm, position: ev.target.value})} placeholder="Position" className={editInputClass(e, 'position')} />
-                                                    <input type="text" value={editForm.phone} onChange={(ev) => setEditForm({...editForm, phone: ev.target.value})} placeholder="Phone" className={editInputClass(e, 'phone')} />
-                                                    <input type="text" value={editForm.email} onChange={(ev) => setEditForm({...editForm, email: ev.target.value})} placeholder="Email" className={editInputClass(e, 'email')} />
-                                                    <input type="text" value={editForm.address} onChange={(ev) => setEditForm({...editForm, address: ev.target.value})} placeholder="Address" className={editInputClass(e, 'address')} />
-                                                    <input type="text" value={editForm.notes} onChange={(ev) => setEditForm({...editForm, notes: ev.target.value})} placeholder="Notes" className={editInputClass(e, 'notes')} />
+                                                    <label className="sr-only" htmlFor={`log-edit-name-${i}`}>Name</label>
+                                                    <input id={`log-edit-name-${i}`} type="text" value={editForm.name} onChange={(ev) => setEditForm({...editForm, name: ev.target.value})} placeholder="Name" className={editInputClass(e, 'name')} />
+                                                    <label className="sr-only" htmlFor={`log-edit-company-${i}`}>Company</label>
+                                                    <input id={`log-edit-company-${i}`} type="text" value={editForm.company} onChange={(ev) => setEditForm({...editForm, company: ev.target.value})} placeholder="Company" className={editInputClass(e, 'company')} />
+                                                    <label className="sr-only" htmlFor={`log-edit-position-${i}`}>Position</label>
+                                                    <input id={`log-edit-position-${i}`} type="text" value={editForm.position} onChange={(ev) => setEditForm({...editForm, position: ev.target.value})} placeholder="Position" className={editInputClass(e, 'position')} />
+                                                    <label className="sr-only" htmlFor={`log-edit-phone-${i}`}>Phone</label>
+                                                    <input id={`log-edit-phone-${i}`} type="text" value={editForm.phone} onChange={(ev) => setEditForm({...editForm, phone: ev.target.value})} placeholder="Phone" className={editInputClass(e, 'phone')} />
+                                                    <label className="sr-only" htmlFor={`log-edit-email-${i}`}>Email</label>
+                                                    <input id={`log-edit-email-${i}`} type="text" value={editForm.email} onChange={(ev) => setEditForm({...editForm, email: ev.target.value})} placeholder="Email" className={editInputClass(e, 'email')} />
+                                                    <label className="sr-only" htmlFor={`log-edit-address-${i}`}>Address</label>
+                                                    <input id={`log-edit-address-${i}`} type="text" value={editForm.address} onChange={(ev) => setEditForm({...editForm, address: ev.target.value})} placeholder="Address" className={editInputClass(e, 'address')} />
+                                                    <label className="sr-only" htmlFor={`log-edit-notes-${i}`}>Notes</label>
+                                                    <input id={`log-edit-notes-${i}`} type="text" value={editForm.notes} onChange={(ev) => setEditForm({...editForm, notes: ev.target.value})} placeholder="Notes" className={editInputClass(e, 'notes')} />
                                                     <div className="flex gap-2 pt-1">
-                                                        <button onClick={saveEntryEdit} className="flex-1 flex items-center justify-center gap-1 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs font-medium text-emerald-400">
-                                                            <Check size={12} /> Save & mark reviewed
+                                                        <button type="button" onClick={saveEntryEdit} className="flex-1 flex items-center justify-center gap-1 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs font-medium text-emerald-400">
+                                                            <Check size={12} aria-hidden="true" /> Save & mark reviewed
                                                         </button>
-                                                        <button onClick={() => setEditingIndex(null)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-brand-800 rounded-lg text-xs font-medium text-slate-400">
-                                                            <X size={12} /> Cancel
+                                                        <button type="button" onClick={() => setEditingIndex(null)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-brand-800 rounded-lg text-xs font-medium text-slate-400">
+                                                            <X size={12} aria-hidden="true" /> Cancel
                                                         </button>
                                                     </div>
                                                 </div>
                                             ) : (
                                                 <div className="flex items-start gap-2">
                                                     {/* Selection checkbox */}
-                                                    <button onClick={() => toggleEntrySelection(i)} className="flex-shrink-0 mt-0.5">
-                                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-brand-500 border-brand-500' : 'border-brand-600'}`}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleEntrySelection(i)}
+                                                        className="flex-shrink-0 mt-0.5"
+                                                        aria-label={isSelected ? `Deselect ${e.name || 'entry'}` : `Select ${e.name || 'entry'}`}
+                                                        aria-pressed={isSelected}
+                                                    >
+                                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-brand-500 border-brand-500' : 'border-brand-600'}`} aria-hidden="true">
                                                             {isSelected && <Check size={12} className="text-white" />}
                                                         </div>
                                                     </button>
-                                                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEntryEdit(i)}>
+                                                    <div
+                                                        className="flex-1 min-w-0 cursor-pointer"
+                                                        onClick={() => openEntryEdit(i)}
+                                                        onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEntryEdit(i); } }}
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        aria-label={`Edit ${e.name || 'entry'}`}
+                                                    >
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             <p className="font-medium text-sm text-slate-100 truncate">{e.name || 'No name'}</p>
                                                             {needs && (
                                                                 <span className="flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded text-[9px] font-bold text-amber-400">
-                                                                    <AlertTriangle size={9} />
+                                                                    <AlertTriangle size={9} aria-hidden="true" />
                                                                     REVIEW
                                                                 </span>
                                                             )}
                                                             {isDup && (
                                                                 <span className="flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded text-[9px] font-bold text-amber-400">
-                                                                    <AlertCircle size={9} />
+                                                                    <AlertCircle size={9} aria-hidden="true" />
                                                                     DUP
                                                                 </span>
                                                             )}
@@ -1222,67 +1257,76 @@ const LogScan: React.FC = () => {
                                                     <div className="flex flex-col gap-1 flex-shrink-0">
                                                         {needs && (
                                                             <button
+                                                                type="button"
                                                                 onClick={() => markEntryReviewed(i)}
                                                                 title="Mark as reviewed"
                                                                 className="p-1.5 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                                aria-label={`Mark ${e.name || 'entry'} as reviewed`}
                                                             >
-                                                                <Check size={14} className="text-emerald-400" />
+                                                                <Check size={14} className="text-emerald-400" aria-hidden="true" />
                                                             </button>
                                                         )}
-                                                        <button onClick={() => openEntryEdit(i)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
-                                                            <Edit3 size={14} className="text-brand-400" />
+                                                        <button type="button" onClick={() => openEntryEdit(i)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors" aria-label={`Edit ${e.name || 'entry'}`}>
+                                                            <Edit3 size={14} className="text-brand-400" aria-hidden="true" />
                                                         </button>
-                                                        <button onClick={() => deleteEntry(i)} className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors">
-                                                            <Trash2 size={14} className="text-red-400" />
+                                                        <button type="button" onClick={() => deleteEntry(i)} className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors" aria-label={`Delete ${e.name || 'entry'}`}>
+                                                            <Trash2 size={14} className="text-red-400" aria-hidden="true" />
                                                         </button>
                                                     </div>
                                                 </div>
                                             )}
-                                        </div>
+                                        </li>
                                         );
                                     })}
-                                </div>
+                                </ul>
                             </>
                         )}
                     </div>
                 )}
-            </div>
+            </main>
 
             {/* Bottom action bar */}
             {entries && entries.length > 0 && !isProcessing && (
-                <div className="sticky bottom-0 glass border-t border-brand-800 p-4 space-y-2 z-10">
+                <div className="sticky bottom-0 glass border-t border-brand-800 p-4 space-y-2 z-10" role="region" aria-label="Import actions">
                     <button
+                        type="button"
                         onClick={() => handleImport()}
                         disabled={isImporting || selectedEntries.size === 0}
+                        aria-busy={isImporting}
                         className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95"
                     >
                         {isImporting ? (
-                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" aria-hidden="true" />
                         ) : (
-                            <Upload size={16} />
+                            <Upload size={16} aria-hidden="true" />
                         )}
                         Import {selectedEntries.size} of {entries.length} Contact{entries.length !== 1 ? 's' : ''}
                     </button>
                     <div className="relative">
                         <button
+                            type="button"
                             onClick={() => setShowExportOptions(!showExportOptions)}
+                            aria-expanded={showExportOptions}
+                            aria-haspopup="menu"
                             className="w-full py-2.5 bg-brand-800 hover:bg-brand-700 rounded-xl font-medium text-sm text-brand-300 transition-colors flex items-center justify-center gap-2"
                         >
-                            <Download size={16} />
+                            <Download size={16} aria-hidden="true" />
                             Export Instead
                         </button>
                         {showExportOptions && (
-                            <div className="absolute bottom-full left-0 right-0 mb-2 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl overflow-hidden">
-                                <button onClick={() => handleExport('csv')} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors">
+                            <div className="absolute bottom-full left-0 right-0 mb-2 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl overflow-hidden" role="menu">
+                                <button type="button" role="menuitem" onClick={() => handleExport('csv')} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors">
                                     Export as CSV
                                 </button>
-                                <button onClick={() => handleExport('excel')} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors">
+                                <button type="button" role="menuitem" onClick={() => handleExport('excel')} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors">
                                     Export as Excel
                                 </button>
-                                <button onClick={() => handleExport('crm-csv')} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors">
+                                <button type="button" role="menuitem" onClick={() => handleExport('crm-csv')} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors">
                                     CRM-ready CSV
                                 </button>
                                 <button
+                                    type="button"
+                                    role="menuitem"
                                     onClick={() => { void handleGoogleSheetsExport(); }}
                                     disabled={isExportingSheets}
                                     className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors disabled:opacity-50"
