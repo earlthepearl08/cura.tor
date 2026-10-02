@@ -3,6 +3,9 @@ import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
+// Ops (billing / 429 / cost): see GEMINI_OPS.md — no in-app health dashboard.
+// Grep Vercel logs for: "Cloud Vision API error:", "[api/ocr]", "quota-exceeded", "rate-limit-".
+
 // Verify Firebase ID tokens directly via Google's public JWKS rather than
 // firebase-admin/auth. Multiple firebase-admin/auth import patterns crashed
 // this Vercel function at module load with FUNCTION_INVOCATION_FAILED. jose
