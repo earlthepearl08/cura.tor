@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+<<<<<<< /tmp/meld/16-main-Settings.tsx
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff } from 'lucide-react';
+=======
 import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, HelpCircle } from 'lucide-react';
+>>>>>>> /tmp/meld/16-pr-Settings.tsx
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TIER_LIMITS } from '@/types/user';
-import { STRIPE_PRICES, createCheckoutSession, createPortalSession, PLAN_TO_TIER, type BillingInterval } from '@/services/stripe';
+import { STRIPE_PRICES, createCheckoutSession, createPortalSession, type BillingInterval } from '@/services/stripe';
 import AccessCodeInput from '@/components/AccessCodeInput';
 import RequestTeamAccessCard from '@/components/RequestTeamAccessCard';
 import RedeemTeamCodeCard from '@/components/RedeemTeamCodeCard';
@@ -41,40 +45,77 @@ const Settings = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { theme, toggleTheme } = useTheme();
     const [ocrEngine, setOcrEngineState] = useState<OCREngine>(getOCREngine());
-    const [saved, setSaved] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [engineSaved, setEngineSaved] = useState(false);
     const { isConnected, user: driveUser, isSyncing, syncProgress, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
     const { user, firebaseUser, signOut, canUseGoogleDrive, scansRemaining, refreshUserProfile } = useAuth();
 
     const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
     const [isUpgrading, setIsUpgrading] = useState(false);
     const [upgradeError, setUpgradeError] = useState('');
-    const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled'; text: string } | null>(null);
+    const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled' | 'pending'; text: string } | null>(null);
     const [showDeleteAccount, setShowDeleteAccount] = useState(false);
     const isOwnerAccount = !!user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
 
     const tierBadge = TIER_BADGES[user?.tier || 'free'];
     const limits = TIER_LIMITS[user?.tier || 'free'];
 
-    // Handle payment callback from Stripe
+    // Handle payment callback from Stripe — confirm upgrade from Firestore, not redirect alone
     useEffect(() => {
         const payment = searchParams.get('payment');
-        if (payment === 'success') {
-            setPaymentMessage({ type: 'success', text: 'Payment successful! Your plan has been upgraded.' });
-            refreshUserProfile();
-            // Clean up URL
-            searchParams.delete('payment');
-            setSearchParams(searchParams, { replace: true });
-        } else if (payment === 'canceled') {
+        if (!payment) return;
+
+        const next = new URLSearchParams(searchParams);
+        next.delete('payment');
+        setSearchParams(next, { replace: true });
+
+        if (payment === 'canceled') {
             setPaymentMessage({ type: 'canceled', text: 'Payment was canceled. No changes were made.' });
-            searchParams.delete('payment');
-            setSearchParams(searchParams, { replace: true });
+            return;
         }
+
+        if (payment !== 'success') return;
+
+        let cancelled = false;
+        const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+        (async () => {
+            setPaymentMessage({ type: 'pending', text: 'Confirming your upgrade…' });
+            const deadline = Date.now() + 45_000;
+
+            while (!cancelled && Date.now() < deadline) {
+                const profile = await refreshUserProfile();
+                if (
+                    profile?.stripe?.subscriptionId &&
+                    (profile.stripe.subscriptionStatus === 'active')
+                ) {
+                    const label = profile.tier === 'pro' ? 'Pro' : profile.tier === 'early_access' ? 'Pioneer' : 'paid';
+                    if (!cancelled) {
+                        setPaymentMessage({
+                            type: 'success',
+                            text: `You're on ${label}! Your plan is active.`,
+                        });
+                    }
+                    return;
+                }
+                await sleep(1_500);
+            }
+
+            if (!cancelled) {
+                setPaymentMessage({
+                    type: 'pending',
+                    text: 'Payment received — plan activation is taking longer than usual. Refresh this page in a moment.',
+                });
+            }
+        })();
+
+        return () => { cancelled = true; };
     }, []);
 
-    // Auto-dismiss payment message
+    // Auto-dismiss settled payment messages (keep pending visible)
     useEffect(() => {
-        if (paymentMessage) {
-            const timer = setTimeout(() => setPaymentMessage(null), 6000);
+        if (paymentMessage && paymentMessage.type !== 'pending') {
+            const timer = setTimeout(() => setPaymentMessage(null), 8000);
             return () => clearTimeout(timer);
         }
     }, [paymentMessage]);
@@ -86,12 +127,10 @@ const Settings = () => {
 
         try {
             const price = STRIPE_PRICES[plan][billingInterval];
-            const url = await createCheckoutSession({
-                firebaseUid: firebaseUser.uid,
-                email: user.email,
-                priceId: price.id,
-                tier: PLAN_TO_TIER[plan],
-            });
+            if (!price.id) {
+                throw new Error('Stripe price is not configured for this plan.');
+            }
+            const url = await createCheckoutSession({ priceId: price.id });
             window.location.href = url;
         } catch (err: any) {
             console.error('Upgrade failed:', err);
@@ -106,7 +145,7 @@ const Settings = () => {
         setUpgradeError('');
 
         try {
-            const url = await createPortalSession(user.stripe.customerId);
+            const url = await createPortalSession();
             window.location.href = url;
         } catch (err: any) {
             console.error('Portal failed:', err);
@@ -138,6 +177,13 @@ const Settings = () => {
         }
     };
 
+    const handleOcrEngineChange = (engine: OCREngine) => {
+        setOCREngine(engine);
+        setOcrEngineState(engine);
+        setEngineSaved(true);
+        window.setTimeout(() => setEngineSaved(false), 2000);
+    };
+
     const hasStripeSubscription = !!user?.stripe?.subscriptionId;
     const showPricing = user?.tier !== 'pro' && user?.tier !== 'enterprise' && !hasStripeSubscription;
     // Pioneer (access code) users can only upgrade to Pro
@@ -147,7 +193,7 @@ const Settings = () => {
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
             <div className="flex items-center justify-between p-4 glass sticky top-0 z-10">
-                <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">Settings</h1>
@@ -159,6 +205,8 @@ const Settings = () => {
                 <div className={`mx-6 mt-4 p-3 rounded-xl flex items-center justify-between text-sm ${
                     paymentMessage.type === 'success'
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : paymentMessage.type === 'pending'
+                        ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
                         : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                 }`}>
                     <span>{paymentMessage.text}</span>
@@ -535,23 +583,94 @@ const Settings = () => {
                     </div>
                 </div>
 
-                {/* OCR Engine */}
+                {/* Advanced — OCR engine (power users) */}
                 <div className="space-y-3">
-                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">OCR Engine</p>
-                    <div className="card-elevated rounded-2xl p-4">
-                        <div className="flex items-center gap-4">
-                            <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-sky-500/20">
-                                <Sparkles className="w-5 h-5 text-sky-400" />
-                            </div>
-                            <div className="flex-1">
+                    <button
+                        type="button"
+                        onClick={() => setShowAdvanced(v => !v)}
+                        className="w-full flex items-center justify-between px-1"
+                    >
+                        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Advanced</p>
+                        <ChevronDown
+                            size={14}
+                            className={`text-slate-600 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+                        />
+                    </button>
+                    {showAdvanced && (
+                        <div className="card-elevated rounded-2xl p-4 space-y-4">
+                            <div>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <p className="font-semibold text-sm">Cloud Vision + Gemini AI</p>
-                                    <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">ACTIVE</span>
+                                    <p className="font-semibold text-sm">Scan engine</p>
+                                    {engineSaved && (
+                                        <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
+                                            Saved
+                                        </span>
+                                    )}
                                 </div>
-                                <p className="text-xs text-slate-500">Google Cloud Vision for text extraction, Gemini AI for intelligent parsing</p>
+                                <p className="text-xs text-slate-500 mb-3">
+                                    Default scanning uses online AI. Offline Tesseract is best-effort and typically less accurate — especially on stylized cards and handwriting.
+                                </p>
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={() => handleOcrEngineChange('cloud-vision')}
+                                className={`w-full text-left p-3 rounded-xl border transition-colors ${
+                                    ocrEngine === 'cloud-vision'
+                                        ? 'border-sky-500/50 bg-sky-500/10'
+                                        : 'border-brand-800 hover:bg-white/5'
+                                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="w-9 h-9 rounded-lg bg-sky-500/20 flex items-center justify-center shrink-0">
+                                        <Sparkles className="w-4 h-4 text-sky-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-medium text-sm text-white">Online AI (Gemini)</p>
+                                            {ocrEngine === 'cloud-vision' && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
+                                                    ACTIVE
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Sends card images to Google Gemini for extraction. Recommended.
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleOcrEngineChange('tesseract')}
+                                className={`w-full text-left p-3 rounded-xl border transition-colors ${
+                                    ocrEngine === 'tesseract'
+                                        ? 'border-amber-500/50 bg-amber-500/10'
+                                        : 'border-brand-800 hover:bg-white/5'
+                                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                                        <WifiOff className="w-4 h-4 text-amber-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-medium text-sm text-white">Offline (Tesseract)</p>
+                                            {ocrEngine === 'tesseract' && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">
+                                                    ACTIVE
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            On-device OCR for single cards when offline. Lower quality; log sheet and multi-card still need online AI.
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Google Drive Sync */}
@@ -664,6 +783,9 @@ const Settings = () => {
                     </div>
                 </div>
 
+<<<<<<< /tmp/meld/16-main-Settings.tsx
+                {/* Legal & trust */}
+=======
                 {/* Help */}
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Help</p>
@@ -683,9 +805,17 @@ const Settings = () => {
                 </div>
 
                 {/* Legal */}
+>>>>>>> /tmp/meld/16-pr-Settings.tsx
                 <div className="space-y-3">
-                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Legal</p>
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Legal & trust</p>
                     <div className="card-elevated rounded-2xl p-4 space-y-2">
+                        <button
+                            onClick={() => navigate('/accuracy#report')}
+                            className="w-full flex items-center gap-3 py-2 px-1 rounded-lg hover:bg-white/5 transition-colors"
+                        >
+                            <Sparkles size={16} className="text-sky-400" />
+                            <span className="text-sm text-slate-300">Accuracy report</span>
+                        </button>
                         <button
                             onClick={() => navigate('/legal?tab=tos')}
                             className="w-full flex items-center gap-3 py-2 px-1 rounded-lg hover:bg-white/5 transition-colors"
@@ -727,7 +857,7 @@ const Settings = () => {
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">About</p>
                     <div className="card-elevated rounded-2xl p-4 text-center">
-                        <p className="text-xs text-slate-500">Cura.tor v1.0 Beta</p>
+                        <p className="text-xs text-slate-500">Cura.tor v1.0.0</p>
                     </div>
                 </div>
             </div>
