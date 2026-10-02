@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-022-rn-suffix",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "CarePlus Medical Center",
+    "Nurse Joy Alcantara, RN",
+    "Charge Nurse",
+    "0917-888-1212",
+    "jalcantara@careplus.ph",
+    "Mandaluyong"
+  ]
+}

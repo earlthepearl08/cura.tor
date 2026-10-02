@@ -1,0 +1,20 @@
+{
+  "name": "Owen Garcia",
+  "company": "PixelForge Studios",
+  "position": "Creative Director",
+  "phone": [
+    "0917-123-9876"
+  ],
+  "email": [
+    "owen@pixelforge.ph"
+  ],
+  "address": "Quezon City",
+  "notes": "www.pixelforge.ph | behance.net/owengarcia",
+  "_meta": {
+    "id": "card-027-website-only-notes",
+    "difficulty": "easy",
+    "tags": [
+      "ph"
+    ]
+  }
+}

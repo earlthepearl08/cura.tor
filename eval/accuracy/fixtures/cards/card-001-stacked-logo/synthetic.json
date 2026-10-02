@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-001-stacked-logo",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "KINMO PW Corporation",
+    "Engr. Maria Santos, REE, PEE",
+    "Senior Sales Manager",
+    "+63 917 555 1234 / 8703-5284",
+    "maria.santos@kinmopw.com",
+    "Main Office: 12th Floor, BGC Tower, Taguig | Branch: Cebu Business Park",
+    "www.kinmopw.com"
+  ]
+}
