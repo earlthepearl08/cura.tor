@@ -25,6 +25,15 @@ export interface UserProfile {
     };
     organizationId?: string;
     orgRole?: 'admin' | 'member';
+    /** Lightweight event workspace memberships (trade-show packs). Independent of enterprise org. */
+    eventIds?: string[];
+    /**
+     * Extra concurrent host slots from purchased Event packs (one-time Stripe product).
+     * Capacity = FREE_HOST_SLOTS + eventPackCredits (see eventWorkspace types).
+     */
+    eventPackCredits?: number;
+    /** Lifetime count of Event packs purchased (audit / support). */
+    eventPackPurchased?: number;
     // Trial/grant expiry. When set and elapsed, the user is auto-downgraded to
     // 'free' on next sign-in (see api/check-tier-expiry). null = no expiry.
     expiresAt?: number | null;

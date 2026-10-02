@@ -83,6 +83,7 @@ interface AuthContextType {
     reloadFirebaseUser: () => Promise<void>;
 
     // Refresh — returns the latest profile (or null if signed out / load failed)
+    // Refresh
     refreshUserProfile: () => Promise<UserProfile | null>;
 }
 
@@ -176,6 +177,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Failed to refresh user profile:', err);
             return null;
         }
+        if (!firebaseUser) return null;
+        const profile = await getOrCreateUserDoc(firebaseUser);
+        setUser(profile);
+        return profile;
     }, [firebaseUser]);
 
     // --- Auth methods ---
