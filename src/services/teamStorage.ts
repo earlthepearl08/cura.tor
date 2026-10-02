@@ -16,32 +16,63 @@ import { Batch } from '@/types/batch';
 import { FieldCorrection } from '@/types/correction';
 import { storage as personalStorage } from './storage';
 
+export type SharedWorkspaceKind = 'organization' | 'event';
+
 /**
- * Firestore-backed storage for team/organization workspaces.
- * Mirrors the StorageService API surface so pages can swap between
- * personal (IndexedDB) and team (Firestore) storage transparently.
+ * Firestore-backed storage for shared workspaces:
+ * - enterprise organizations (`organizations/{id}`)
+ * - lightweight event packs (`eventWorkspaces/{id}`)
+ *
+ * Mirrors the StorageService API so pages can swap between personal
+ * (IndexedDB) and shared (Firestore) storage transparently.
  *
  * Real-time: use subscribeContacts / subscribeFolders / subscribeBatches
  * for live claim + presence updates. One-shot getters remain for import
  * flows and personal-mode parity.
  */
 export class TeamStorageService {
-    private orgId: string | null = null;
+    private workspaceKind: SharedWorkspaceKind = 'organization';
+    private workspaceId: string | null = null;
 
-    /** Switch to a specific organization */
+    /** Switch to a specific organization (enterprise team). */
     setOrganization(orgId: string | null) {
-        this.orgId = orgId;
+        this.workspaceKind = 'organization';
+        this.workspaceId = orgId;
+    }
+
+    /** Switch to a lightweight event workspace. */
+    setEventWorkspace(eventId: string | null) {
+        this.workspaceKind = 'event';
+        this.workspaceId = eventId;
     }
 
     getOrganizationId(): string | null {
-        return this.orgId;
+        return this.workspaceKind === 'organization' ? this.workspaceId : null;
     }
 
-    private requireOrg(): string {
-        if (!this.orgId) {
-            throw new Error('No organization selected');
+    getEventWorkspaceId(): string | null {
+        return this.workspaceKind === 'event' ? this.workspaceId : null;
+    }
+
+    private rootCollection(): 'organizations' | 'eventWorkspaces' {
+        return this.workspaceKind === 'event' ? 'eventWorkspaces' : 'organizations';
+    }
+
+    private requireWorkspace(): string {
+        if (!this.workspaceId) {
+            throw new Error(this.workspaceKind === 'event' ? 'No event selected' : 'No organization selected');
         }
-        return this.orgId;
+        return this.workspaceId;
+    }
+
+    private workspaceDoc(...segments: string[]) {
+        const id = this.requireWorkspace();
+        return doc(db, this.rootCollection(), id, ...segments);
+    }
+
+    private workspaceCollection(sub: string) {
+        const id = this.requireWorkspace();
+        return collection(db, this.rootCollection(), id, sub);
     }
 
     private getCurrentUserInfo(): { uid: string; displayName: string } {
@@ -93,9 +124,9 @@ export class TeamStorageService {
     /** Claim a contact as "mine to follow up on". Respects Firestore rules
      *  so only unclaimed contacts can be claimed by regular members. */
     async claimContact(contactId: string): Promise<void> {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         const { uid, displayName } = this.getCurrentUserInfo();
-        const ref = doc(db, 'organizations', orgId, 'contacts', contactId);
+        const ref = this.workspaceDoc('contacts', contactId);
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error('Contact not found');
         const data = snap.data();
@@ -116,9 +147,9 @@ export class TeamStorageService {
 
     /** Release your own claim on a contact so someone else can pick it up. */
     async releaseClaim(contactId: string): Promise<void> {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         const { uid } = this.getCurrentUserInfo();
-        const ref = doc(db, 'organizations', orgId, 'contacts', contactId);
+        const ref = this.workspaceDoc('contacts', contactId);
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error('Contact not found');
         const data = snap.data();
@@ -145,8 +176,8 @@ export class TeamStorageService {
         contactId: string,
         assignee: { uid: string; displayName: string } | null
     ): Promise<void> {
-        const orgId = this.requireOrg();
-        const ref = doc(db, 'organizations', orgId, 'contacts', contactId);
+        this.requireWorkspace();
+        const ref = this.workspaceDoc('contacts', contactId);
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error('Contact not found');
         const data = snap.data();
@@ -186,9 +217,9 @@ export class TeamStorageService {
             followUpDueAt?: number | null;
         }
     ): Promise<void> {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         const { uid } = this.getCurrentUserInfo();
-        const ref = doc(db, 'organizations', orgId, 'contacts', contactId);
+        const ref = this.workspaceDoc('contacts', contactId);
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error('Contact not found');
         const data = snap.data();
@@ -222,7 +253,7 @@ export class TeamStorageService {
         await setDoc(ref, updated);
     }
 
-    /** Remove base64 image fields — team workspace stores parsed data only to keep docs small and reduce legal surface */
+    /** Remove base64 image fields — shared workspace stores parsed data only */
     private stripImages<T extends Record<string, any>>(data: T): T {
         const clone: any = { ...data };
         delete clone.imageData;
@@ -231,24 +262,23 @@ export class TeamStorageService {
         return clone;
     }
 
-    /** Get all contacts in active org */
     async getAllContacts(): Promise<Contact[]> {
-        const orgId = this.requireOrg();
-        const snap = await getDocs(collection(db, 'organizations', orgId, 'contacts'));
+        this.requireWorkspace();
+        const snap = await getDocs(this.workspaceCollection('contacts'));
         return snap.docs.map(d => this.docToContact(d.data(), d.id));
     }
 
     /**
-     * Live subscription to org contacts (claims, edits, adds, deletes).
-     * Returns an unsubscribe function — call it on unmount / org switch.
+     * Live subscription to shared-workspace contacts (claims, edits, adds, deletes).
+     * Returns an unsubscribe function — call it on unmount / workspace switch.
      */
     subscribeContacts(
         onUpdate: (contacts: Contact[]) => void,
         onError?: (error: Error) => void,
     ): Unsubscribe {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         return onSnapshot(
-            collection(db, 'organizations', orgId, 'contacts'),
+            this.workspaceCollection('contacts'),
             (snap) => {
                 onUpdate(snap.docs.map(d => this.docToContact(d.data(), d.id)));
             },
@@ -259,14 +289,14 @@ export class TeamStorageService {
         );
     }
 
-    /** Live subscription to org folder names */
+    /** Live subscription to shared-workspace folder names */
     subscribeFolders(
         onUpdate: (folders: string[]) => void,
         onError?: (error: Error) => void,
     ): Unsubscribe {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         return onSnapshot(
-            collection(db, 'organizations', orgId, 'folders'),
+            this.workspaceCollection('folders'),
             (snap) => {
                 onUpdate(snap.docs.map(d => d.id));
             },
@@ -277,14 +307,14 @@ export class TeamStorageService {
         );
     }
 
-    /** Live subscription to org batches */
+    /** Live subscription to shared-workspace batches */
     subscribeBatches(
         onUpdate: (batches: Batch[]) => void,
         onError?: (error: Error) => void,
     ): Unsubscribe {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         return onSnapshot(
-            collection(db, 'organizations', orgId, 'batches'),
+            this.workspaceCollection('batches'),
             (snap) => {
                 onUpdate(
                     snap.docs
@@ -299,17 +329,15 @@ export class TeamStorageService {
         );
     }
 
-    /** Parity with StorageService — team contacts are hard-deleted, so this is the same as getAllContacts */
+    /** Parity with StorageService — shared contacts are hard-deleted, so this is the same as getAllContacts */
     async getAllContactsIncludingDeleted(): Promise<Contact[]> {
         return this.getAllContacts();
     }
 
-    /** Save a contact to the team workspace */
     async saveContact(contact: Contact): Promise<void> {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         const { uid, displayName } = this.getCurrentUserInfo();
 
-        // Stamp createdBy on first save, lastEditedBy on subsequent saves
         const isNew = !contact.createdBy;
         const data: any = this.stripImages({
             ...contact,
@@ -323,13 +351,10 @@ export class TeamStorageService {
             data.lastEditedByName = displayName;
         }
 
-        // Strip undefined fields (Firestore rejects undefined)
         Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
 
-        await setDoc(doc(db, 'organizations', orgId, 'contacts', contact.id), data);
+        await setDoc(this.workspaceDoc('contacts', contact.id), data);
 
-        // Dual-write: keep the full contact (with images) in the scanner's personal IndexedDB
-        // so they retain the original photo even though the shared org copy is stripped.
         try {
             await personalStorage.saveContact({
                 ...contact,
@@ -340,78 +365,69 @@ export class TeamStorageService {
                 updatedAt: data.updatedAt,
             });
         } catch (err) {
-            console.warn('Personal archive write failed (org save succeeded):', err);
+            console.warn('Personal archive write failed (shared save succeeded):', err);
         }
     }
 
-    /** Hard-delete a contact from the team workspace */
     async deleteContact(id: string): Promise<void> {
-        const orgId = this.requireOrg();
-        await deleteDoc(doc(db, 'organizations', orgId, 'contacts', id));
+        this.requireWorkspace();
+        await deleteDoc(this.workspaceDoc('contacts', id));
     }
 
-    /** Parity with StorageService — same as deleteContact for team workspace */
     async hardDeleteContact(id: string): Promise<void> {
         return this.deleteContact(id);
     }
 
-    /** Parity with StorageService — no-op for team workspace (hard-delete only, no tombstones) */
     async getDeletedContacts(): Promise<Contact[]> {
         return [];
     }
 
-    /** Parity with StorageService — no-op for team workspace */
     async restoreContact(_id: string): Promise<void> {
-        // No tombstones in team workspace
+        // No tombstones in shared workspace
     }
 
-    /** Parity with StorageService — no-op for team workspace */
     async purgeTombstones(_maxAgeMs?: number): Promise<number> {
         return 0;
     }
 
-    /** Bulk save (used by import flows) */
     async batchSave(contacts: Contact[]): Promise<void> {
         for (const contact of contacts) {
             await this.saveContact(contact);
         }
     }
 
-    /** Clear all contacts (admin action — used carefully) */
     async clearAll(): Promise<void> {
-        const orgId = this.requireOrg();
-        const snap = await getDocs(collection(db, 'organizations', orgId, 'contacts'));
+        this.requireWorkspace();
+        const snap = await getDocs(this.workspaceCollection('contacts'));
         for (const d of snap.docs) {
             await deleteDoc(d.ref);
         }
     }
 
-    /** Get all folders */
     async getAllFolders(): Promise<string[]> {
-        const orgId = this.requireOrg();
-        const snap = await getDocs(collection(db, 'organizations', orgId, 'folders'));
+        this.requireWorkspace();
+        const snap = await getDocs(this.workspaceCollection('folders'));
         return snap.docs.map(d => d.id);
     }
 
     async saveFolder(name: string): Promise<void> {
-        const orgId = this.requireOrg();
-        await setDoc(doc(db, 'organizations', orgId, 'folders', name), {
+        this.requireWorkspace();
+        await setDoc(this.workspaceDoc('folders', name), {
             name,
             createdAt: serverTimestamp(),
         });
     }
 
     async deleteFolder(name: string): Promise<void> {
-        const orgId = this.requireOrg();
-        await deleteDoc(doc(db, 'organizations', orgId, 'folders', name));
+        this.requireWorkspace();
+        await deleteDoc(this.workspaceDoc('folders', name));
     }
 
-    /** Bulk update folder for multiple contacts */
     async batchUpdateFolder(ids: string[], folder: string): Promise<void> {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         const { uid, displayName } = this.getCurrentUserInfo();
         for (const id of ids) {
-            const ref = doc(db, 'organizations', orgId, 'contacts', id);
+            const ref = this.workspaceDoc('contacts', id);
             const snap = await getDoc(ref);
             if (snap.exists()) {
                 await setDoc(ref, this.stripImages({
@@ -425,12 +441,10 @@ export class TeamStorageService {
         }
     }
 
-    /** No-op for parity (team contacts don't have legacy DB to migrate from) */
     async migrateFromLegacyDB(): Promise<number> {
         return 0;
     }
 
-    /** Convert Firestore doc data to Batch */
     private docToBatch(data: any, id: string): Batch {
         return {
             id,
@@ -445,30 +459,30 @@ export class TeamStorageService {
     }
 
     async getAllBatches(): Promise<Batch[]> {
-        const orgId = this.requireOrg();
-        const snap = await getDocs(collection(db, 'organizations', orgId, 'batches'));
+        this.requireWorkspace();
+        const snap = await getDocs(this.workspaceCollection('batches'));
         return snap.docs
             .map(d => this.docToBatch(d.data(), d.id))
             .sort((a, b) => b.scannedAt - a.scannedAt);
     }
 
     async getBatch(id: string): Promise<Batch | undefined> {
-        const orgId = this.requireOrg();
-        const snap = await getDoc(doc(db, 'organizations', orgId, 'batches', id));
+        this.requireWorkspace();
+        const snap = await getDoc(this.workspaceDoc('batches', id));
         return snap.exists() ? this.docToBatch(snap.data(), snap.id) : undefined;
     }
 
     async saveBatch(batch: Batch): Promise<void> {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         const data: any = { ...batch };
         delete data.thumbnailData;
         Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
-        await setDoc(doc(db, 'organizations', orgId, 'batches', batch.id), data);
+        await setDoc(this.workspaceDoc('batches', batch.id), data);
     }
 
     async deleteBatch(id: string): Promise<void> {
-        const orgId = this.requireOrg();
-        await deleteDoc(doc(db, 'organizations', orgId, 'batches', id));
+        this.requireWorkspace();
+        await deleteDoc(this.workspaceDoc('batches', id));
     }
 
     async getContactsByBatchId(batchId: string): Promise<Contact[]> {
@@ -486,8 +500,8 @@ export class TeamStorageService {
 
     /** Org-shared OCR correction glossary */
     async getAllCorrections(): Promise<FieldCorrection[]> {
-        const orgId = this.requireOrg();
-        const snap = await getDocs(collection(db, 'organizations', orgId, 'corrections'));
+        this.requireWorkspace();
+        const snap = await getDocs(this.workspaceCollection('corrections'));
         return snap.docs.map(d => {
             const data = d.data();
             return {
@@ -507,7 +521,7 @@ export class TeamStorageService {
     }
 
     async saveCorrection(correction: FieldCorrection): Promise<void> {
-        const orgId = this.requireOrg();
+        this.requireWorkspace();
         const { uid } = this.getCurrentUserInfo();
         const data: Record<string, unknown> = {
             ...correction,
@@ -516,12 +530,12 @@ export class TeamStorageService {
             updatedAt: Date.now(),
         };
         Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
-        await setDoc(doc(db, 'organizations', orgId, 'corrections', correction.id), data);
+        await setDoc(this.workspaceDoc('corrections', correction.id), data);
     }
 
     async deleteCorrection(id: string): Promise<void> {
-        const orgId = this.requireOrg();
-        await deleteDoc(doc(db, 'organizations', orgId, 'corrections', id));
+        this.requireWorkspace();
+        await deleteDoc(this.workspaceDoc('corrections', id));
     }
 }
 

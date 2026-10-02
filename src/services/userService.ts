@@ -41,6 +41,7 @@ const docToProfile = (data: any): UserProfile => ({
     } : undefined,
     organizationId: data.organizationId || undefined,
     orgRole: data.orgRole || undefined,
+    eventIds: Array.isArray(data.eventIds) ? data.eventIds.filter((id: unknown) => typeof id === 'string') : [],
     expiresAt: data.expiresAt?.toMillis?.() ?? data.expiresAt ?? null,
     trialSourceTier: data.trialSourceTier ?? null,
     createdAt: data.createdAt?.toMillis?.() || data.createdAt || Date.now(),

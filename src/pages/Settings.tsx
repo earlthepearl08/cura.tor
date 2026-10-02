@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Headphones, Mail, HelpCircle, BookMarked, Languages } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Headphones, Mail, HelpCircle, BookMarked, Languages, CalendarDays } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
@@ -318,6 +318,26 @@ const Settings = () => {
                             Sign Out
                         </button>
                     </div>
+                </div>
+
+                {/* Event packs — lightweight shared show workspaces */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Event packs</p>
+                    <button
+                        onClick={() => navigate('/events')}
+                        className="w-full card-elevated rounded-2xl p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                            <CalendarDays className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">Shared event workspace</p>
+                            <p className="text-xs text-slate-500">
+                                Temporary 2–10 person space for one show — create or join with a code
+                            </p>
+                        </div>
+                        <ChevronRight size={16} className="text-slate-600" />
+                    </button>
                 </div>
 
                 {/* Team — only visible for enterprise users */}

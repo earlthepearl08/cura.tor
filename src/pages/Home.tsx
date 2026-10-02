@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers, Lock } from 'lucide-react';
+import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers, Lock, CalendarDays } from 'lucide-react';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -157,12 +157,23 @@ const Home = () => {
                 </div>
             )}
 
-            {/* Workspace Switcher — only visible for enterprise users */}
-            {canSwitchWorkspace && (
-                <div className="w-full max-w-md mb-4">
-                    <WorkspaceSwitcher />
-                </div>
-            )}
+            {/* Workspace switcher — enterprise team and/or event packs */}
+            <div className="w-full max-w-md mb-4 flex items-center gap-2">
+                {canSwitchWorkspace ? (
+                    <div className="flex-1">
+                        <WorkspaceSwitcher />
+                    </div>
+                ) : (
+                    <Link
+                        to="/events"
+                        className="flex-1 flex items-center gap-2 px-3 py-2 glass border border-brand-800 rounded-xl text-sm font-medium hover:border-amber-500/40 transition-colors"
+                    >
+                        <CalendarDays size={16} className="text-amber-400" />
+                        <span className="text-slate-200">Event packs</span>
+                        <span className="text-[10px] text-slate-500 ml-auto">Create / join</span>
+                    </Link>
+                )}
+            </div>
 
             {/* Primary workflows — Log Sheet + Multi-Card */}
             <div className="w-full max-w-md mb-6">
