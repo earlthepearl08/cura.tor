@@ -11,6 +11,7 @@ import {
 import { db, auth } from '@/config/firebase';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
+import { FieldCorrection } from '@/types/correction';
 import { storage as personalStorage } from './storage';
 
 /**
@@ -314,6 +315,46 @@ export class TeamStorageService {
             total: contacts.length,
             verified: contacts.filter(c => c.isVerified).length,
         };
+    }
+
+    /** Org-shared OCR correction glossary */
+    async getAllCorrections(): Promise<FieldCorrection[]> {
+        const orgId = this.requireOrg();
+        const snap = await getDocs(collection(db, 'organizations', orgId, 'corrections'));
+        return snap.docs.map(d => {
+            const data = d.data();
+            return {
+                id: d.id,
+                field: data.field,
+                from: data.from || '',
+                fromNorm: data.fromNorm || '',
+                to: data.to || '',
+                scope: 'org' as const,
+                learnCount: data.learnCount || 1,
+                hitCount: data.hitCount || 0,
+                createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : (data.createdAt || Date.now()),
+                updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : (data.updatedAt || Date.now()),
+                createdBy: data.createdBy,
+            } satisfies FieldCorrection;
+        });
+    }
+
+    async saveCorrection(correction: FieldCorrection): Promise<void> {
+        const orgId = this.requireOrg();
+        const { uid } = this.getCurrentUserInfo();
+        const data: Record<string, unknown> = {
+            ...correction,
+            scope: 'org',
+            createdBy: correction.createdBy || uid,
+            updatedAt: Date.now(),
+        };
+        Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
+        await setDoc(doc(db, 'organizations', orgId, 'corrections', correction.id), data);
+    }
+
+    async deleteCorrection(id: string): Promise<void> {
+        const orgId = this.requireOrg();
+        await deleteDoc(doc(db, 'organizations', orgId, 'corrections', id));
     }
 }
 

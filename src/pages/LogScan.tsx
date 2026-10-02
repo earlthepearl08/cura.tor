@@ -10,6 +10,13 @@ import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import BatchNamingModal from '@/components/BatchNamingModal';
+import { CorrectionAppliedBanner } from '@/components/CorrectionHint';
+import {
+    enrichEntriesWithGlossary,
+    learnFromFieldDiffs,
+    type OcrFieldSnapshot,
+} from '@/services/correctionMemory';
+import { AppliedCorrection } from '@/types/correction';
 import { compressForOCR } from '@/utils/compressPhoto';
 
 const LogScan: React.FC = () => {
@@ -18,10 +25,12 @@ const LogScan: React.FC = () => {
     const galRef = useRef<HTMLInputElement>(null);
     const addMoreCamRef = useRef<HTMLInputElement>(null);
     const addMoreGalRef = useRef<HTMLInputElement>(null);
-    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canUseBulkScan } = useAuth();
-    const { storage } = useWorkspace();
+    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canUseBulkScan, user } = useAuth();
+    const { storage, mode } = useWorkspace();
 
     const [imageData, setImageData] = useState<string | null>(null);
+    const [ocrSnapshots, setOcrSnapshots] = useState<OcrFieldSnapshot[]>([]);
+    const [glossaryApplied, setGlossaryApplied] = useState<AppliedCorrection[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [entries, setEntries] = useState<LogSheetEntry[] | null>(null);
@@ -107,6 +116,8 @@ const LogScan: React.FC = () => {
         setError(null);
         if (!append) {
             setEntries(null);
+            setOcrSnapshots([]);
+            setGlossaryApplied([]);
             setDuplicateMap(new Map());
             setSelectedEntries(new Set());
         }
@@ -116,6 +127,7 @@ const LogScan: React.FC = () => {
         const firstData = await compressForOCR(files[0]);
         setImageData(firstData);
 
+        const priorCount = append ? (entries?.length || 0) : 0;
         let allEntries = append ? [...(entries || [])] : [];
         let sheetsProcessed = append ? sheetCount : 0;
         const failedIndices: number[] = [];
@@ -178,17 +190,21 @@ const LogScan: React.FC = () => {
 
         setProcessingProgress(null);
         setSheetCount(sheetsProcessed);
-        if (allEntries.length > 0) {
-            setEntries(allEntries);
+        if (allEntries.length > priorCount || (!append && allEntries.length > 0)) {
+            const prior = allEntries.slice(0, priorCount);
+            const fresh = allEntries.slice(priorCount);
+            const enrichedFresh = fresh.length > 0 ? await finalizeEntries(fresh, append) : [];
+            const finalized = [...prior, ...enrichedFresh];
+            setEntries(finalized);
             if (failedIndices.length > 0) {
                 const nums = failedIndices.map(i => i + 1);
                 setError(`partial:Sheet${nums.length > 1 ? 's' : ''} ${nums.join(', ')} couldn't be read. You can add them again later.`);
             }
-            await checkEntriesForDuplicates(allEntries);
+            await checkEntriesForDuplicates(finalized);
             const timestamp = Date.now();
             setScanTimestamp(timestamp);
             setShowBatchNaming(true);
-        } else {
+        } else if (!append) {
             setEntries(null);
             setError(failedIndices.length > 0
                 ? 'The server is busy right now. Try again in a moment, or try fewer sheets at a time.'
@@ -221,6 +237,19 @@ const LogScan: React.FC = () => {
 
         setDuplicateMap(dupMap);
         setSelectedEntries(selected);
+    };
+
+    /** Apply org/user glossary, keep OCR snapshots for learning on edit. */
+    const finalizeEntries = async (raw: LogSheetEntry[], append: boolean) => {
+        const { entries: enriched, snapshots, appliedFlat } = await enrichEntriesWithGlossary(storage, raw);
+        if (append) {
+            setOcrSnapshots(prev => [...prev, ...snapshots]);
+            setGlossaryApplied(prev => [...prev, ...appliedFlat]);
+        } else {
+            setOcrSnapshots(snapshots);
+            setGlossaryApplied(appliedFlat);
+        }
+        return enriched;
     };
 
     const friendlyError = (err: unknown): string => {
@@ -269,7 +298,8 @@ const LogScan: React.FC = () => {
             } else {
                 await incrementScanCount();
                 const prevEntries = entries || [];
-                const combined = [...prevEntries, ...results];
+                const enrichedNew = await finalizeEntries(results, true);
+                const combined = [...prevEntries, ...enrichedNew];
                 setEntries(combined);
                 setSheetCount(prev => prev + 1);
                 await checkEntriesForDuplicates(combined);
@@ -291,18 +321,22 @@ const LogScan: React.FC = () => {
         setIsProcessing(true);
         setError(null);
         setEntries(null);
+        setOcrSnapshots([]);
+        setGlossaryApplied([]);
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
 
         try {
             const results = await parseWithRetry(base64Image);
-            setEntries(results);
             if (results.length === 0) {
+                setEntries(results);
                 setError('No entries found. Make sure the log sheet is clearly visible.');
             } else {
+                const finalized = await finalizeEntries(results, false);
+                setEntries(finalized);
                 await incrementScanCount();
                 setSheetCount(1);
-                await checkEntriesForDuplicates(results);
+                await checkEntriesForDuplicates(finalized);
                 const timestamp = Date.now();
                 setScanTimestamp(timestamp);
                 setShowBatchNaming(true);
@@ -403,6 +437,8 @@ const LogScan: React.FC = () => {
         setSheetCount(0);
         setShowBatchNaming(false);
         setCurrentBatchId(null);
+        setOcrSnapshots([]);
+        setGlossaryApplied([]);
     };
 
     const openEntryEdit = (index: number) => {
@@ -425,6 +461,11 @@ const LogScan: React.FC = () => {
         if (editingIndex === null || !entries) return;
         const updated = [...entries];
         const original = entries[editingIndex];
+        const snapshot = ocrSnapshots[editingIndex] || {
+            name: original.name,
+            company: original.company,
+            position: original.position,
+        };
         updated[editingIndex] = {
             ...original,
             name: editForm.name,
@@ -437,14 +478,23 @@ const LogScan: React.FC = () => {
         };
         setEntries(updated);
         setEditingIndex(null);
+        // Learn from raw OCR snapshot → user edit (fire-and-forget)
+        void learnFromFieldDiffs(
+            storage,
+            snapshot,
+            { name: editForm.name, company: editForm.company, position: editForm.position },
+            { scope: mode === 'team' ? 'org' : 'user', createdBy: user?.uid }
+        ).catch(err => console.warn('Failed to learn corrections:', err));
     };
 
     const deleteEntry = (index: number) => {
         if (!entries) return;
         const updated = entries.filter((_, i) => i !== index);
         setEntries(updated.length > 0 ? updated : null);
+        setOcrSnapshots(prev => prev.filter((_, i) => i !== index));
         if (updated.length === 0) {
             setError('All entries removed. Scan another sheet or start over.');
+            setGlossaryApplied([]);
         }
         if (editingIndex === index) {
             setEditingIndex(null);
@@ -570,6 +620,24 @@ const LogScan: React.FC = () => {
                         <div className="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-brand-800">
                             <img src={imageData} alt="Log sheet" className="w-full object-contain max-h-32" />
                         </div>
+
+                        {glossaryApplied.length > 0 && (
+                            <CorrectionAppliedBanner
+                                applied={glossaryApplied.slice(0, 4)}
+                                onUndo={(field) => {
+                                    if (!entries) return;
+                                    const next = entries.map((e, i) => {
+                                        const snap = ocrSnapshots[i];
+                                        if (!snap || snap[field] === undefined) return e;
+                                        const hit = glossaryApplied.find(a => a.field === field && a.to === e[field]);
+                                        if (!hit) return e;
+                                        return { ...e, [field]: snap[field] as string };
+                                    });
+                                    setEntries(next);
+                                    setGlossaryApplied(prev => prev.filter(a => a.field !== field));
+                                }}
+                            />
+                        )}
 
                         {error && (() => {
                             const isPartial = error.startsWith('partial:');

@@ -10,16 +10,25 @@ import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import BatchNamingModal from '@/components/BatchNamingModal';
+import { CorrectionAppliedBanner } from '@/components/CorrectionHint';
+import {
+    enrichEntriesWithGlossary,
+    learnFromFieldDiffs,
+    type OcrFieldSnapshot,
+} from '@/services/correctionMemory';
+import { AppliedCorrection } from '@/types/correction';
 import { compressForOCR } from '@/utils/compressPhoto';
 
 const MultiCardScan: React.FC = () => {
     const navigate = useNavigate();
     const camRef = useRef<HTMLInputElement>(null);
     const galRef = useRef<HTMLInputElement>(null);
-    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canUseBulkScan } = useAuth();
-    const { storage } = useWorkspace();
+    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canUseBulkScan, user } = useAuth();
+    const { storage, mode } = useWorkspace();
 
     const [imageData, setImageData] = useState<string | null>(null);
+    const [ocrSnapshots, setOcrSnapshots] = useState<OcrFieldSnapshot[]>([]);
+    const [glossaryApplied, setGlossaryApplied] = useState<AppliedCorrection[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [entries, setEntries] = useState<LogSheetEntry[] | null>(null);
@@ -64,6 +73,8 @@ const MultiCardScan: React.FC = () => {
         setIsProcessing(true);
         setError(null);
         setEntries(null);
+        setOcrSnapshots([]);
+        setGlossaryApplied([]);
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
 
@@ -71,12 +82,16 @@ const MultiCardScan: React.FC = () => {
             const data = await compressForOCR(file);
             setImageData(data);
             const results = await parseWithRetry(data);
-            setEntries(results);
             if (results.length === 0) {
+                setEntries(results);
                 setError('No cards detected. Make sure cards are spread out and clearly visible.');
             } else {
+                const { entries: enriched, snapshots, appliedFlat } = await enrichEntriesWithGlossary(storage, results);
+                setEntries(enriched);
+                setOcrSnapshots(snapshots);
+                setGlossaryApplied(appliedFlat);
                 await incrementScanCount();
-                await checkEntriesForDuplicates(results);
+                await checkEntriesForDuplicates(enriched);
                 const timestamp = Date.now();
                 setScanTimestamp(timestamp);
                 setShowBatchNaming(true);
@@ -230,6 +245,8 @@ const MultiCardScan: React.FC = () => {
         setSelectedEntries(new Set());
         setShowBatchNaming(false);
         setCurrentBatchId(null);
+        setOcrSnapshots([]);
+        setGlossaryApplied([]);
     };
 
     const openEntryEdit = (index: number) => {
@@ -252,6 +269,11 @@ const MultiCardScan: React.FC = () => {
         if (editingIndex === null || !entries) return;
         const updated = [...entries];
         const original = entries[editingIndex];
+        const snapshot = ocrSnapshots[editingIndex] || {
+            name: original.name,
+            company: original.company,
+            position: original.position,
+        };
         updated[editingIndex] = {
             ...original,
             name: editForm.name,
@@ -264,14 +286,22 @@ const MultiCardScan: React.FC = () => {
         };
         setEntries(updated);
         setEditingIndex(null);
+        void learnFromFieldDiffs(
+            storage,
+            snapshot,
+            { name: editForm.name, company: editForm.company, position: editForm.position },
+            { scope: mode === 'team' ? 'org' : 'user', createdBy: user?.uid }
+        ).catch(err => console.warn('Failed to learn corrections:', err));
     };
 
     const deleteEntry = (index: number) => {
         if (!entries) return;
         const updated = entries.filter((_, i) => i !== index);
         setEntries(updated.length > 0 ? updated : null);
+        setOcrSnapshots(prev => prev.filter((_, i) => i !== index));
         if (updated.length === 0) {
             setError('All entries removed. Take another photo or start over.');
+            setGlossaryApplied([]);
         }
         if (editingIndex === index) {
             setEditingIndex(null);
@@ -393,6 +423,23 @@ const MultiCardScan: React.FC = () => {
                         <div className="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-brand-800">
                             <img src={imageData} alt="Cards" className="w-full object-contain max-h-32" />
                         </div>
+
+                        {glossaryApplied.length > 0 && (
+                            <CorrectionAppliedBanner
+                                applied={glossaryApplied.slice(0, 4)}
+                                onUndo={(field) => {
+                                    if (!entries) return;
+                                    const next = entries.map((e, i) => {
+                                        const snap = ocrSnapshots[i];
+                                        if (!snap || snap[field] === undefined) return e;
+                                        if (e[field] !== glossaryApplied.find(a => a.field === field)?.to) return e;
+                                        return { ...e, [field]: snap[field] as string };
+                                    });
+                                    setEntries(next);
+                                    setGlossaryApplied(prev => prev.filter(a => a.field !== field));
+                                }}
+                            />
+                        )}
 
                         {error && (
                             <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">

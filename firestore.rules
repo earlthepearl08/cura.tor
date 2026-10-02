@@ -102,6 +102,11 @@ service cloud.firestore {
         allow read, write: if isMember();
       }
 
+      // OCR correction glossary — shared per org; members can teach/apply
+      match /corrections/{correctionId} {
+        allow read, write: if isMember();
+      }
+
       // Invites subcollection — read if member; writes only via Admin SDK
       match /invites/{code} {
         allow read: if isMember();
