@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers } from 'lucide-react';
 import { exportService } from '@/services/export';
 import { exportContactsToHubSpot, type HubSpotSetupError } from '@/services/hubspot';
+import { googleSheets } from '@/services/googleSheets';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
@@ -40,11 +41,13 @@ const Contacts: React.FC = () => {
     });
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { canExportCSV, canExportExcel, canExportBulkVCard, canExportVCard, user } = useAuth();
+    const { canExportCSV, canExportExcel, canExportBulkVCard, canExportVCard, canExportGoogleSheets, user } = useAuth();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const [isExportingHubSpot, setIsExportingHubSpot] = useState(false);
     const [hubspotExportMessage, setHubspotExportMessage] = useState<string | null>(null);
     const [hubspotExportError, setHubspotExportError] = useState<string | null>(null);
+    const [isExportingSheets, setIsExportingSheets] = useState(false);
+    const [sheetsExportError, setSheetsExportError] = useState<string | null>(null);
     const [persistedFolders, setPersistedFolders] = useState<string[]>([]);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const [vcfPreview, setVcfPreview] = useState<ParsedVCard[] | null>(null);
@@ -225,12 +228,13 @@ const Contacts: React.FC = () => {
         loadContacts();
     };
 
-    const handleExport = (type: 'csv' | 'excel' | 'vcard' | 'salesforce-csv') => {
+    const handleExport = (type: 'csv' | 'excel' | 'vcard' | 'salesforce-csv' | 'crm-csv') => {
         // Check tier permissions
         if (type === 'csv' && !canExportCSV()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
         if (type === 'excel' && !canExportExcel()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
         if (type === 'vcard' && !canExportBulkVCard()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
         if (type === 'salesforce-csv' && !canExportCSV()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
+        if (type === 'crm-csv' && !canExportGoogleSheets()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
 
         const toExport = selectedIds.size > 0
             ? contacts.filter(c => selectedIds.has(c.id))
@@ -241,11 +245,51 @@ const Contacts: React.FC = () => {
         else if (type === 'excel') exportService.toExcel(toExport, batchMap);
         else if (type === 'vcard') exportService.toVCardAll(toExport);
         else if (type === 'salesforce-csv') exportService.toSalesforceCSV(toExport, batchMap);
+        else if (type === 'crm-csv') exportService.toCRMCSV(toExport, batchMap);
         setShowExportOptions(false);
         setHubspotExportError(null);
+        setSheetsExportError(null);
         if (selectedIds.size > 0) {
             setSelectedIds(new Set());
             setSelectMode(false);
+        }
+    };
+
+    const handleGoogleSheetsExport = async () => {
+        if (!canExportGoogleSheets()) {
+            setShowUpgradePrompt(true);
+            setShowExportOptions(false);
+            return;
+        }
+
+        const toExport = selectedIds.size > 0
+            ? contacts.filter(c => selectedIds.has(c.id))
+            : filteredContacts;
+        if (toExport.length === 0) {
+            setSheetsExportError('No contacts to export');
+            setShowExportOptions(false);
+            return;
+        }
+
+        const batchMap: Record<string, string> = {};
+        for (const b of batches) { batchMap[b.id] = b.name; }
+
+        setIsExportingSheets(true);
+        setSheetsExportError(null);
+        setShowExportOptions(false);
+        try {
+            const result = await googleSheets.exportContacts(toExport, batchMap);
+            if (result.spreadsheetUrl) {
+                window.open(result.spreadsheetUrl, '_blank', 'noopener,noreferrer');
+            }
+            if (selectedIds.size > 0) {
+                setSelectedIds(new Set());
+                setSelectMode(false);
+            }
+        } catch (err: any) {
+            setSheetsExportError(err?.message || 'Google Sheets export failed');
+        } finally {
+            setIsExportingSheets(false);
         }
     };
 
@@ -715,7 +759,22 @@ const Contacts: React.FC = () => {
                                         {!canExportBulkVCard() && <Lock size={12} className="text-amber-400" />}
                                     </button>
                                     <button
-onClick={() => { void handleHubSpotExport(); }}
+                                        onClick={() => handleExport('crm-csv')}
+                                        className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportGoogleSheets() ? 'opacity-60' : ''}`}
+                                    >
+                                        CRM-ready CSV
+                                        {!canExportGoogleSheets() && <Lock size={12} className="text-amber-400" />}
+                                    </button>
+                                    <button
+                                        onClick={() => { void handleGoogleSheetsExport(); }}
+                                        disabled={isExportingSheets}
+                                        className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between disabled:opacity-50 ${!canExportGoogleSheets() ? 'opacity-60' : ''}`}
+                                    >
+                                        {isExportingSheets ? 'Exporting to Sheets…' : 'Google Sheets'}
+                                        {!canExportGoogleSheets() && <Lock size={12} className="text-amber-400" />}
+                                    </button>
+                                    <button
+                                        onClick={() => { void handleHubSpotExport(); }}
                                         disabled={isExportingHubSpot}
                                         className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between disabled:opacity-50 ${!canExportCSV() ? 'opacity-60' : ''}`}
                                     >
@@ -734,6 +793,21 @@ onClick={() => { void handleHubSpotExport(); }}
                         </div>
                     </div>
                 </div>
+
+                {sheetsExportError && (
+                    <div className="rounded-xl px-3 py-2 text-xs flex items-start gap-2 bg-red-500/10 text-red-300 border border-red-500/20">
+                        <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                        <p className="flex-1">{sheetsExportError}</p>
+                        <button
+                            type="button"
+                            onClick={() => setSheetsExportError(null)}
+                            className="shrink-0 opacity-70 hover:opacity-100"
+                            aria-label="Dismiss"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                )}
 
                 {(hubspotExportError || hubspotExportMessage || isExportingHubSpot) && (
                     <div

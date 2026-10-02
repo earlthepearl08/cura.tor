@@ -83,6 +83,7 @@ interface AuthContextType {
     canExportExcel: () => boolean;
     canExportBulkVCard: () => boolean;
     canExportVCard: () => boolean;
+    canExportGoogleSheets: () => boolean;
     canUseGoogleDrive: () => boolean;
     canUseBulkScan: () => boolean;
 
@@ -347,6 +348,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return tierLimits.googleDriveSync;
     }, [tierLimits]);
 
+    const canExportGoogleSheets = useCallback((): boolean => {
+        return tierLimits.googleSheetsExport;
+    }, [tierLimits]);
+
     const canUseBulkScan = useCallback((): boolean => {
         return tierLimits.bulkScan;
     }, [tierLimits]);
@@ -423,6 +428,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             canExportExcel,
             canExportBulkVCard,
             canExportVCard,
+            canExportGoogleSheets,
             canUseGoogleDrive,
             canUseBulkScan,
             incrementScanCount,

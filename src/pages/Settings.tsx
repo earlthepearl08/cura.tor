@@ -27,6 +27,7 @@ const PIONEER_FEATURES = [
     'Up to 50 contacts',
     'vCard, CSV & Excel export',
     'HubSpot CRM export',
+    'CRM-ready CSV & Google Sheets',
     'Google Drive sync',
 ];
 
@@ -371,6 +372,13 @@ const Settings = () => {
                             <div className="flex items-center justify-between text-xs">
                                 <span className="text-slate-400">HubSpot CRM export</span>
                                 {limits.csvExport
+                                    ? <Check size={14} className="text-emerald-400" />
+                                    : <Lock size={14} className="text-slate-600" />
+                                }
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400">Google Sheets / CRM CSV</span>
+                                {limits.googleSheetsExport
                                     ? <Check size={14} className="text-emerald-400" />
                                     : <Lock size={14} className="text-slate-600" />
                                 }

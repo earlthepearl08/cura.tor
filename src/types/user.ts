@@ -42,6 +42,8 @@ export interface TierLimits {
     excelExport: boolean;
     bulkVCardExport: boolean;
     googleDriveSync: boolean;
+    /** Google Sheets + CRM CSV — same paid export gate as CSV/Excel (Pioneer+) */
+    googleSheetsExport: boolean;
     individualVCard: boolean;
     bulkScan: boolean;                 // log sheet scan + multi-card scan
 }
@@ -54,6 +56,7 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         excelExport: false,
         bulkVCardExport: false,
         googleDriveSync: false,
+        googleSheetsExport: false,
         individualVCard: false,
         bulkScan: false,
     },
@@ -64,6 +67,7 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         excelExport: true,
         bulkVCardExport: true,
         googleDriveSync: true,
+        googleSheetsExport: true,
         individualVCard: true,
         bulkScan: false,               // Multi-Card & Log Sheet are Pro-only
     },
@@ -74,6 +78,7 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         excelExport: true,
         bulkVCardExport: true,
         googleDriveSync: true,
+        googleSheetsExport: true,
         individualVCard: true,
         bulkScan: true,
     },
@@ -86,6 +91,7 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
         excelExport: true,
         bulkVCardExport: true,
         googleDriveSync: true,
+        googleSheetsExport: true,
         individualVCard: true,
         bulkScan: true,
     },

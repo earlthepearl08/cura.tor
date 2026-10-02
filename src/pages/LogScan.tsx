@@ -4,6 +4,7 @@ import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, Rotate
 import { ocrService, LogSheetEntry, entryNeedsReview, ContactFieldKey } from '@/services/ocr';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { exportService } from '@/services/export';
+import { googleSheets } from '@/services/googleSheets';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
@@ -30,7 +31,7 @@ const LogScan: React.FC = () => {
     const galRef = useRef<HTMLInputElement>(null);
     const addMoreCamRef = useRef<HTMLInputElement>(null);
     const addMoreGalRef = useRef<HTMLInputElement>(null);
-    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canUseBulkScan } = useAuth();
+    const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canExportGoogleSheets, canUseBulkScan } = useAuth();
     const { storage } = useWorkspace();
 
     const [imageData, setImageData] = useState<string | null>(null);
@@ -41,6 +42,7 @@ const LogScan: React.FC = () => {
     const [folders, setFolders] = useState<string[]>([]);
     const [isImporting, setIsImporting] = useState(false);
     const [showExportOptions, setShowExportOptions] = useState(false);
+    const [isExportingSheets, setIsExportingSheets] = useState(false);
     const [upgradeFeature, setUpgradeFeature] = useState<'bulk-scan' | 'scan' | 'export' | null>(null);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editForm, setEditForm] = useState<{ name: string; company: string; position: string; phone: string; email: string; address: string; notes: string }>({ name: '', company: '', position: '', phone: '', email: '', address: '', notes: '' });
@@ -421,15 +423,36 @@ const LogScan: React.FC = () => {
         navigate('/contacts');
     };
 
-    const handleExport = (type: 'csv' | 'excel') => {
+    const handleExport = (type: 'csv' | 'excel' | 'crm-csv') => {
         if (!entries) return;
         if (type === 'csv' && !canExportCSV()) { setUpgradeFeature('export'); return; }
         if (type === 'excel' && !canExportExcel()) { setUpgradeFeature('export'); return; }
+        if (type === 'crm-csv' && !canExportGoogleSheets()) { setUpgradeFeature('export'); return; }
         const selected = entries.filter((_, i) => selectedEntries.has(i));
         const contacts = entriesToContacts(selected.length > 0 ? selected : entries);
         if (type === 'csv') exportService.toCSV(contacts);
-        else exportService.toExcel(contacts);
+        else if (type === 'excel') exportService.toExcel(contacts);
+        else exportService.toCRMCSV(contacts);
         setShowExportOptions(false);
+    };
+
+    const handleGoogleSheetsExport = async () => {
+        if (!entries) return;
+        if (!canExportGoogleSheets()) { setUpgradeFeature('export'); return; }
+        const selected = entries.filter((_, i) => selectedEntries.has(i));
+        const contacts = entriesToContacts(selected.length > 0 ? selected : entries);
+        setIsExportingSheets(true);
+        setShowExportOptions(false);
+        try {
+            const result = await googleSheets.exportContacts(contacts, undefined, 'Cura.Tor Log Sheet');
+            if (result.spreadsheetUrl) {
+                window.open(result.spreadsheetUrl, '_blank', 'noopener,noreferrer');
+            }
+        } catch (err: any) {
+            setError(err?.message || 'Google Sheets export failed');
+        } finally {
+            setIsExportingSheets(false);
+        }
     };
 
     const handleSaveBatch = async (name: string) => {
@@ -966,6 +989,16 @@ const LogScan: React.FC = () => {
                                 </button>
                                 <button onClick={() => handleExport('excel')} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors">
                                     Export as Excel
+                                </button>
+                                <button onClick={() => handleExport('crm-csv')} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors">
+                                    CRM-ready CSV
+                                </button>
+                                <button
+                                    onClick={() => { void handleGoogleSheetsExport(); }}
+                                    disabled={isExportingSheets}
+                                    className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors disabled:opacity-50"
+                                >
+                                    {isExportingSheets ? 'Exporting to Sheets…' : 'Google Sheets'}
                                 </button>
                             </div>
                         )}

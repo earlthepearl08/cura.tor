@@ -99,3 +99,7 @@ Once configured:
 - **Quota**: 1 billion requests/day (more than enough)
 - **Security**: OAuth 2.0 standard authentication
 - **Privacy**: Only your app data, not access to entire Drive
+
+## Related: Google Sheets / CRM export
+
+For one-click Google Sheets export and HubSpot/Salesforce column mapping, see **[CRM_EXPORT_MAPPING.md](./CRM_EXPORT_MAPPING.md)**. Enable the **Google Sheets API** on the same Google Cloud project and add the `spreadsheets` scope to the OAuth consent screen.
