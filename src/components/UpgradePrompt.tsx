@@ -4,6 +4,7 @@ import { Lock, Ticket, Sparkles, Camera, PenLine, QrCode, Users, FolderOpen } fr
 import { useAuth } from '@/contexts/AuthContext';
 import { TIER_LIMITS } from '@/types/user';
 import { getNextScanReset } from '@/services/userService';
+import { trackEvent } from '@/services/observability';
 
 export type UpgradeFeature = 'scan' | 'export' | 'drive' | 'storage' | 'bulk-scan';
 
@@ -167,6 +168,12 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
     };
 
     const goUpgrade = () => {
+        trackEvent('upgrade_intent', {
+            source: 'upgrade_prompt',
+            feature,
+            plan: upgradeTier,
+            fromTier: user?.tier || 'free',
+        });
         onDismiss();
         navigate('/settings?upgrade=' + upgradeTier);
     };

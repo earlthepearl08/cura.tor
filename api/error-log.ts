@@ -143,27 +143,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   // Structured log line for Vercel / drains / future BigQuery
+  const isFunnelPreview =
+    event.name === 'signup' ||
+    event.name === 'first_scan' ||
+    event.name === 'upgrade_intent' ||
+    event.name === 'upgrade_success' ||
+    event.level === 'info';
   console.log(
     JSON.stringify({
-      src: 'cura.tor.api.error-log',
+      src: isFunnelPreview ? 'cura.tor.api.analytics' : 'cura.tor.api.error-log',
       ip,
       ...event,
       // never echo huge context blobs twice
     })
   );
 
-  // Alert-oriented server log for Gemini quota / upstream pain
-  if (event.name === 'gemini_429' || event.status === 429) {
-    console.warn('[alert] gemini_429', event.flow, event.reason, event.message);
-  }
-  if (event.name === 'gemini_5xx' || (event.status != null && event.status >= 500)) {
-    console.warn('[alert] gemini_5xx', event.status, event.flow, event.message);
-  }
-  if (event.name === 'scan_failure') {
-    console.warn('[alert] scan_failure', event.flow, event.message);
+  // Alert-oriented server log for Gemini quota / upstream pain (never for funnel/info)
+  const isFunnel =
+    event.name === 'signup' ||
+    event.name === 'first_scan' ||
+    event.name === 'upgrade_intent' ||
+    event.name === 'upgrade_success' ||
+    event.level === 'info';
+
+  if (!isFunnel) {
+    if (event.name === 'gemini_429' || event.status === 429) {
+      console.warn('[alert] gemini_429', event.flow, event.reason, event.message);
+    }
+    if (event.name === 'gemini_5xx' || (event.status != null && event.status >= 500)) {
+      console.warn('[alert] gemini_5xx', event.status, event.flow, event.message);
+    }
+    if (event.name === 'scan_failure') {
+      console.warn('[alert] scan_failure', event.flow, event.message);
+    }
   }
 
-  void forwardSentry(event);
+  // Forward errors/warns to Sentry when DSN set; skip pure funnel noise
+  if (!isFunnel || event.level === 'error' || event.level === 'warn') {
+    void forwardSentry(event);
+  }
 
   return res.status(202).json({ ok: true });
 }

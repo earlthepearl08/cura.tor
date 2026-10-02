@@ -47,8 +47,14 @@ const docToProfile = (data: any): UserProfile => ({
     updatedAt: data.updatedAt?.toMillis?.() || data.updatedAt || Date.now(),
 });
 
+export type GetOrCreateUserResult = {
+    profile: UserProfile;
+    /** True when a new Firestore user doc was created (signup / first Google login). */
+    isNew: boolean;
+};
+
 /** Get or create user document on sign-in */
-export async function getOrCreateUserDoc(firebaseUser: User): Promise<UserProfile> {
+export async function getOrCreateUserDoc(firebaseUser: User): Promise<GetOrCreateUserResult> {
     const userRef = doc(db, 'users', firebaseUser.uid);
     const snap = await getDoc(userRef);
 
@@ -76,9 +82,9 @@ export async function getOrCreateUserDoc(firebaseUser: User): Promise<UserProfil
         // Check if owner and upgrade if needed
         if (OWNER_EMAILS.includes(firebaseUser.email || '') && profile.tier !== 'pro') {
             await updateDoc(userRef, { tier: 'pro', contactLimit: null, updatedAt: serverTimestamp() });
-            return { ...profile, tier: 'pro', contactLimit: null };
+            return { profile: { ...profile, tier: 'pro', contactLimit: null }, isNew: false };
         }
-        return resetMonthlyScansIfNeeded(profile);
+        return { profile: await resetMonthlyScansIfNeeded(profile), isNew: false };
     }
 
     // New user — determine tier
@@ -106,17 +112,20 @@ export async function getOrCreateUserDoc(firebaseUser: User): Promise<UserProfil
     await setDoc(userRef, newUser);
 
     return {
-        ...newUser,
-        scanUsage: {
-            count: 0,
-            periodStart: Date.now(),
-            lifetimeCount: 0,
-            lifetimeLimit: null,
-        },
-        contactLimit: TIER_LIMITS[tier].contactStorage,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-    } as UserProfile;
+        profile: {
+            ...newUser,
+            scanUsage: {
+                count: 0,
+                periodStart: Date.now(),
+                lifetimeCount: 0,
+                lifetimeLimit: null,
+            },
+            contactLimit: TIER_LIMITS[tier].contactStorage,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        } as UserProfile,
+        isNew: true,
+    };
 }
 
 /** Get the next reset date: same day-of-month as periodStart, one month later */

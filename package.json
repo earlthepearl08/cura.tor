@@ -24,6 +24,7 @@
         "lighthouse:assert": "npx --yes @lhci/cli@0.14.0 assert --config=./lighthouserc.cjs"
     },
     "dependencies": {
+        "@sentry/react": "^8.55.2",
         "@stripe/stripe-js": "^9.0.0",
         "clsx": "^2.1.0",
         "firebase": "^12.10.0",

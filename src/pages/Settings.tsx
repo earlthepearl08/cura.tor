@@ -16,6 +16,7 @@ import ContactSupportModal from '@/components/ContactSupportModal';
 import DriveBackupPrompt from '@/components/DriveBackupPrompt';
 import { OWNER_EMAILS } from '@/config/firebase';
 import { SUPPORT_EMAIL, PRIORITY_SUPPORT_SLA } from '@/config/support';
+import { trackEvent } from '@/services/observability';
 import { Trash2 } from 'lucide-react';
 
 const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> = {
@@ -102,6 +103,11 @@ const Settings = () => {
                             type: 'success',
                             text: `You're on ${label}. Thanks for upgrading.`,
                         });
+                        trackEvent('upgrade_success', {
+                            method: 'stripe_checkout',
+                            tier: profile.tier,
+                            source: 'settings_return',
+                        });
                     }
                     return;
                 }
@@ -144,6 +150,12 @@ const Settings = () => {
         setUpgradeError('');
 
         try {
+            trackEvent('upgrade_intent', {
+                source: 'settings_checkout',
+                plan,
+                interval: billingInterval,
+                fromTier: user.tier,
+            });
             const price = STRIPE_PRICES[plan][billingInterval];
             if (!price.id) {
                 throw new Error('Stripe price is not configured for this plan.');

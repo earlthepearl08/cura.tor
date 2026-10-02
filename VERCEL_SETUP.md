@@ -72,3 +72,16 @@ Auth / rate-limit / tier-quota logic for scan endpoints is shared in `api/_lib/s
 - Paths under `api/` starting with `_` are **helpers**, not HTTP endpoints
 - Handlers must use **static relative** imports so Node File Trace includes the module in each function bundle
 - Do **not** import `firebase-admin/auth` on this project (use `jose` + JWKS instead)
+
+## Observability & analytics (optional)
+
+Full checklist: **`MONITORING.md`**.
+
+| Env var | Scope | Notes |
+|---------|--------|------|
+| `VITE_SENTRY_DSN` | Client (build-time) | Enables `@sentry/react` in `src/services/sentry.ts`. Omit = no Sentry SDK load. |
+| `SENTRY_DSN` | Server (runtime) | Optional forward from `POST /api/error-log` for error/warn events. |
+
+Funnel events (`signup`, `first_scan`, `upgrade_intent`, `upgrade_success`) always POST to `/api/error-log` as info-level analytics lines — **no Sentry DSN required**.
+
+After setting `VITE_SENTRY_DSN`, **redeploy** so Vite embeds the DSN in the client bundle.
