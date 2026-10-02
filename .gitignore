@@ -17,6 +17,9 @@ Thumbs.db
 dist/
 build/
 
+# Lighthouse CI reports
+.lighthouseci/
+
 # Logs
 *.log
 

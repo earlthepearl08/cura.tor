@@ -17,7 +17,11 @@
         "eval:accuracy": "node eval/accuracy/run-eval.mjs",
         "eval:accuracy:live": "node eval/accuracy/run-eval.mjs --live",
         "eval:accuracy:score-test": "node eval/accuracy/scripts/score-test.mjs",
-        "eval:accuracy:generate": "node eval/accuracy/scripts/generate-synthetic-fixtures.mjs"
+        "eval:accuracy:generate": "node eval/accuracy/scripts/generate-synthetic-fixtures.mjs",
+        "lighthouse": "npm run build && npx --yes @lhci/cli@0.14.0 autorun --config=./lighthouserc.cjs",
+        "lighthouse:advisory": "bash scripts/lighthouse-advisory.sh",
+        "lighthouse:collect": "npx --yes @lhci/cli@0.14.0 collect --config=./lighthouserc.cjs",
+        "lighthouse:assert": "npx --yes @lhci/cli@0.14.0 assert --config=./lighthouserc.cjs"
     },
     "dependencies": {
         "@stripe/stripe-js": "^9.0.0",
