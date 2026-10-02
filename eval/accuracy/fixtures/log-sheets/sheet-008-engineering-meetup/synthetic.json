@@ -1,0 +1,55 @@
+{
+  "kind": "log-sheet",
+  "id": "sheet-008-engineering-meetup",
+  "description": "Synthetic log-sheet rows — no photo required. Replace with image.jpg for live Gemini eval.",
+  "columns": [
+    "name",
+    "company",
+    "position",
+    "phone",
+    "email",
+    "address",
+    "notes"
+  ],
+  "rows": [
+    {
+      "name": "Engr. Ramon dela Cruz, PEE",
+      "company": "VoltEdge Engineering",
+      "position": "Project Engineer",
+      "phone": [
+        "+63 917 222 8899"
+      ],
+      "email": [
+        "rdelacruz@voltedge.ph"
+      ],
+      "address": "Las Piñas",
+      "notes": ""
+    },
+    {
+      "name": "Engr. Maria Santos, REE, PEE",
+      "company": "KINMO PW Corporation",
+      "position": "Senior Sales Manager",
+      "phone": [
+        "+63 917 555 1234"
+      ],
+      "email": [
+        "maria.santos@kinmopw.com"
+      ],
+      "address": "Taguig",
+      "notes": "panel speaker"
+    },
+    {
+      "name": "Kevin Ong",
+      "company": "Nimbus Cloud Corporation",
+      "position": "CTO",
+      "phone": [
+        "+63 928 111 2222"
+      ],
+      "email": [
+        "kevin.ong@nimbuscloud.ph"
+      ],
+      "address": "BGC",
+      "notes": ""
+    }
+  ]
+}

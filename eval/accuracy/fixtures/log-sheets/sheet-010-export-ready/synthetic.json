@@ -1,0 +1,94 @@
+{
+  "kind": "log-sheet",
+  "id": "sheet-010-export-ready",
+  "description": "Synthetic log-sheet rows — no photo required. Replace with image.jpg for live Gemini eval.",
+  "columns": [
+    "name",
+    "company",
+    "position",
+    "phone",
+    "email",
+    "address",
+    "notes"
+  ],
+  "rows": [
+    {
+      "name": "Patricia Uy",
+      "company": "Northwind Retail Inc.",
+      "position": "Marketing Manager",
+      "phone": [
+        "02-8777-5555"
+      ],
+      "email": [
+        "patricia.uy@northwind.ph"
+      ],
+      "address": "Pasig",
+      "notes": ""
+    },
+    {
+      "name": "Trevor Blake",
+      "company": "Harbor Tech LLC",
+      "position": "Solutions Architect",
+      "phone": [
+        "+63 917 444 0198"
+      ],
+      "email": [
+        "trevor@harbortech.io"
+      ],
+      "address": "Makati",
+      "notes": "demo booked"
+    },
+    {
+      "name": "Wei Chen",
+      "company": "Apex Trade Pte Ltd",
+      "position": "Regional Director",
+      "phone": [
+        "+63 917 900 8000"
+      ],
+      "email": [
+        "wei.chen@apextrade.com"
+      ],
+      "address": "BGC",
+      "notes": ""
+    },
+    {
+      "name": "Roberto Santos III",
+      "company": "Santos Realty Corporation",
+      "position": "Broker",
+      "phone": [
+        "+63 922 333 4444"
+      ],
+      "email": [
+        "rsantos3@santosrealty.ph"
+      ],
+      "address": "QC",
+      "notes": "condo leads"
+    },
+    {
+      "name": "Lourdes Pineda",
+      "company": "Pineda Dental Clinic",
+      "position": "Clinic Administrator",
+      "phone": [
+        "0918-200-3000"
+      ],
+      "email": [
+        "info@pinedadental.ph"
+      ],
+      "address": "San Juan",
+      "notes": ""
+    },
+    {
+      "name": "Manuel Cruz",
+      "company": "Metro Print Services",
+      "position": "Plant Supervisor",
+      "phone": [
+        "02-8123-9000"
+      ],
+      "email": [
+        "mcruz@metroprint.ph"
+      ],
+      "address": "Valenzuela",
+      "notes": ""
+    }
+  ]
+}

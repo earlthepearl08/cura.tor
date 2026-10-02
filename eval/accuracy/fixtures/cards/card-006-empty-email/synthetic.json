@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-006-empty-email",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Island Coffee Co.",
+    "Jun Rivera",
+    "Owner",
+    "0917-333-4444",
+    "Davao City",
+    "Walk-in wholesale"
+  ]
+}

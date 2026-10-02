@@ -1,0 +1,12 @@
+{
+  "kind": "calling-card",
+  "id": "card-019-handwriting-style",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Booth Pop-Up PH",
+    "Mark Villanueva",
+    "Founder",
+    "0917-555-0199",
+    "met at SMX booth 12"
+  ]
+}

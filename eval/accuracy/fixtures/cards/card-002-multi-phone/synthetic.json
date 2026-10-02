@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-002-multi-phone",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Health First Inc.",
+    "Dr. John Lee, MD",
+    "Medical Director",
+    "+63 2 8888 9999 / 0917-222-3333 / 8362-5820 (Fax)",
+    "jlee@healthfirst.ph ; appointments@healthfirst.ph",
+    "Quezon City, Metro Manila",
+    "linkedin.com/in/johnlee-md"
+  ]
+}

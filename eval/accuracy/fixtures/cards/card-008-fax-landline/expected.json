@@ -1,0 +1,23 @@
+{
+  "name": "Manuel Cruz",
+  "company": "Metro Print Services",
+  "position": "Plant Supervisor",
+  "phone": [
+    "02-8123-9000",
+    "02-8123-9001 (Fax)"
+  ],
+  "email": [
+    "mcruz@metroprint.ph"
+  ],
+  "address": "Valenzuela City",
+  "notes": "",
+  "_meta": {
+    "id": "card-008-fax-landline",
+    "difficulty": "medium",
+    "tags": [
+      "fax",
+      "landline",
+      "ph"
+    ]
+  }
+}

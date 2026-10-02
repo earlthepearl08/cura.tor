@@ -1,0 +1,21 @@
+{
+  "name": "Tina Bautista",
+  "company": "AquaPure Filters Co.",
+  "position": "Sales Representative",
+  "phone": [
+    "0918-777-0101"
+  ],
+  "email": [
+    "tina.b@aquapure.ph"
+  ],
+  "address": "Pampanga",
+  "notes": "",
+  "_meta": {
+    "id": "card-028-low-contrast-fields",
+    "difficulty": "hard",
+    "tags": [
+      "low-contrast",
+      "ph"
+    ]
+  }
+}

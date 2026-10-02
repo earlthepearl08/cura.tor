@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { reportClientError } from '../services/observability';
 
 interface Props {
     children: ReactNode;
@@ -10,6 +11,7 @@ interface State {
     hasError: boolean;
     error: Error | null;
     errorInfo: ErrorInfo | null;
+    reportId: string | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -18,7 +20,8 @@ class ErrorBoundary extends Component<Props, State> {
         this.state = {
             hasError: false,
             error: null,
-            errorInfo: null
+            errorInfo: null,
+            reportId: null,
         };
     }
 
@@ -27,13 +30,16 @@ class ErrorBoundary extends Component<Props, State> {
     }
 
     componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-        this.setState({ errorInfo });
-        // Log error to console in development
-        console.error('ErrorBoundary caught an error:', error, errorInfo);
+        const reportId = `ui-${Date.now().toString(36)}`;
+        this.setState({ errorInfo, reportId });
+        reportClientError(error, {
+            reportId,
+            componentStack: errorInfo.componentStack?.slice(0, 1500),
+        });
     }
 
     handleRetry = (): void => {
-        this.setState({ hasError: false, error: null, errorInfo: null });
+        this.setState({ hasError: false, error: null, errorInfo: null, reportId: null });
     };
 
     render(): ReactNode {
@@ -53,9 +59,17 @@ class ErrorBoundary extends Component<Props, State> {
                             Something went wrong
                         </h2>
 
-                        <p className="text-brand-400 text-sm mb-6">
+                        <p className="text-brand-400 text-sm mb-2">
                             {this.state.error?.message || 'An unexpected error occurred'}
                         </p>
+
+                        {this.state.reportId && (
+                            <p className="text-brand-500 text-xs mb-6">
+                                Reference: {this.state.reportId}
+                            </p>
+                        )}
+
+                        {!this.state.reportId && <div className="mb-6" />}
 
                         <button
                             onClick={this.handleRetry}

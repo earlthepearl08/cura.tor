@@ -1,0 +1,40 @@
+{
+  "kind": "log-sheet",
+  "id": "sheet-002-handwritten-mix",
+  "description": "Synthetic log-sheet rows — no photo required. Replace with image.jpg for live Gemini eval.",
+  "columns": [
+    "name",
+    "company",
+    "position",
+    "phone",
+    "email",
+    "address",
+    "notes"
+  ],
+  "rows": [
+    {
+      "name": "Carlo Mendoza",
+      "company": "Bright Solar PH",
+      "position": "Owner",
+      "phone": [
+        "0917-111-2222"
+      ],
+      "email": [],
+      "address": "Batangas",
+      "notes": "wants quote"
+    },
+    {
+      "name": "Liza Cruz",
+      "company": "Metro Builders Co.",
+      "position": "Architect",
+      "phone": [
+        "02-8123-4567"
+      ],
+      "email": [
+        "liza@metrobuilders.ph"
+      ],
+      "address": "",
+      "notes": ""
+    }
+  ]
+}
