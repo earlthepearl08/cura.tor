@@ -1,15 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus, Lock } from 'lucide-react';
-import { ocrService, LogSheetEntry } from '@/services/ocr';
+import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Lock, Plus, Layers, Sun } from 'lucide-react';
+import { ocrService, LogSheetEntry, LogSheetParseResult } from '@/services/ocr';
+import { remapEntries, mappingsEqual } from '@/services/logSheetMapping';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
+import { LogSheetColumnMapping, LogSheetParseMeta } from '@/types/logSheet';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import BatchNamingModal from '@/components/BatchNamingModal';
+import ColumnMappingConfirm from '@/components/ColumnMappingConfirm';
+import LogSheetGuidedCamera from '@/components/LogSheetGuidedCamera';
+import LogSheetFramingOverlay from '@/components/LogSheetFramingOverlay';
 import { compressForOCR } from '@/utils/compressPhoto';
 
 const LogScan: React.FC = () => {
@@ -39,6 +44,19 @@ const LogScan: React.FC = () => {
     const [showBatchNaming, setShowBatchNaming] = useState(false);
     const [scanTimestamp, setScanTimestamp] = useState<number>(Date.now());
     const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
+
+    // Guided capture + column mapping
+    const [showGuidedCamera, setShowGuidedCamera] = useState(false);
+    const [guidedAppend, setGuidedAppend] = useState(false);
+    const [showAddNextPrompt, setShowAddNextPrompt] = useState(false);
+    const [pendingMapping, setPendingMapping] = useState<{
+        meta: LogSheetParseMeta;
+        entries: LogSheetEntry[];
+        append: boolean;
+        sample: LogSheetEntry | null;
+    } | null>(null);
+    const [confirmedMapping, setConfirmedMapping] = useState<LogSheetColumnMapping | null>(null);
+    const [mappingBanner, setMappingBanner] = useState<string | null>(null);
 
     useEffect(() => {
         const loadFolders = async () => {
@@ -90,12 +108,67 @@ const LogScan: React.FC = () => {
         }
     };
 
-    /** Wrap a promise with a hard timeout so we never get stuck */
     const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
         Promise.race([
             promise,
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms))
         ]);
+
+    const parseOpts = () =>
+        confirmedMapping ? { columnMapping: confirmedMapping } : undefined;
+
+    /** Run parse; if headers ambiguous on first sheet (no confirmed mapping yet), pause for confirm. */
+    const handleParseResult = async (
+        result: LogSheetParseResult,
+        append: boolean,
+    ): Promise<LogSheetEntry[] | null> => {
+        const { entries: nextEntries, meta } = result;
+
+        const shouldConfirm =
+            meta.headersAmbiguous &&
+            !confirmedMapping &&
+            nextEntries.length > 0 &&
+            // Only interrupt on the first sheet of a batch (or when appending without a prior confirm)
+            (!append || sheetCount === 0);
+
+        if (shouldConfirm) {
+            setPendingMapping({
+                meta,
+                entries: nextEntries,
+                append,
+                sample: nextEntries[0] || null,
+            });
+            return null; // caller should not finish yet
+        }
+
+        if (meta.suggestedMapping && Object.keys(meta.suggestedMapping).length > 0 && !confirmedMapping) {
+            setConfirmedMapping(meta.suggestedMapping);
+        }
+
+        return nextEntries;
+    };
+
+    const finishWithEntries = async (
+        nextEntries: LogSheetEntry[],
+        append: boolean,
+        opts?: { promptAddNext?: boolean; openBatchNaming?: boolean },
+    ) => {
+        if (append) {
+            const combined = [...(entries || []), ...nextEntries];
+            setEntries(combined);
+            setSheetCount(prev => prev + 1);
+            await checkEntriesForDuplicates(combined);
+            if (opts?.promptAddNext !== false) setShowAddNextPrompt(true);
+        } else {
+            setEntries(nextEntries);
+            setSheetCount(1);
+            await checkEntriesForDuplicates(nextEntries);
+            const timestamp = Date.now();
+            setScanTimestamp(timestamp);
+            if (opts?.openBatchNaming !== false) setShowBatchNaming(true);
+            if (opts?.promptAddNext !== false) setShowAddNextPrompt(true);
+        }
+    };
 
     const processMultipleSheets = async (files: File[], append: boolean) => {
         if (!canPerformScan()) {
@@ -111,7 +184,6 @@ const LogScan: React.FC = () => {
             setSelectedEntries(new Set());
         }
 
-        // Compress first image immediately so the spinner is visible
         setProcessingProgress(`Preparing ${files.length} sheets...`);
         const firstData = await compressForOCR(files[0]);
         setImageData(firstData);
@@ -119,54 +191,53 @@ const LogScan: React.FC = () => {
         let allEntries = append ? [...(entries || [])] : [];
         let sheetsProcessed = append ? sheetCount : 0;
         const failedIndices: number[] = [];
+        let firstMeta: LogSheetParseMeta | null = null;
 
         for (let i = 0; i < files.length; i++) {
             setProcessingProgress(`Analyzing sheet ${i + 1} of ${files.length}...`);
             try {
                 const data = i === 0 ? firstData : await compressForOCR(files[i]);
                 setImageData(data);
-                // 60-second hard timeout per sheet so we never get stuck
-                const results = await withTimeout(
-                    ocrService.parseLogSheet(data),
+                const result = await withTimeout(
+                    ocrService.parseLogSheet(data, parseOpts()),
                     60000,
                     `Sheet ${i + 1}`
                 );
-                if (results.length > 0) {
+                if (i === 0) firstMeta = result.meta;
+                if (result.entries.length > 0) {
                     await incrementScanCount();
-                    allEntries = [...allEntries, ...results];
+                    allEntries = [...allEntries, ...result.entries];
                     sheetsProcessed++;
                 }
             } catch (err: any) {
                 failedIndices.push(i);
                 console.error(`Failed to process sheet ${i + 1}:`, err?.message || err);
             }
-            // Progressive delay: longer waits for later sheets to respect Gemini rate limits
             if (i < files.length - 1) {
                 const baseDelay = failedIndices.length > 0 ? 10000 : 6000;
-                const progressiveDelay = baseDelay + (i * 2000); // +2s per sheet
+                const progressiveDelay = baseDelay + (i * 2000);
                 setProcessingProgress(`Preparing next sheet...`);
                 await new Promise(r => setTimeout(r, progressiveDelay));
             }
         }
 
-        // Auto-retry failed sheets up to 3 times with increasing delays
         const MAX_RETRIES = 3;
         for (let attempt = 1; attempt <= MAX_RETRIES && failedIndices.length > 0 && failedIndices.length < files.length; attempt++) {
-            const retryDelay = 10000 + (attempt * 4000); // 14s, 18s, 22s
+            const retryDelay = 10000 + (attempt * 4000);
             for (let r = failedIndices.length - 1; r >= 0; r--) {
                 const idx = failedIndices[r];
                 setProcessingProgress(`Re-analyzing sheet ${idx + 1}... (attempt ${attempt + 1})`);
                 await new Promise(res => setTimeout(res, retryDelay));
                 try {
                     const data = await compressForOCR(files[idx]);
-                    const results = await withTimeout(
-                        ocrService.parseLogSheet(data),
+                    const result = await withTimeout(
+                        ocrService.parseLogSheet(data, parseOpts()),
                         60000,
                         `Sheet ${idx + 1} retry ${attempt}`
                     );
-                    if (results.length > 0) {
+                    if (result.entries.length > 0) {
                         await incrementScanCount();
-                        allEntries = [...allEntries, ...results];
+                        allEntries = [...allEntries, ...result.entries];
                         sheetsProcessed++;
                         failedIndices.splice(r, 1);
                     }
@@ -178,7 +249,20 @@ const LogScan: React.FC = () => {
 
         setProcessingProgress(null);
         setSheetCount(sheetsProcessed);
+
         if (allEntries.length > 0) {
+            // Multi-file: if first sheet headers were ambiguous and no mapping yet, confirm once
+            if (firstMeta?.headersAmbiguous && !confirmedMapping && !append) {
+                setPendingMapping({
+                    meta: firstMeta,
+                    entries: allEntries,
+                    append: false,
+                    sample: allEntries[0] || null,
+                });
+                setIsProcessing(false);
+                return;
+            }
+
             setEntries(allEntries);
             if (failedIndices.length > 0) {
                 const nums = failedIndices.map(i => i + 1);
@@ -188,6 +272,7 @@ const LogScan: React.FC = () => {
             const timestamp = Date.now();
             setScanTimestamp(timestamp);
             setShowBatchNaming(true);
+            setShowAddNextPrompt(true);
         } else {
             setEntries(null);
             setError(failedIndices.length > 0
@@ -215,7 +300,7 @@ const LogScan: React.FC = () => {
             if (result.isDuplicate) {
                 dupMap.set(index, result);
             } else {
-                selected.add(index); // Auto-select non-duplicates
+                selected.add(index);
             }
         });
 
@@ -234,12 +319,15 @@ const LogScan: React.FC = () => {
         return msg;
     };
 
-    /** Try parsing with up to 2 silent retries before surfacing an error */
-    const parseWithRetry = async (base64Image: string): Promise<LogSheetEntry[]> => {
+    const parseWithRetry = async (base64Image: string): Promise<LogSheetParseResult> => {
         const MAX_SILENT_RETRIES = 2;
         for (let attempt = 0; attempt <= MAX_SILENT_RETRIES; attempt++) {
             try {
-                return await withTimeout(ocrService.parseLogSheet(base64Image), 60000, `Sheet attempt ${attempt + 1}`);
+                return await withTimeout(
+                    ocrService.parseLogSheet(base64Image, parseOpts()),
+                    60000,
+                    `Sheet attempt ${attempt + 1}`
+                );
             } catch (err) {
                 console.log(`[LogScan] Attempt ${attempt + 1} failed:`, err);
                 if (attempt < MAX_SILENT_RETRIES) {
@@ -261,18 +349,18 @@ const LogScan: React.FC = () => {
 
         setIsProcessing(true);
         setError(null);
+        setShowAddNextPrompt(false);
 
         try {
-            const results = await parseWithRetry(base64Image);
-            if (results.length === 0) {
+            const result = await parseWithRetry(base64Image);
+            if (result.entries.length === 0) {
                 setError('No entries found on this sheet.');
             } else {
                 await incrementScanCount();
-                const prevEntries = entries || [];
-                const combined = [...prevEntries, ...results];
-                setEntries(combined);
-                setSheetCount(prev => prev + 1);
-                await checkEntriesForDuplicates(combined);
+                const resolved = await handleParseResult(result, true);
+                if (resolved) {
+                    await finishWithEntries(resolved, true);
+                }
             }
         } catch (err) {
             setError(friendlyError(err));
@@ -293,19 +381,19 @@ const LogScan: React.FC = () => {
         setEntries(null);
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
+        setShowAddNextPrompt(false);
 
         try {
-            const results = await parseWithRetry(base64Image);
-            setEntries(results);
-            if (results.length === 0) {
-                setError('No entries found. Make sure the log sheet is clearly visible.');
+            const result = await parseWithRetry(base64Image);
+            if (result.entries.length === 0) {
+                setEntries(null);
+                setError('No entries found. Make sure the log sheet is clearly visible and aligned in the frame.');
             } else {
                 await incrementScanCount();
-                setSheetCount(1);
-                await checkEntriesForDuplicates(results);
-                const timestamp = Date.now();
-                setScanTimestamp(timestamp);
-                setShowBatchNaming(true);
+                const resolved = await handleParseResult(result, false);
+                if (resolved) {
+                    await finishWithEntries(resolved, false);
+                }
             }
         } catch (err) {
             setError(friendlyError(err));
@@ -313,6 +401,48 @@ const LogScan: React.FC = () => {
             setProcessingProgress(null);
             setIsProcessing(false);
         }
+    };
+
+    const onMappingConfirm = async (mapping: LogSheetColumnMapping) => {
+        if (!pendingMapping) return;
+        const { entries: pendingEntries, append, meta } = pendingMapping;
+        const remapped = remapEntries(pendingEntries, meta.suggestedMapping, mapping);
+        setConfirmedMapping(mapping);
+        setMappingBanner(
+            mappingsEqual(mapping, meta.suggestedMapping)
+                ? 'Column mapping confirmed for this batch.'
+                : 'Column mapping updated — applied to current rows and next sheets.'
+        );
+        setPendingMapping(null);
+        await finishWithEntries(remapped, append);
+    };
+
+    const onMappingSkip = async () => {
+        if (!pendingMapping) return;
+        const { entries: pendingEntries, append, meta } = pendingMapping;
+        if (Object.keys(meta.suggestedMapping).length > 0) {
+            setConfirmedMapping(meta.suggestedMapping);
+        }
+        setMappingBanner('Using suggested column mapping.');
+        setPendingMapping(null);
+        await finishWithEntries(pendingEntries, append);
+    };
+
+    const openGuidedCamera = (append: boolean) => {
+        if (!canUseBulkScan()) {
+            setUpgradeFeature('bulk-scan');
+            return;
+        }
+        setGuidedAppend(append);
+        setShowGuidedCamera(true);
+        setShowAddNextPrompt(false);
+    };
+
+    const onGuidedCapture = (data: string) => {
+        setShowGuidedCamera(false);
+        setImageData(data);
+        if (guidedAppend) processLogSheetAppend(data);
+        else processLogSheet(data);
     };
 
     const entriesToContacts = (list: LogSheetEntry[]): Contact[] =>
@@ -403,6 +533,11 @@ const LogScan: React.FC = () => {
         setSheetCount(0);
         setShowBatchNaming(false);
         setCurrentBatchId(null);
+        setShowAddNextPrompt(false);
+        setPendingMapping(null);
+        setConfirmedMapping(null);
+        setMappingBanner(null);
+        setShowGuidedCamera(false);
     };
 
     const openEntryEdit = (index: number) => {
@@ -452,7 +587,6 @@ const LogScan: React.FC = () => {
             setEditingIndex(editingIndex - 1);
         }
 
-        // Rebuild index-based maps to account for shifted indices
         const newSelected = new Set<number>();
         const newDupMap = new Map<number, DuplicateResult>();
         for (let i = 0; i < entries.length; i++) {
@@ -494,7 +628,6 @@ const LogScan: React.FC = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
-            {/* Header */}
             <div className="flex items-center justify-between glass sticky top-0 z-10 p-4">
                 <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                     <ArrowLeft size={24} />
@@ -504,14 +637,24 @@ const LogScan: React.FC = () => {
             </div>
 
             <div className="flex-1 p-4">
-                {/* Stage 1: Capture */}
+                {/* Stage 1: Capture with framing guide */}
                 {!imageData && (
-                    <div className="flex flex-col items-center justify-center gap-6 py-12">
-                        <div className="text-center space-y-2 mb-4">
+                    <div className="flex flex-col items-center justify-center gap-5 py-8">
+                        <div className="text-center space-y-2">
                             <h2 className="text-xl font-bold text-slate-100">Scan a Log Sheet</h2>
                             <p className="text-sm text-brand-400 max-w-xs mx-auto">
-                                Take a photo of an event sign-in sheet. Each row will be parsed into a separate contact.
+                                Align the table in the frame. Each row becomes a contact — add more pages after the first sheet.
                             </p>
+                        </div>
+
+                        {/* Static framing guide preview */}
+                        <div className="w-full max-w-sm aspect-[3/4] rounded-2xl overflow-hidden relative border-2 border-brand-500/40 bg-gradient-to-b from-brand-900 to-brand-950">
+                            <LogSheetFramingOverlay compact />
+                            <div className="absolute inset-x-0 top-3 flex justify-center pointer-events-none">
+                                <span className="px-2.5 py-1 rounded-full bg-black/50 text-[10px] font-bold uppercase tracking-wider text-brand-200 border border-brand-500/30">
+                                    Framing guide
+                                </span>
+                            </div>
                         </div>
 
                         <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelect} />
@@ -519,27 +662,34 @@ const LogScan: React.FC = () => {
 
                         <div className="w-full max-w-sm space-y-3">
                             <button
-                                onClick={() => camRef.current?.click()}
-                                className="w-full flex items-center justify-center gap-3 py-4 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-2xl transition-colors active:scale-95"
+                                onClick={() => openGuidedCamera(false)}
+                                className="w-full flex items-center justify-center gap-3 py-4 bg-gradient-to-r from-brand-500/20 to-emerald-500/15 hover:from-brand-500/30 hover:to-emerald-500/25 border border-brand-400/40 rounded-2xl transition-colors active:scale-95"
                             >
-                                <Camera size={22} className="text-brand-400" />
-                                <span className="font-semibold text-brand-300">Take Photo</span>
+                                <Camera size={22} className="text-emerald-400" />
+                                <span className="font-semibold text-brand-100">Guided camera</span>
+                            </button>
+                            <button
+                                onClick={() => camRef.current?.click()}
+                                className="w-full flex items-center justify-center gap-3 py-3.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-2xl transition-colors active:scale-95"
+                            >
+                                <Camera size={20} className="text-brand-400" />
+                                <span className="font-semibold text-brand-300">System camera</span>
                             </button>
                             <button
                                 onClick={() => galRef.current?.click()}
-                                className="w-full flex items-center justify-center gap-3 py-4 bg-brand-800/50 hover:bg-brand-800 border border-brand-800 rounded-2xl transition-colors active:scale-95"
+                                className="w-full flex items-center justify-center gap-3 py-3.5 bg-brand-800/50 hover:bg-brand-800 border border-brand-800 rounded-2xl transition-colors active:scale-95"
                             >
-                                <ImageIcon size={22} className="text-brand-400" />
-                                <span className="font-semibold text-brand-300">Choose from Gallery</span>
+                                <ImageIcon size={20} className="text-brand-400" />
+                                <span className="font-semibold text-brand-300">Gallery (multi-page OK)</span>
                             </button>
                         </div>
 
-                        <div className="glass border border-brand-800 rounded-xl p-4 max-w-sm mt-4">
-                            <p className="text-[10px] text-brand-500 uppercase tracking-wider font-bold mb-2">Tips</p>
-                            <ul className="text-xs text-brand-400 space-y-1">
-                                <li>- Ensure the sheet is flat and well-lit</li>
-                                <li>- Printed sheets work best</li>
-                                <li>- Include all rows in the frame</li>
+                        <div className="glass border border-brand-800 rounded-xl p-4 max-w-sm w-full space-y-2">
+                            <p className="text-[10px] text-brand-500 uppercase tracking-wider font-bold">Capture tips</p>
+                            <ul className="text-xs text-brand-400 space-y-1.5">
+                                <li className="flex gap-2"><Layers size={12} className="mt-0.5 flex-shrink-0 text-brand-500" /> Fill the frame with the full table — headers + all rows</li>
+                                <li className="flex gap-2"><Sun size={12} className="mt-0.5 flex-shrink-0 text-amber-400" /> Avoid glare; tilt slightly if the sheet is glossy</li>
+                                <li className="flex gap-2"><Plus size={12} className="mt-0.5 flex-shrink-0 text-emerald-400" /> Multi-page? Capture one sheet, then tap Add next sheet</li>
                             </ul>
                         </div>
                     </div>
@@ -548,28 +698,51 @@ const LogScan: React.FC = () => {
                 {/* Stage 2: Processing */}
                 {imageData && isProcessing && (
                     <div className="flex flex-col items-center gap-6 py-8">
-                        <div className="w-full max-w-sm rounded-2xl overflow-hidden border border-brand-800">
+                        <div className="w-full max-w-sm rounded-2xl overflow-hidden border border-brand-800 relative">
                             <img src={imageData} alt="Log sheet" className="w-full object-contain max-h-48" />
                         </div>
                         <div className="flex flex-col items-center gap-3">
                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-400" />
                             <p className="text-sm text-brand-400 font-medium">{processingProgress || 'Analyzing log sheet...'}</p>
-                            <p className="text-xs text-brand-600">This may take a moment for large sheets</p>
+                            <p className="text-xs text-brand-600">Reading table structure and rows</p>
                         </div>
                     </div>
                 )}
 
-                {/* Hidden inputs for "Add More Sheet" */}
                 <input ref={addMoreCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddMoreImage} />
                 <input ref={addMoreGalRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddMoreImage} />
 
-                {/* Stage 3: Results */}
-                {imageData && !isProcessing && (entries || error) && (
+                {/* Stage 3: Results (or error while waiting on column mapping) */}
+                {imageData && !isProcessing && (entries || error || pendingMapping) && (
                     <div className="space-y-4">
-                        {/* Small image preview */}
                         <div className="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-brand-800">
                             <img src={imageData} alt="Log sheet" className="w-full object-contain max-h-32" />
                         </div>
+
+                        {sheetCount > 0 && entries && (
+                            <div className="flex items-center justify-center gap-2">
+                                <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30">
+                                    {sheetCount} sheet{sheetCount !== 1 ? 's' : ''}
+                                </span>
+                                <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                    {entries.length} row{entries.length !== 1 ? 's' : ''}
+                                </span>
+                                {confirmedMapping && (
+                                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                                        Columns mapped
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
+                        {mappingBanner && (
+                            <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-sky-500/10 border border-sky-500/30">
+                                <p className="text-xs text-sky-200">{mappingBanner}</p>
+                                <button onClick={() => setMappingBanner(null)} className="text-sky-400 p-1">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
 
                         {error && (() => {
                             const isPartial = error.startsWith('partial:');
@@ -588,6 +761,12 @@ const LogScan: React.FC = () => {
                                 </div>
                             );
                         })()}
+
+                        {pendingMapping && !entries && (
+                            <div className="text-center py-6 text-sm text-brand-400">
+                                Waiting for column mapping confirm…
+                            </div>
+                        )}
 
                         {entries && entries.length > 0 && (
                             <>
@@ -609,25 +788,42 @@ const LogScan: React.FC = () => {
                                             Start Over
                                         </button>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => addMoreCamRef.current?.click()}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300 active:scale-95"
-                                        >
-                                            <Camera size={15} />
-                                            Add via Camera
-                                        </button>
-                                        <button
-                                            onClick={() => addMoreGalRef.current?.click()}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300 active:scale-95"
-                                        >
-                                            <ImageIcon size={15} />
-                                            Add via Gallery
-                                        </button>
+
+                                    {/* Add next sheet — primary multi-page CTA */}
+                                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <Plus size={16} className="text-emerald-400" />
+                                            <p className="text-sm font-semibold text-emerald-200">Add next sheet</p>
+                                        </div>
+                                        <p className="text-[11px] text-emerald-400/80">
+                                            Page {sheetCount} done. Capture the next page of the same sign-in book — rows append to this batch.
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => openGuidedCamera(true)}
+                                                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-xl transition-colors text-sm font-medium text-emerald-200 active:scale-95"
+                                            >
+                                                <Camera size={15} />
+                                                Guided
+                                            </button>
+                                            <button
+                                                onClick={() => addMoreCamRef.current?.click()}
+                                                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300 active:scale-95"
+                                            >
+                                                <Camera size={15} />
+                                                Camera
+                                            </button>
+                                            <button
+                                                onClick={() => addMoreGalRef.current?.click()}
+                                                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 rounded-xl transition-colors text-sm font-medium text-brand-300 active:scale-95"
+                                            >
+                                                <ImageIcon size={15} />
+                                                Gallery
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Folder picker */}
                                 <div className="relative">
                                     <Folder className="absolute left-3 top-3 text-brand-500" size={18} />
                                     <select
@@ -642,8 +838,7 @@ const LogScan: React.FC = () => {
                                     </select>
                                 </div>
 
-                                {/* Entry list */}
-                                <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+                                <div className="space-y-2 max-h-[40vh] overflow-y-auto">
                                     {entries.map((e, i) => {
                                         const isDup = duplicateMap.has(i);
                                         const isSelected = selectedEntries.has(i);
@@ -669,7 +864,6 @@ const LogScan: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 <div className="flex items-start gap-2">
-                                                    {/* Selection checkbox */}
                                                     <button onClick={() => toggleEntrySelection(i)} className="flex-shrink-0 mt-0.5">
                                                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-brand-500 border-brand-500' : 'border-brand-600'}`}>
                                                             {isSelected && <Check size={12} className="text-white" />}
@@ -716,7 +910,6 @@ const LogScan: React.FC = () => {
                 )}
             </div>
 
-            {/* Bottom action bar */}
             {entries && entries.length > 0 && !isProcessing && (
                 <div className="sticky bottom-0 glass border-t border-brand-800 p-4 space-y-2 z-10">
                     <button
@@ -757,7 +950,7 @@ const LogScan: React.FC = () => {
                 <UpgradePrompt feature={upgradeFeature} onDismiss={() => setUpgradeFeature(null)} />
             )}
 
-            {showBatchNaming && entries && (
+            {showBatchNaming && entries && !pendingMapping && (
                 <BatchNamingModal
                     scanType="log-sheet"
                     totalContacts={entries.length}
@@ -769,6 +962,57 @@ const LogScan: React.FC = () => {
                 />
             )}
 
+            {/* Add-next-sheet prompt after first successful parse */}
+            {showAddNextPrompt && entries && !showBatchNaming && !pendingMapping && !isProcessing && (
+                <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="w-full max-w-md glass border border-brand-800 rounded-t-3xl sm:rounded-3xl p-5 space-y-4">
+                        <div className="text-center space-y-1">
+                            <div className="w-11 h-11 mx-auto bg-emerald-500/20 rounded-2xl flex items-center justify-center mb-2">
+                                <Layers className="w-5 h-5 text-emerald-400" />
+                            </div>
+                            <h2 className="text-lg font-bold text-slate-100">Sheet {sheetCount} captured</h2>
+                            <p className="text-xs text-brand-400">
+                                {entries.length} rows ready. Add another page of the same log book, or continue to review.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => openGuidedCamera(true)}
+                            className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2"
+                        >
+                            <Plus size={16} />
+                            Add next sheet
+                        </button>
+                        <button
+                            onClick={() => setShowAddNextPrompt(false)}
+                            className="w-full py-2.5 bg-brand-800 hover:bg-brand-700 rounded-xl font-medium text-sm text-brand-300"
+                        >
+                            Continue to review
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {pendingMapping && (
+                <ColumnMappingConfirm
+                    meta={pendingMapping.meta}
+                    sampleEntry={pendingMapping.sample}
+                    onConfirm={onMappingConfirm}
+                    onSkip={onMappingSkip}
+                />
+            )}
+
+            {showGuidedCamera && (
+                <LogSheetGuidedCamera
+                    sheetNumber={guidedAppend ? sheetCount + 1 : 1}
+                    onCapture={onGuidedCapture}
+                    onClose={() => setShowGuidedCamera(false)}
+                    onUseGallery={() => {
+                        setShowGuidedCamera(false);
+                        if (guidedAppend) addMoreGalRef.current?.click();
+                        else galRef.current?.click();
+                    }}
+                />
+            )}
         </div>
     );
 };
