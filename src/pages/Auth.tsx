@@ -50,7 +50,9 @@ const Auth: React.FC = () => {
     const mapAuthError = (err: any): string => {
         const code = err?.code || '';
         if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
-            return 'Invalid email or password';
+            return mode === 'reset'
+                ? 'If an account exists for that email, a reset link will be sent.'
+                : 'Invalid email or password';
         }
         if (code === 'auth/email-already-in-use') {
             return 'An account with this email already exists';
@@ -96,7 +98,13 @@ const Auth: React.FC = () => {
                 await signInWithEmail(email, password);
             }
         } catch (err: any) {
-            setError(mapAuthError(err));
+            // Firebase may omit user-not-found for reset to prevent enumeration.
+            // Surface a neutral success-style message for that case when resetting.
+            if (mode === 'reset' && (err?.code === 'auth/user-not-found' || err?.code === 'auth/invalid-credential')) {
+                setInfo('If an account exists for that email, a reset link will be sent.');
+            } else {
+                setError(mapAuthError(err));
+            }
         } finally {
             setIsSubmitting(false);
         }
