@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers, Radio } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers } from 'lucide-react';
 import { exportService } from '@/services/export';
+import { exportContactsToHubSpot, type HubSpotSetupError } from '@/services/hubspot';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useTeamContacts } from '@/hooks/useTeamContacts';
 import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
@@ -17,14 +17,6 @@ import OfflineStatusBanner from '@/components/OfflineStatusBanner';
 const Contacts: React.FC = () => {
     const { storage, mode: workspaceMode, organization } = useWorkspace();
     const isTeamMode = workspaceMode === 'team';
-    const {
-        contacts: liveContacts,
-        folders: liveFolders,
-        batches: liveBatches,
-        isLoading: liveLoading,
-        error: liveError,
-        isLive,
-    } = useTeamContacts();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +42,9 @@ const Contacts: React.FC = () => {
     const [searchParams] = useSearchParams();
     const { canExportCSV, canExportExcel, canExportBulkVCard, canExportVCard, user } = useAuth();
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [isExportingHubSpot, setIsExportingHubSpot] = useState(false);
+    const [hubspotExportMessage, setHubspotExportMessage] = useState<string | null>(null);
+    const [hubspotExportError, setHubspotExportError] = useState<string | null>(null);
     const [persistedFolders, setPersistedFolders] = useState<string[]>([]);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const [vcfPreview, setVcfPreview] = useState<ParsedVCard[] | null>(null);
@@ -96,30 +91,12 @@ const Contacts: React.FC = () => {
         }
     }, [editFormData.folder]);
 
-    // Personal mode: one-shot IndexedDB load. Team mode: live listeners via useTeamContacts.
     useEffect(() => {
-        if (isTeamMode) return;
         loadContacts();
         loadFolders();
         loadDeletedContacts();
         loadBatches();
     }, [workspaceMode]);
-
-    // Mirror live team snapshots into local state (claims update without reload)
-    useEffect(() => {
-        if (!isTeamMode) return;
-        setContacts(liveContacts);
-        setPersistedFolders(liveFolders);
-        setBatches(liveBatches);
-        setIsLoading(liveLoading);
-        setDeletedContacts([]); // team workspace has no soft-delete tombstones
-        // Keep open editor in sync with live claim/presence fields
-        setEditingContact(prev => {
-            if (!prev) return prev;
-            const next = liveContacts.find(c => c.id === prev.id);
-            return next ?? prev;
-        });
-    }, [isTeamMode, liveContacts, liveFolders, liveBatches, liveLoading]);
 
     // Handle batch query parameter from URL
     useEffect(() => {
@@ -130,7 +107,6 @@ const Contacts: React.FC = () => {
     }, [searchParams]);
 
     const loadContacts = async () => {
-        if (isTeamMode) return; // live listener owns team contacts
         setIsLoading(true);
         try {
             const data = await storage.getAllContacts();
@@ -143,7 +119,6 @@ const Contacts: React.FC = () => {
     };
 
     const loadFolders = async () => {
-        if (isTeamMode) return;
         try {
             const saved = await storage.getAllFolders();
             setPersistedFolders(saved);
@@ -153,7 +128,6 @@ const Contacts: React.FC = () => {
     };
 
     const loadDeletedContacts = async () => {
-        if (isTeamMode) return;
         try {
             const deleted = await storage.getDeletedContacts();
             setDeletedContacts(deleted);
@@ -163,7 +137,6 @@ const Contacts: React.FC = () => {
     };
 
     const loadBatches = async () => {
-        if (isTeamMode) return;
         try {
             const allBatches = await storage.getAllBatches();
             setBatches(allBatches);
@@ -267,9 +240,64 @@ const Contacts: React.FC = () => {
         else if (type === 'excel') exportService.toExcel(toExport, batchMap);
         else if (type === 'vcard') exportService.toVCardAll(toExport);
         setShowExportOptions(false);
+        setHubspotExportError(null);
         if (selectedIds.size > 0) {
             setSelectedIds(new Set());
             setSelectMode(false);
+        }
+    };
+
+    const handleHubSpotExport = async () => {
+        // Same Pioneer+/Pro gate as CSV export
+        if (!canExportCSV()) {
+            setShowUpgradePrompt(true);
+            setShowExportOptions(false);
+            return;
+        }
+
+        const toExport = selectedIds.size > 0
+            ? contacts.filter(c => selectedIds.has(c.id))
+            : filteredContacts;
+        if (toExport.length === 0) {
+            setHubspotExportError('No contacts to export');
+            setShowExportOptions(false);
+            return;
+        }
+
+        const batchMap: Record<string, string> = {};
+        for (const b of batches) { batchMap[b.id] = b.name; }
+
+        setIsExportingHubSpot(true);
+        setHubspotExportError(null);
+        setHubspotExportMessage(null);
+        setShowExportOptions(false);
+        try {
+            const result = await exportContactsToHubSpot(toExport, batchMap);
+            const parts = [
+                result.created ? `${result.created} created` : null,
+                result.updated ? `${result.updated} updated` : null,
+                result.notesCreated ? `${result.notesCreated} notes` : null,
+            ].filter(Boolean);
+            setHubspotExportMessage(
+                parts.length > 0
+                    ? `HubSpot: ${parts.join(', ')}`
+                    : 'HubSpot export finished'
+            );
+            if (selectedIds.size > 0) {
+                setSelectedIds(new Set());
+                setSelectMode(false);
+            }
+        } catch (err: any) {
+            const setupErr = err as HubSpotSetupError;
+            if (setupErr?.code === 'hubspot_not_configured' && setupErr.setup?.length) {
+                setHubspotExportError(
+                    `${setupErr.message}. Set HUBSPOT_ACCESS_TOKEN on the server — see HUBSPOT.md.`
+                );
+            } else {
+                setHubspotExportError(err?.message || 'HubSpot export failed');
+            }
+        } finally {
+            setIsExportingHubSpot(false);
         }
     };
 
@@ -380,12 +408,13 @@ const Contacts: React.FC = () => {
     // Filter contacts by search, folder, and batch
     const currentUid = user?.uid;
 
-    // Claim / release — team-only; snapshot refreshes UI (no full reload)
+    // Claim / release — team-only, calls TeamStorageService methods
     const handleClaim = async (contact: Contact) => {
         if (!isTeamMode || !('claimContact' in storage)) return;
         setClaimActionId(contact.id);
         try {
             await storage.claimContact(contact.id);
+            await loadContacts();
         } catch (err: any) {
             alert(err.message || 'Failed to claim contact');
         } finally {
@@ -398,6 +427,7 @@ const Contacts: React.FC = () => {
         setClaimActionId(contact.id);
         try {
             await storage.releaseClaim(contact.id);
+            await loadContacts();
         } catch (err: any) {
             alert(err.message || 'Failed to release claim');
         } finally {
@@ -624,18 +654,7 @@ const Contacts: React.FC = () => {
                             {isTeamMode ? 'Team Contacts' : 'My Contacts'}
                         </h1>
                         {isTeamMode && organization && (
-                            <p className="text-[10px] text-sky-400/70 mt-0.5 flex items-center justify-center gap-1.5">
-                                <span>{organization.name}</span>
-                                {isLive && (
-                                    <span className="inline-flex items-center gap-0.5 text-emerald-400/80" title="Live sync active">
-                                        <Radio size={10} className="animate-pulse" />
-                                        Live
-                                    </span>
-                                )}
-                            </p>
-                        )}
-                        {isTeamMode && liveError && (
-                            <p className="text-[10px] text-amber-400/90 mt-0.5">{liveError}</p>
+                            <p className="text-[10px] text-sky-400/70 mt-0.5">{organization.name}</p>
                         )}
                     </div>
                     <div className="flex items-center gap-1">
@@ -666,7 +685,7 @@ const Contacts: React.FC = () => {
                                 <Download size={20} />
                             </button>
                             {showExportOptions && (
-                                <div className="absolute right-0 mt-2 w-48 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden">
+                                <div className="absolute right-0 mt-2 w-56 bg-brand-900 rounded-xl border border-brand-800 shadow-2xl z-50 overflow-hidden">
                                     {selectedIds.size > 0 && (
                                         <div className="px-4 py-2 text-xs text-brand-400 border-b border-brand-800 bg-brand-500/10">
                                             {selectedIds.size} contact{selectedIds.size > 1 ? 's' : ''} selected
@@ -693,11 +712,53 @@ const Contacts: React.FC = () => {
                                         Export as vCard (.vcf)
                                         {!canExportBulkVCard() && <Lock size={12} className="text-amber-400" />}
                                     </button>
+                                    <button
+                                        onClick={() => { void handleHubSpotExport(); }}
+                                        disabled={isExportingHubSpot}
+                                        className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between disabled:opacity-50 ${!canExportCSV() ? 'opacity-60' : ''}`}
+                                    >
+                                        {isExportingHubSpot ? 'Exporting to HubSpot…' : 'Export to HubSpot'}
+                                        {!canExportCSV() && <Lock size={12} className="text-amber-400" />}
+                                    </button>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
+
+                {(hubspotExportError || hubspotExportMessage || isExportingHubSpot) && (
+                    <div
+                        className={`rounded-xl px-3 py-2 text-xs flex items-start gap-2 ${
+                            hubspotExportError
+                                ? 'bg-red-500/10 text-red-300 border border-red-500/20'
+                                : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                        }`}
+                    >
+                        {hubspotExportError ? (
+                            <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                        ) : (
+                            <Check size={14} className="shrink-0 mt-0.5" />
+                        )}
+                        <p className="flex-1">
+                            {isExportingHubSpot && !hubspotExportError && !hubspotExportMessage
+                                ? 'Sending contacts to HubSpot…'
+                                : hubspotExportError || hubspotExportMessage}
+                        </p>
+                        {(hubspotExportError || hubspotExportMessage) && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setHubspotExportError(null);
+                                    setHubspotExportMessage(null);
+                                }}
+                                className="shrink-0 opacity-70 hover:opacity-100"
+                                aria-label="Dismiss"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" size={18} />
