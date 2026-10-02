@@ -215,10 +215,18 @@ const Auth: React.FC = () => {
 
     if (isLoading || completingMagicLink) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-brand-950 gap-3">
-                <div className="animate-spin h-8 w-8 border-2 border-brand-400 border-t-transparent rounded-full"></div>
+            <div
+                className="flex flex-col items-center justify-center min-h-screen bg-brand-950 gap-3"
+                role="status"
+                aria-live="polite"
+                aria-busy="true"
+            >
+                <span className="sr-only">
+                    {completingMagicLink ? 'Signing you in from email link' : 'Loading authentication'}
+                </span>
+                <div className="animate-spin h-8 w-8 border-2 border-brand-400 border-t-transparent rounded-full" aria-hidden="true"></div>
                 {completingMagicLink && (
-                    <p className="text-sm text-slate-400">Signing you in from email link…</p>
+                    <p className="text-sm text-slate-400" aria-hidden="true">Signing you in from email link…</p>
                 )}
             </div>
         );
@@ -229,7 +237,7 @@ const Auth: React.FC = () => {
             <div className="lg:grid lg:grid-cols-[1.2fr_1fr] min-h-screen">
 
                 {/* --- Left panel: value prop (desktop) --- */}
-                <div className="hidden lg:flex flex-col justify-between p-12 bg-[radial-gradient(ellipse_at_top_left,rgba(56,189,248,0.08),transparent_55%)] border-r border-brand-800">
+                <aside className="hidden lg:flex flex-col justify-between p-12 bg-[radial-gradient(ellipse_at_top_left,rgba(56,189,248,0.08),transparent_55%)] border-r border-brand-800" aria-label="Product highlights">
                     <div>
                         <Link to="/">
                             <img src="/logo.svg" alt="Cura.tor" className="h-10" />
@@ -248,7 +256,7 @@ const Auth: React.FC = () => {
                         <div className="mt-10 space-y-5">
                             {BENEFITS.map(({ icon: Icon, label, detail }) => (
                                 <div key={label} className="flex gap-3 items-start">
-                                    <Icon className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+                                    <Icon className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" aria-hidden="true" />
                                     <div>
                                         <p className="text-white font-medium text-sm">{label}</p>
                                         <p className="text-slate-500 text-sm">{detail}</p>
@@ -259,13 +267,13 @@ const Auth: React.FC = () => {
                     </div>
 
                     <p className="text-xs text-slate-600 flex items-center gap-1.5">
-                        <ShieldCheck size={12} />
+                        <ShieldCheck size={12} aria-hidden="true" />
                         Contacts stay on your device. Card images go to Google AI only for extraction, then are not kept on our servers.
                     </p>
-                </div>
+                </aside>
 
                 {/* --- Right panel: auth card --- */}
-                <div className="flex flex-col min-h-screen">
+                <main id="main-content" className="flex flex-col min-h-screen">
                     <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12">
                         <div className="w-full max-w-sm">
                             {/* Mobile header */}
@@ -274,7 +282,7 @@ const Auth: React.FC = () => {
                                     <img src="/logo.svg" alt="Cura.tor" className="h-9 mx-auto mb-6" />
                                 </Link>
                                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 mb-5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" aria-hidden="true" />
                                     <span className="text-[10px] font-medium text-sky-400 tracking-wide uppercase">In testing — early access</span>
                                 </div>
                                 <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">
@@ -292,7 +300,7 @@ const Auth: React.FC = () => {
                                         onClick={() => switchMode('signin')}
                                         className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-sky-400 mb-4 transition-colors"
                                     >
-                                        <ArrowLeft size={14} />
+                                        <ArrowLeft size={14} aria-hidden="true" />
                                         Back to log in
                                     </button>
                                     <h2 className="text-xl font-bold text-white mb-1">Reset password</h2>
@@ -302,14 +310,20 @@ const Auth: React.FC = () => {
                                 </>
                             ) : (
                                 /* Mode tabs */
-                                <div className="flex rounded-xl bg-brand-900 border border-brand-800 p-1 mb-6">
+                                <div className="flex rounded-xl bg-brand-900 border border-brand-800 p-1 mb-6" role="tablist" aria-label="Authentication mode">
                                     <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={mode === 'signin'}
                                         onClick={() => switchMode('signin')}
                                         className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${mode === 'signin' ? 'bg-brand-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                                     >
                                         Log in
                                     </button>
                                     <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={mode === 'signup'}
                                         onClick={() => switchMode('signup')}
                                         className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${mode === 'signup' ? 'bg-brand-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                                     >
@@ -320,23 +334,23 @@ const Auth: React.FC = () => {
 
                             {/* Error */}
                             {error && (
-                                <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-2">
-                                    <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={16} />
+                                <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-2" role="alert" aria-live="assertive">
+                                    <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={16} aria-hidden="true" />
                                     <p className="text-sm text-red-400">{error}</p>
                                 </div>
                             )}
 
                             {/* Success / info */}
                             {info && (
-                                <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2">
-                                    <CheckCircle2 className="text-emerald-400 shrink-0 mt-0.5" size={16} />
+                                <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2" role="status" aria-live="polite">
+                                    <CheckCircle2 className="text-emerald-400 shrink-0 mt-0.5" size={16} aria-hidden="true" />
                                     <p className="text-sm text-emerald-400">{info}</p>
                                 </div>
                             )}
 
                             {/* In-app browser warning */}
                             {inAppBrowser && mode !== 'reset' && (
-                                <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                                <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30" role="status">
                                     <p className="text-xs text-amber-300">
                                         For Google sign-in, tap the menu and choose "Open in Chrome" or "Open in Safari". Email or magic link works here.
                                     </p>
@@ -347,11 +361,13 @@ const Auth: React.FC = () => {
                                 <>
                                     {/* Primary: Google */}
                                     <button
+                                        type="button"
                                         onClick={handleGoogleSignIn}
                                         disabled={isSubmitting || !!inAppBrowser}
+                                        aria-label={inAppBrowser ? 'Google sign-in unavailable in this browser' : 'Continue with Google'}
                                         className={`w-full h-12 bg-white text-brand-950 font-semibold rounded-xl ring-1 ring-sky-400/20 shadow-lg shadow-sky-500/10 hover:ring-sky-400/40 active:scale-[0.99] transition-all disabled:opacity-50 flex items-center justify-center gap-3 ${inAppBrowser ? 'opacity-40 cursor-not-allowed' : ''}`}
                                     >
-                                        <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                        <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
                                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
                                             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                                             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
@@ -366,15 +382,18 @@ const Auth: React.FC = () => {
 
                                     {/* Divider + email toggle */}
                                     <div className="flex items-center gap-3 my-6">
-                                        <div className="flex-1 h-px bg-brand-800"></div>
+                                        <div className="flex-1 h-px bg-brand-800" aria-hidden="true"></div>
                                         <button
+                                            type="button"
                                             onClick={() => setShowEmailForm(v => !v)}
+                                            aria-expanded={showEmailForm}
+                                            aria-controls="email-auth-form"
                                             className="text-xs text-slate-500 hover:text-sky-400 flex items-center gap-1 transition-colors"
                                         >
                                             or use email
-                                            <ChevronDown size={12} className={`transition-transform ${showEmailForm ? 'rotate-180' : ''}`} />
+                                            <ChevronDown size={12} className={`transition-transform ${showEmailForm ? 'rotate-180' : ''}`} aria-hidden="true" />
                                         </button>
-                                        <div className="flex-1 h-px bg-brand-800"></div>
+                                        <div className="flex-1 h-px bg-brand-800" aria-hidden="true"></div>
                                     </div>
                                 </>
                             )}
@@ -383,35 +402,56 @@ const Auth: React.FC = () => {
                             {(showEmailForm || mode === 'reset') && (
                                 <div className="space-y-3 animate-in fade-in">
                                     {mode !== 'reset' && !needsEmailConfirm && (
-                                        <div className="flex rounded-xl bg-brand-900/80 border border-brand-800 p-0.5">
+                                        <div className="flex rounded-xl bg-brand-900/80 border border-brand-800 p-0.5" role="tablist" aria-label="Email sign-in method">
                                             <button
                                                 type="button"
+                                                role="tab"
+                                                aria-selected={emailMethod === 'magic'}
                                                 onClick={() => { setEmailMethod('magic'); setError(''); setMagicLinkSent(false); }}
                                                 className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
                                                     emailMethod === 'magic' ? 'bg-sky-500/20 text-sky-300' : 'text-slate-500 hover:text-slate-300'
                                                 }`}
                                             >
-                                                <Link2 size={12} />
+                                                <Link2 size={12} aria-hidden="true" />
                                                 Magic link
                                             </button>
                                             <button
                                                 type="button"
+                                                role="tab"
+                                                aria-selected={emailMethod === 'password'}
                                                 onClick={() => { setEmailMethod('password'); setError(''); setInfo(''); setMagicLinkSent(false); }}
                                                 className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
                                                     emailMethod === 'password' ? 'bg-sky-500/20 text-sky-300' : 'text-slate-500 hover:text-slate-300'
                                                 }`}
                                             >
-                                                <Lock size={12} />
+                                                <Lock size={12} aria-hidden="true" />
                                                 Password
                                             </button>
                                         </div>
                                     )}
 
-                                    <form onSubmit={handleEmailAuth} className="space-y-3">
+                                    <form
+                                        id="email-auth-form"
+                                        onSubmit={handleEmailAuth}
+                                        className="space-y-3"
+                                        aria-label={
+                                            mode === 'reset'
+                                                ? 'Reset password'
+                                                : needsEmailConfirm
+                                                    ? 'Confirm email for magic link'
+                                                    : emailMethod === 'magic'
+                                                        ? 'Sign in with magic link'
+                                                        : mode === 'signin'
+                                                            ? 'Log in with email'
+                                                            : 'Create account with email'
+                                        }
+                                    >
                                         {emailMethod === 'password' && mode === 'signup' && (
                                             <div className="relative">
-                                                <User className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                                <label htmlFor="auth-display-name" className="sr-only">Full name</label>
+                                                <User className="absolute left-3 top-3.5 text-slate-500" size={18} aria-hidden="true" />
                                                 <input
+                                                    id="auth-display-name"
                                                     type="text"
                                                     value={displayName}
                                                     onChange={(e) => setDisplayName(e.target.value)}
@@ -423,8 +463,10 @@ const Auth: React.FC = () => {
                                         )}
 
                                         <div className="relative">
-                                            <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                            <label htmlFor="auth-email" className="sr-only">Email address</label>
+                                            <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} aria-hidden="true" />
                                             <input
+                                                id="auth-email"
                                                 type="email"
                                                 value={email}
                                                 onChange={(e) => setEmail(e.target.value)}
@@ -438,8 +480,10 @@ const Auth: React.FC = () => {
 
                                         {mode !== 'reset' && emailMethod === 'password' && !needsEmailConfirm && (
                                             <div className="relative">
-                                                <Lock className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                                <label htmlFor="auth-password" className="sr-only">Password</label>
+                                                <Lock className="absolute left-3 top-3.5 text-slate-500" size={18} aria-hidden="true" />
                                                 <input
+                                                    id="auth-password"
                                                     type={showPassword ? 'text' : 'password'}
                                                     value={password}
                                                     onChange={(e) => setPassword(e.target.value)}
@@ -453,9 +497,10 @@ const Auth: React.FC = () => {
                                                     type="button"
                                                     onClick={() => setShowPassword(!showPassword)}
                                                     className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300"
-                                                    tabIndex={-1}
+                                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                                    aria-pressed={showPassword}
                                                 >
-                                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                    {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                                                 </button>
                                             </div>
                                         )}
@@ -475,10 +520,11 @@ const Auth: React.FC = () => {
                                         <button
                                             type="submit"
                                             disabled={isSubmitting}
+                                            aria-busy={isSubmitting}
                                             className="w-full py-3 bg-sky-500 hover:bg-sky-400 active:scale-[0.99] text-white rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                                         >
                                             {isSubmitting ? (
-                                                <Loader2 className="animate-spin" size={18} />
+                                                <Loader2 className="animate-spin" size={18} aria-hidden="true" />
                                             ) : mode === 'reset' ? (
                                                 'Send reset link'
                                             ) : needsEmailConfirm ? (
@@ -524,7 +570,7 @@ const Auth: React.FC = () => {
                             <Link to="/legal?tab=privacy" className="text-slate-400 hover:text-sky-400 underline-offset-2 hover:underline transition-colors">Privacy</Link>
                         </p>
                     </div>
-                </div>
+                </main>
             </div>
         </div>
     );

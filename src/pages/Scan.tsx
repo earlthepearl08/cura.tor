@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCcw, Check, X, ArrowLeft, CameraOff, Layers, Zap, HelpCircle } from 'lucide-react';
+import { Camera, RefreshCcw, Check, ArrowLeft, CameraOff, Layers, Zap, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useOCR } from '@/hooks/useOCR';
 import ContactReview from '@/components/ContactReview';
@@ -118,39 +118,48 @@ const Scanner: React.FC = () => {
     return (
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 glass sticky top-0 z-10">
-                <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                    <ArrowLeft size={24} />
+            <header className="flex items-center justify-between p-4 glass sticky top-0 z-10">
+                <button
+                    type="button"
+                    onClick={() => navigate('/app')}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    aria-label="Back to home"
+                >
+                    <ArrowLeft size={24} aria-hidden="true" />
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">
                     {batchMode ? `Batch Scan${batchCount > 0 ? ` (${batchCount})` : ''}` : 'Scan Card'}
                 </h1>
                 <div className="flex items-center gap-0.5">
                     <button
+                        type="button"
                         onClick={() => navigate('/help?clip=single-card')}
                         className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-500 hover:text-brand-300"
                         title="Help: single card scan"
-                        aria-label="Help"
+                        aria-label="Help: single card scan"
                     >
-                        <HelpCircle size={20} />
+                        <HelpCircle size={20} aria-hidden="true" />
                     </button>
                     <button
+                        type="button"
                         onClick={() => { setBatchMode(!batchMode); setBatchCount(0); }}
                         className={`p-2 rounded-full transition-colors ${batchMode ? 'bg-sky-500/20 text-sky-400' : 'hover:bg-white/10 text-slate-500'}`}
                         title={batchMode ? 'Exit batch mode' : 'Batch scan mode'}
+                        aria-label={batchMode ? 'Exit batch mode' : 'Enable batch scan mode'}
+                        aria-pressed={batchMode}
                     >
-                        <Layers size={20} />
+                        <Layers size={20} aria-hidden="true" />
                     </button>
                 </div>
-            </div>
+            </header>
 
             {(atScanLimit || lowOnScans) && !showReview && (
                 <div className={`mx-4 mt-2 p-3 rounded-xl text-xs flex items-start gap-2 ${
                     atScanLimit
                         ? 'bg-amber-500/15 border border-amber-500/30 text-amber-300'
                         : 'bg-sky-500/10 border border-sky-500/25 text-sky-300'
-                }`}>
-                    <Zap size={14} className="mt-0.5 shrink-0" />
+                }`} role="status" aria-live="polite">
+                    <Zap size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                     <div className="flex-1">
                         {atScanLimit ? (
                             <>
@@ -159,6 +168,7 @@ const Scanner: React.FC = () => {
                                     Upgrade for more, or use QR scan / manual entry (no scan credit).
                                 </p>
                                 <button
+                                    type="button"
                                     onClick={() => setShowUpgradePrompt(true)}
                                     className="mt-2 text-[11px] font-bold underline underline-offset-2"
                                 >
@@ -175,11 +185,11 @@ const Scanner: React.FC = () => {
                 </div>
             )}
 
-            <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
+            <main id="main-content" className="flex-1 flex flex-col items-center justify-center p-6 relative">
                 {!imgSrc ? (
                     cameraError ? (
-                        <div className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-red-500/30 flex flex-col items-center justify-center gap-4 p-6">
-                            <div className="p-4 rounded-full bg-red-500/10">
+                        <div className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-red-500/30 flex flex-col items-center justify-center gap-4 p-6" role="alert">
+                            <div className="p-4 rounded-full bg-red-500/10" aria-hidden="true">
                                 <CameraOff size={40} className="text-red-400" />
                             </div>
                             <div className="text-center">
@@ -189,6 +199,7 @@ const Scanner: React.FC = () => {
                                 </p>
                             </div>
                             <button
+                                type="button"
                                 onClick={() => navigate('/upload')}
                                 className="mt-2 px-4 py-2 text-sm glass rounded-xl hover:bg-white/10 transition-colors"
                             >
@@ -199,6 +210,15 @@ const Scanner: React.FC = () => {
                     <div
                         className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-brand-500/30 cursor-pointer"
                         onClick={handleTapToFocus}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                capture();
+                            }
+                        }}
+                        role="img"
+                        aria-label="Camera viewfinder. Tap to focus. Use the capture button below to take a photo."
+                        tabIndex={0}
                     >
                         <Webcam
                             audio={false}
@@ -219,7 +239,7 @@ const Scanner: React.FC = () => {
                             className="w-full h-full object-cover"
                         />
                         {/* Viewfinder Overlay */}
-                        <div className="absolute inset-0 pointer-events-none border-[20px] border-black/40">
+                        <div className="absolute inset-0 pointer-events-none border-[20px] border-black/40" aria-hidden="true">
                             <div className="w-full h-full border-2 border-dashed border-brand-400 opacity-50 rounded-lg"></div>
                         </div>
                         {/* Focus Point Animation */}
@@ -231,22 +251,25 @@ const Scanner: React.FC = () => {
                                     top: `${focusPoint.y}%`,
                                     transform: 'translate(-50%, -50%)',
                                 }}
+                                aria-hidden="true"
                             />
                         )}
                         {!isCameraReady && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-brand-950">
-                                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-brand-400"></div>
+                            <div className="absolute inset-0 flex items-center justify-center bg-brand-950" role="status" aria-live="polite">
+                                <span className="sr-only">Starting camera</span>
+                                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-brand-400" aria-hidden="true"></div>
                             </div>
                         )}
                     </div>
                     )
                 ) : (
                     <div className="w-full max-w-md aspect-[1.586/1] rounded-2xl overflow-hidden glass relative border-2 border-emerald-500/50">
-                        <img src={imgSrc} alt="captured" className="w-full h-full object-cover" />
+                        <img src={imgSrc} alt="Captured business card preview" className="w-full h-full object-cover" />
                         {/* Processing Overlay */}
                         {isProcessing && (
-                            <div className="absolute inset-0 bg-brand-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
-                                <div className="relative w-16 h-16">
+                            <div className="absolute inset-0 bg-brand-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4" role="status" aria-live="polite" aria-busy="true">
+                                <span className="sr-only">Analyzing card, extracting contact info</span>
+                                <div className="relative w-16 h-16" aria-hidden="true">
                                     <div className="absolute inset-0 border-4 border-brand-700 rounded-full"></div>
                                     <div className="absolute inset-0 border-4 border-transparent border-t-sky-400 rounded-full animate-spin"></div>
                                 </div>
@@ -255,30 +278,35 @@ const Scanner: React.FC = () => {
                                     <p className="text-[10px] text-slate-500 mt-1">Extracting contact info...</p>
                                 </div>
                                 {/* Scan line animation */}
-                                <div className="absolute inset-x-4 h-0.5 bg-gradient-to-r from-transparent via-sky-400 to-transparent animate-scan-line"></div>
+                                <div className="absolute inset-x-4 h-0.5 bg-gradient-to-r from-transparent via-sky-400 to-transparent animate-scan-line" aria-hidden="true"></div>
                             </div>
                         )}
                     </div>
                 )}
 
-                <div className="mt-12 flex items-center gap-6">
+                <div className="mt-12 flex items-center gap-6" role="group" aria-label="Capture controls">
                     {!imgSrc ? (
                         <button
+                            type="button"
                             onClick={capture}
                             disabled={!isCameraReady}
+                            aria-label="Capture photo"
                             className="h-20 w-20 rounded-full bg-brand-100 flex items-center justify-center text-brand-950 hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-50"
                         >
-                            <Camera size={32} />
+                            <Camera size={32} aria-hidden="true" />
                         </button>
                     ) : (
                         <>
                             <button
+                                type="button"
                                 onClick={retake}
+                                aria-label="Retake photo"
                                 className="h-16 w-16 rounded-full glass flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                             >
-                                <RefreshCcw size={28} />
+                                <RefreshCcw size={28} aria-hidden="true" />
                             </button>
                             <button
+                                type="button"
                                 onClick={async () => {
                                     if (imgSrc) {
                                         if (!canPerformScan()) {
@@ -295,19 +323,21 @@ const Scanner: React.FC = () => {
                                     }
                                 }}
                                 disabled={isProcessing}
+                                aria-label="Confirm photo and start OCR"
+                                aria-busy={isProcessing}
                                 className="h-16 w-16 rounded-full bg-emerald-500 flex items-center justify-center text-white hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all disabled:opacity-50"
                             >
                                 {isProcessing ? (
-                                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-white"></div>
+                                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-white" aria-hidden="true"></div>
                                 ) : (
-                                    <Check size={28} />
+                                    <Check size={28} aria-hidden="true" />
                                 )}
                             </button>
                         </>
                     )}
                 </div>
 
-                <div className="mt-8 text-sm text-brand-400 text-center max-w-xs leading-relaxed">
+                <div className="mt-8 text-sm text-brand-400 text-center max-w-xs leading-relaxed" role="status" aria-live="polite">
                     {error ? (
                         <div className="space-y-2">
                             <p className="text-red-400">{error}</p>
@@ -347,6 +377,7 @@ const Scanner: React.FC = () => {
                         type="button"
                         onClick={() => navigate('/settings')}
                         className="mt-3 px-3 py-1 rounded-full text-[11px] font-semibold bg-brand-800/80 text-brand-300 border border-brand-700 hover:border-brand-500 transition-colors"
+                        aria-label={`OCR languages: ${formatOcrLanguageSummary()}. Open settings to change.`}
                     >
                         {t('scan.ocrLangBadge', { langs: formatOcrLanguageSummary() })}
                     </button>
@@ -372,10 +403,12 @@ const Scanner: React.FC = () => {
 
                 {batchMode && batchCount > 0 && !imgSrc && !showReview && !isProcessing && (
                     <button
+                        type="button"
                         onClick={() => navigate('/contacts')}
                         className="mt-4 px-6 py-3 bg-brand-100 text-brand-950 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] active:scale-95 transition-all"
+                        aria-label={`Done batch scanning, ${batchCount} scanned`}
                     >
-                        <Check size={18} />
+                        <Check size={18} aria-hidden="true" />
                         Done ({batchCount} scanned)
                     </button>
                 )}
@@ -388,7 +421,7 @@ const Scanner: React.FC = () => {
                         scansLimit={user?.tier === 'early_access' ? (user.scanUsage.lifetimeLimit || 30) : 5}
                     />
                 )}
-            </div>
+            </main>
         </div>
     );
 };
