@@ -13,6 +13,7 @@ import RequestTeamAccessCard from '@/components/RequestTeamAccessCard';
 import RedeemTeamCodeCard from '@/components/RedeemTeamCodeCard';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
 import ContactSupportModal from '@/components/ContactSupportModal';
+import DriveBackupPrompt from '@/components/DriveBackupPrompt';
 import { OWNER_EMAILS } from '@/config/firebase';
 import { SUPPORT_EMAIL, PRIORITY_SUPPORT_SLA } from '@/config/support';
 import { Trash2 } from 'lucide-react';
@@ -812,6 +813,7 @@ const Settings = () => {
                 {/* Google Drive Sync */}
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Cloud Backup</p>
+                    <DriveBackupPrompt variant="settings" />
                     <div className="card-elevated rounded-2xl p-4">
                         {!canUseGoogleDrive() ? (
                             <div className="text-center py-4">

@@ -8,6 +8,7 @@ import { TIER_LIMITS } from '@/types/user';
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
 import TrialExpiryBanner from '@/components/TrialExpiryBanner';
 import OfflineStatusBanner from '@/components/OfflineStatusBanner';
+import DriveBackupPrompt from '@/components/DriveBackupPrompt';
 import { Contact } from '@/types/contact';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -124,6 +125,7 @@ const Home = () => {
             {/* Honest offline status — saved contacts OK; scans need network */}
             <div className="w-full max-w-md mb-4">
                 <OfflineStatusBanner context="home" />
+                <DriveBackupPrompt variant="home" />
             </div>
 
             {user?.tier === 'free' && scansRemaining === 0 && (
