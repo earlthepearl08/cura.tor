@@ -27,6 +27,7 @@ import {
 } from '@/services/userService';
 import { storage } from '@/services/storage';
 import { isE2EMockAuthEnabled } from '@/e2e/mockAuthFlag';
+import { trackEvent, trackEventOnce } from '@/services/observability';
 
 /** localStorage key for email awaiting magic-link completion (Firebase recommendation). */
 export const MAGIC_LINK_EMAIL_KEY = 'cura_email_for_sign_in';
@@ -165,8 +166,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 try {
                     storage.switchUser(fbUser.uid);
                     await storage.migrateFromLegacyDB();
-                    const profile = await getOrCreateUserDoc(fbUser);
+                    const { profile, isNew } = await getOrCreateUserDoc(fbUser);
                     setUser(profile);
+                    if (isNew) {
+                        const method = fbUser.providerData?.some((p) => p.providerId === 'google.com')
+                            ? 'google'
+                            : 'email';
+                        trackEventOnce('signup', fbUser.uid, { method, tier: profile.tier });
+                    }
                 } catch (err) {
                     console.error('Failed to load user profile:', err);
                     setUser(null);
@@ -185,7 +192,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isE2EMockAuthEnabled()) return null;
         if (!firebaseUser) return null;
         try {
-            const profile = await getOrCreateUserDoc(firebaseUser);
+            const { profile } = await getOrCreateUserDoc(firebaseUser);
             setUser(profile);
             return profile;
         } catch (err) {
@@ -382,14 +389,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isE2EMockAuthEnabled()) return true;
         if (!firebaseUser) return false;
         try {
-            const refreshed = await getOrCreateUserDoc(firebaseUser);
+            const prevLifetime = user?.scanUsage.lifetimeCount || 0;
+            const { profile: refreshed } = await getOrCreateUserDoc(firebaseUser);
             setUser(refreshed);
+            if (prevLifetime === 0 && (refreshed.scanUsage.lifetimeCount || 0) >= 1) {
+                trackEventOnce('first_scan', refreshed.uid, {
+                    tier: refreshed.tier,
+                    lifetimeCount: refreshed.scanUsage.lifetimeCount,
+                });
+            }
             return true;
         } catch (err) {
             console.error('Failed to refresh profile after scan:', err);
             return false;
         }
-    }, [firebaseUser]);
+    }, [firebaseUser, user?.scanUsage.lifetimeCount]);
 
     // --- Access code ---
 
@@ -398,6 +412,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const result = await redeemAccessCodeService(user.uid, code);
         if (result.success && result.profile) {
             setUser(result.profile);
+            trackEvent('upgrade_success', {
+                method: 'access_code',
+                tier: result.profile.tier,
+            });
         }
         return result;
     }, [user]);

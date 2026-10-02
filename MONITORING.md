@@ -1,6 +1,24 @@
 # Production monitoring (Cura.Tor)
 
-Short operator checklist for **Gemini cost-per-scan** and **rate-limit / error alerts**. Complements the accuracy harness in `eval/accuracy/`.
+Short operator checklist for **Gemini cost-per-scan**, **rate-limit / error alerts**, optional **Sentry**, and **product funnel analytics**. Complements the accuracy harness in `eval/accuracy/`.
+
+## Required / optional env vars
+
+| Variable | Where | Required? | Purpose |
+|----------|--------|-----------|---------|
+| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Vercel (server) | Yes for OCR | Gemini + Vision |
+| `VITE_SENTRY_DSN` | Vercel / `.env` (client) | Optional | Enables `@sentry/react` init in `src/services/sentry.ts` |
+| `SENTRY_DSN` | Vercel (server) | Optional | Forwards error/warn events from `/api/error-log` to Sentry store API |
+
+Without Sentry DSNs the app still emits structured JSON logs and accepts `POST /api/error-log` (202). Sentry is additive.
+
+Set both DSNs to the same Sentry project if you want client crashes + server-forwarded events in one place.
+
+**Vercel tips**
+
+- `VITE_*` vars must be present at **build** time for the client bundle.
+- `SENTRY_DSN` is runtime-only on serverless functions.
+- See also `VERCEL_SETUP.md` and `.env.example`.
 
 ## Cost per scan (estimate)
 
@@ -46,21 +64,46 @@ Model default: **Gemini 2.5 Flash** via `api/gemini.ts`.
 - [ ] Alert: Vercel `api/gemini` p95 duration > 60s.
 - [ ] Weekly review: cost_per_scan vs tier pricing (Pioneer/Pro must remain margin-positive on log sheets).
 
+## Product funnel analytics
+
+Lightweight events via `trackEvent` → same `/api/error-log` intake at **info** level (logged as `src: cura.tor.api.analytics`, **no** alert noise, not forwarded to Sentry).
+
+| Event | When | Context (no PII) |
+|-------|------|------------------|
+| `signup` | New Firestore user doc created (`getOrCreateUserDoc` isNew) | `method`: `google` \| `email`, `tier` |
+| `first_scan` | First successful scan refresh (`lifetimeCount` 0→≥1) | `tier`, `lifetimeCount` |
+| `upgrade_intent` | Upgrade CTA (prompt → Settings) or Settings checkout start | `source`, `plan`, `fromTier` / `interval` |
+| `upgrade_success` | Stripe return confirmed active, or access-code redeem | `method`: `stripe_checkout` \| `access_code` |
+
+**Query in Vercel logs**
+
+```text
+cura.tor.api.analytics
+"name":"signup"
+"name":"first_scan"
+"name":"upgrade_intent"
+"name":"upgrade_success"
+```
+
+Dedupe: `signup` and `first_scan` use `localStorage` once-per-uid keys (`analytics_<event>_<uid>`).
+
 ## Observability hooks in this repo
 
 | Piece | Role |
 |-------|------|
-| `src/services/observability.ts` | Structured client events + POST `/api/error-log` |
-| `api/error-log.ts` | JSON log intake; optional `SENTRY_DSN` forward |
-| `ErrorBoundary` | Reports UI crashes (not console-only) |
+| `src/services/sentry.ts` | Env-gated `@sentry/react` init (`VITE_SENTRY_DSN`) |
+| `src/services/observability.ts` | Ops events + `trackEvent` / `trackEventOnce` → `/api/error-log` |
+| `api/error-log.ts` | JSON intake; alerts for 429/5xx/scan_failure; optional `SENTRY_DSN` forward |
+| `ErrorBoundary` | Reports UI crashes with reference id |
 | `ocr.ts` `callGeminiWithRetry` | Emits retry / 429 / 5xx / final scan_failure |
 
 **Optional Sentry**
 
 - Server: set `SENTRY_DSN` on Vercel (full DSN).
-- Client: set `VITE_SENTRY_DSN` and load the Sentry browser SDK when you are ready — the stub calls `globalThis.Sentry` if present.
+- Client: set `VITE_SENTRY_DSN` at **build** time — `initSentry()` loads `@sentry/react` when present.
 
 ## Related
 
 - Accuracy baseline: `eval/accuracy/README.md`
 - Deploy / env: `VERCEL_SETUP.md` (and operator runbook when published)
+- Env template: `.env.example`
