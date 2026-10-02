@@ -197,11 +197,8 @@ export const getOCREngine = (): OCREngine => {
         const stored = localStorage.getItem('ocr_engine');
         if (stored === 'tesseract' || stored === 'cloud-vision') return stored;
     } catch {
-<<<<<<< /tmp/meld/34-main-ocr.ts
         // Ignore storage errors (private mode, etc.)
-=======
         /* private mode */
->>>>>>> /tmp/meld/34-pr-ocr.ts
     }
     return 'cloud-vision';
 };

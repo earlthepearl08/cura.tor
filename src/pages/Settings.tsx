@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-<<<<<<< /tmp/meld/34-main-Settings.tsx
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff } from 'lucide-react';
-=======
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, Cpu } from 'lucide-react';
->>>>>>> /tmp/meld/34-pr-Settings.tsx
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Cpu } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
@@ -45,12 +41,9 @@ const Settings = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { theme, toggleTheme } = useTheme();
     const [ocrEngine, setOcrEngineState] = useState<OCREngine>(getOCREngine());
-<<<<<<< /tmp/meld/34-main-Settings.tsx
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [engineSaved, setEngineSaved] = useState(false);
-=======
     const [advancedOpen, setAdvancedOpen] = useState(false);
->>>>>>> /tmp/meld/34-pr-Settings.tsx
     const { isConnected, user: driveUser, isSyncing, syncProgress, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
     const { user, firebaseUser, signOut, canUseGoogleDrive, scansRemaining, refreshUserProfile } = useAuth();
 
@@ -592,7 +585,6 @@ const Settings = () => {
                     </div>
                 </div>
 
-<<<<<<< /tmp/meld/34-main-Settings.tsx
                 {/* Advanced — OCR engine (power users) */}
                 <div className="space-y-3">
                     <button
@@ -640,7 +632,6 @@ const Settings = () => {
                                             <p className="font-medium text-sm text-white">Online AI (Gemini)</p>
                                             {ocrEngine === 'cloud-vision' && (
                                                 <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
-=======
                 {/* Advanced — OCR engine choice hidden from default buyers */}
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Advanced</p>
@@ -694,12 +685,10 @@ const Settings = () => {
                                             </span>
                                             {ocrEngine === 'cloud-vision' && (
                                                 <span className="text-[10px] px-2 py-0.5 bg-sky-500/20 text-sky-400 rounded-full">
->>>>>>> /tmp/meld/34-pr-Settings.tsx
                                                     ACTIVE
                                                 </span>
                                             )}
                                         </div>
-<<<<<<< /tmp/meld/34-main-Settings.tsx
                                         <p className="text-xs text-slate-500 mt-0.5">
                                             Sends card images to Google Gemini for extraction. Recommended.
                                         </p>
@@ -725,7 +714,6 @@ const Settings = () => {
                                             <p className="font-medium text-sm text-white">Offline (Tesseract)</p>
                                             {ocrEngine === 'tesseract' && (
                                                 <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">
-=======
                                         <p className="text-xs text-slate-500">
                                             Default path for cards, multi-card, and log sheets
                                         </p>
@@ -757,12 +745,10 @@ const Settings = () => {
                                             </span>
                                             {ocrEngine === 'tesseract' && (
                                                 <span className="text-[10px] px-2 py-0.5 bg-brand-500/20 text-brand-400 rounded-full">
->>>>>>> /tmp/meld/34-pr-Settings.tsx
                                                     ACTIVE
                                                 </span>
                                             )}
                                         </div>
-<<<<<<< /tmp/meld/34-main-Settings.tsx
                                         <p className="text-xs text-slate-500 mt-0.5">
                                             On-device OCR for single cards when offline. Lower quality; log sheet and multi-card still need online AI.
                                         </p>
@@ -771,7 +757,6 @@ const Settings = () => {
                             </button>
                         </div>
                     )}
-=======
                                         <p className="text-xs text-slate-500">
                                             On-device OCR · lower quality, no Gemini parsing
                                         </p>
@@ -783,7 +768,6 @@ const Settings = () => {
                             </div>
                         )}
                     </div>
->>>>>>> /tmp/meld/34-pr-Settings.tsx
                 </div>
 
                 {/* Google Drive Sync */}
