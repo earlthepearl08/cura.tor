@@ -2,7 +2,7 @@
 
 ## Setting up the Gemini API Key
 
-Your Gemini API key is stored on the server. Users don't enter their own key — all OCR traffic goes through `/api/gemini` (and optionally `/api/ocr` for Cloud Vision).
+Your Gemini API key is now securely stored on the server. Users won't need to enter their own API key - they'll all use yours.
 
 ### Steps to add your API key to Vercel:
 
@@ -15,10 +15,9 @@ Your Gemini API key is stored on the server. Users don't enter their own key —
    - Click "Environment Variables" in the left sidebar
    - Add a new variable:
      - **Name**: `GEMINI_API_KEY`
-     - **Value**: Your Gemini API key (from https://aistudio.google.com/apikey)
+     - **Value**: Your Gemini API key (get it from https://makersuite.google.com/app/apikey)
      - **Environment**: Production, Preview, and Development (check all three)
    - Click "Save"
-   - Optional: also set `GOOGLE_API_KEY` if you use Cloud Vision via `/api/ocr`
 
 3. **Redeploy**
    - After adding the environment variable, go to "Deployments" tab
@@ -33,7 +32,7 @@ Your Gemini API key is stored on the server. Users don't enter their own key —
   - Users can't see it
   - All requests go through your `/api/gemini` serverless function
   - The function adds your API key before calling Gemini
-  - Auth + per-uid rate limits + tier quotas are enforced server-side
+  - 100% secure and transparent to users
 
 ## Testing locally
 
@@ -44,22 +43,32 @@ If you want to test the Gemini Vision feature locally:
    GEMINI_API_KEY=your_api_key_here
    ```
 
-2. Run the development server (`npm run dev` for the SPA; use `npx vercel dev` to exercise `/api/*`).
+2. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
 Note: The `.env` file is gitignored and won't be committed.
 
-## Production billing & monitoring (required before paid traffic)
+## API Usage Limits
 
-**Do not rely on free-tier Gemini quotas for Pro / log-sheet promotion.** Free limits will return **429** under real multi-user load.
-
-See **`GEMINI_OPS.md`** for:
+Free tier Gemini API provides:
+- **1,500 requests per day**
+- **1 million requests per month**
 
 For a prototype/demo, this should be more than enough. If you need more, you can upgrade or implement rate limiting.
 
 ## Public SEO files
 
 `public/robots.txt` and `public/sitemap.xml` are copied to the site root on build. They list Landing (`/`, `/welcome`), Accuracy (`/accuracy`), and Legal (`/legal`) using the placeholder origin `https://cura-tor.vercel.app`. See **`public/SEO.md`** to update the host for a custom domain.
-- Paid Google AI billing checklist (budget alerts, kill-switch)
-- How to watch **429 / 5xx** in Vercel logs
-- Rough **cost-per-scan** notes for `gemini-2.5-flash`
-- Where in-app rate-limit / quota UX surfaces (incl. PR [#31](https://github.com/earlthepearl08/cura.tor/pull/31))
+App-side abuse ceilings and tier quotas for `/api/gemini` and `/api/ocr` are enforced in code (see `api/_lib/scanGuards.ts`). Prefer **paid** Google billing before production traffic.
+
+## Shared API helpers (`api/_lib`)
+
+Auth / rate-limit / tier-quota logic for scan endpoints is shared in `api/_lib/scanGuards.ts` (imported by `api/gemini.ts` and `api/ocr.ts`).
+
+**Vercel bundling constraints** (full notes in `api/_lib/README.md`):
+
+- Paths under `api/` starting with `_` are **helpers**, not HTTP endpoints
+- Handlers must use **static relative** imports so Node File Trace includes the module in each function bundle
+- Do **not** import `firebase-admin/auth` on this project (use `jose` + JWKS instead)
