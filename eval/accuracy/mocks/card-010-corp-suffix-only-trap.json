@@ -1,0 +1,15 @@
+[
+  {
+    "name": "Kevin Ong",
+    "company": "Nimbus Cloud Corporation",
+    "position": "CTO",
+    "phone": [
+      "+63 928 111 2222"
+    ],
+    "email": [
+      "kevin.ong@nimbuscloud.ph"
+    ],
+    "address": "Bonifacio Global City, Taguig",
+    "notes": "www.nimbuscloud.ph"
+  }
+]

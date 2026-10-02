@@ -1,0 +1,55 @@
+{
+  "kind": "log-sheet",
+  "id": "sheet-005-cebu-expo",
+  "description": "Synthetic log-sheet rows — no photo required. Replace with image.jpg for live Gemini eval.",
+  "columns": [
+    "name",
+    "company",
+    "position",
+    "phone",
+    "email",
+    "address",
+    "notes"
+  ],
+  "rows": [
+    {
+      "name": "Andre Castillo",
+      "company": "Verde Holdings Group",
+      "position": "Business Development Manager",
+      "phone": [
+        "+63 999 321 7654"
+      ],
+      "email": [
+        "andre.c@verdeholdings.ph"
+      ],
+      "address": "Cebu",
+      "notes": ""
+    },
+    {
+      "name": "Clara Sy, MBA",
+      "company": "Summit Capital Partners",
+      "position": "Investment Analyst",
+      "phone": [
+        "+63 2 7777 1212"
+      ],
+      "email": [
+        "clara.sy@summitcap.ph"
+      ],
+      "address": "Makati",
+      "notes": "interested in Series A"
+    },
+    {
+      "name": "Owen Garcia",
+      "company": "PixelForge Studios",
+      "position": "Creative Director",
+      "phone": [
+        "0917-123-9876"
+      ],
+      "email": [
+        "owen@pixelforge.ph"
+      ],
+      "address": "QC",
+      "notes": ""
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-011-jr-suffix",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Ramirez Trading",
+    "Jose Ramirez Jr.",
+    "General Manager",
+    "0918-555-6666",
+    "jose.jr@ramireztrading.com",
+    "Iloilo City"
+  ]
+}

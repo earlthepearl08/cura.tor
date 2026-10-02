@@ -1,0 +1,23 @@
+{
+  "name": "Engr. Ramon dela Cruz, PEE",
+  "company": "VoltEdge Engineering",
+  "position": "Project Engineer",
+  "phone": [
+    "+63 917 222 8899",
+    "02-8333-4455"
+  ],
+  "email": [
+    "rdelacruz@voltedge.ph"
+  ],
+  "address": "Las Piñas City",
+  "notes": "",
+  "_meta": {
+    "id": "card-029-eng-pee",
+    "difficulty": "medium",
+    "tags": [
+      "credentials",
+      "multi-phone",
+      "ph"
+    ]
+  }
+}

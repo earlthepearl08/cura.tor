@@ -47,7 +47,7 @@ export default function Admin() {
 
     useEffect(() => {
         if (!isOwner) {
-            navigate('/');
+            navigate('/app');
             return;
         }
         load();

@@ -98,7 +98,7 @@ const ManualInput: React.FC = () => {
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
             <div className="p-4 glass flex items-center justify-between sticky top-0 z-10">
-                <button onClick={() => navigate('/')} className="p-2 text-brand-600 hover:text-white">
+                <button onClick={() => navigate('/app')} className="p-2 text-brand-600 hover:text-white">
                     <ArrowLeft size={24} />
                 </button>
                 <h2 className="text-lg font-bold gradient-text">Add Contact Manually</h2>

@@ -1,0 +1,53 @@
+{
+  "kind": "log-sheet",
+  "id": "sheet-004-handwritten-dense",
+  "description": "Synthetic log-sheet rows — no photo required. Replace with image.jpg for live Gemini eval.",
+  "columns": [
+    "name",
+    "company",
+    "position",
+    "phone",
+    "email",
+    "address",
+    "notes"
+  ],
+  "rows": [
+    {
+      "name": "Mark Villanueva",
+      "company": "Booth Pop-Up PH",
+      "position": "Founder",
+      "phone": [
+        "0917-555-0199"
+      ],
+      "email": [],
+      "address": "",
+      "notes": "booth 12"
+    },
+    {
+      "name": "Tina Bautista",
+      "company": "AquaPure Filters Co.",
+      "position": "Sales Rep",
+      "phone": [
+        "0918-777-0101"
+      ],
+      "email": [
+        "tina.b@aquapure.ph"
+      ],
+      "address": "Pampanga",
+      "notes": ""
+    },
+    {
+      "name": "Diego Flores",
+      "company": "Flores Family Farms",
+      "position": "",
+      "phone": [
+        "0919-222-3333"
+      ],
+      "email": [
+        "diego@floresfarms.ph"
+      ],
+      "address": "Batangas",
+      "notes": "organic"
+    }
+  ]
+}
