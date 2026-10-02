@@ -13,7 +13,10 @@ const EVENT_SEAT_MAX = 10;
 const EVENT_SEAT_DEFAULT = 5;
 const DEFAULT_DURATION_DAYS = 7;
 const MAX_DURATION_DAYS = 30;
-const MAX_ACTIVE_EVENTS_HOSTED = 3;
+/** Free concurrent host slots without a paid Event pack. */
+const FREE_HOST_SLOTS = 1;
+/** Absolute ceiling even with many packs. */
+const MAX_ACTIVE_EVENTS_HOSTED = 10;
 
 function getAdminDb() {
   if (!getApps().length) {
@@ -119,15 +122,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: `Duration must be 1–${MAX_DURATION_DAYS} days` });
         }
 
-        // Cap how many active events one person can host
+        // Capacity = free slot(s) + purchased Event pack credits
+        const userSnap = await adminDb.collection('users').doc(auth.uid).get();
+        const userData = userSnap.data() || {};
+        const packCredits = typeof userData.eventPackCredits === 'number' ? userData.eventPackCredits : 0;
+        const hostLimit = Math.min(MAX_ACTIVE_EVENTS_HOSTED, FREE_HOST_SLOTS + packCredits);
+
         const hostedSnap = await adminDb.collection('eventWorkspaces')
           .where('hostId', '==', auth.uid)
           .where('status', '==', 'active')
           .get();
         const activeHosted = hostedSnap.docs.filter((d) => isEventWritable(d.data())).length;
-        if (activeHosted >= MAX_ACTIVE_EVENTS_HOSTED) {
+        if (activeHosted >= hostLimit) {
           return res.status(400).json({
-            error: `You can host up to ${MAX_ACTIVE_EVENTS_HOSTED} active events. End one first.`,
+            error: packCredits > 0
+              ? `You are hosting ${activeHosted}/${hostLimit} events. End one or buy another Event pack.`
+              : 'Free host slot is in use. Buy an Event pack to host another show, or end your current event.',
+            code: 'HOST_CAPACITY',
+            activeHosted,
+            hostLimit,
+            eventPackCredits: packCredits,
           });
         }
 
@@ -336,10 +350,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'list': {
         const userSnap = await adminDb.collection('users').doc(auth.uid).get();
-        const eventIds: string[] = userSnap.data()?.eventIds || [];
-        if (eventIds.length === 0) {
-          return res.status(200).json({ events: [] });
-        }
+        const userData = userSnap.data() || {};
+        const eventIds: string[] = userData.eventIds || [];
+        const packCredits = typeof userData.eventPackCredits === 'number' ? userData.eventPackCredits : 0;
+        const hostLimit = Math.min(MAX_ACTIVE_EVENTS_HOSTED, FREE_HOST_SLOTS + packCredits);
 
         const events = [];
         // Firestore getAll in chunks of 10
@@ -368,7 +382,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         events.sort((a, b) => b.createdAt - a.createdAt);
-        return res.status(200).json({ events });
+        const activeHosted = events.filter((e) => e.isHost && e.writable).length;
+        return res.status(200).json({
+          events,
+          capacity: {
+            freeHostSlots: FREE_HOST_SLOTS,
+            eventPackCredits: packCredits,
+            hostLimit,
+            activeHosted,
+          },
+        });
       }
 
       default:

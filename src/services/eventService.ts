@@ -143,7 +143,17 @@ export async function rotateEventJoinCode(eventId: string): Promise<{ success: b
     }
 }
 
-export async function listEventWorkspaces(): Promise<EventListItem[]> {
+export type EventHostCapacity = {
+    freeHostSlots: number;
+    eventPackCredits: number;
+    hostLimit: number;
+    activeHosted: number;
+};
+
+export async function listEventWorkspaces(): Promise<{
+    events: EventListItem[];
+    capacity: EventHostCapacity | null;
+}> {
     const res = await authFetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -151,7 +161,10 @@ export async function listEventWorkspaces(): Promise<EventListItem[]> {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to list events');
-    return (data.events || []) as EventListItem[];
+    return {
+        events: (data.events || []) as EventListItem[],
+        capacity: data.capacity || null,
+    };
 }
 
 export function formatEventExpiry(expiresAt: number): string {

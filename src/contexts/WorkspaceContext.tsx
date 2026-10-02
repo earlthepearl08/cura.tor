@@ -82,7 +82,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
         try {
             await refreshUserProfile();
-            const list = await listEventWorkspaces();
+            const { events: list } = await listEventWorkspaces();
             setEvents(list);
         } catch (err) {
             console.error('Failed to list events:', err);
@@ -119,7 +119,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return;
         }
         listEventWorkspaces()
-            .then(setEvents)
+            .then(({ events: list }) => setEvents(list))
             .catch((err) => console.error('Failed to list events:', err));
     }, [user?.uid, eventIds.join('|')]);
 

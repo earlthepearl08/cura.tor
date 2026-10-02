@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     ArrowLeft, CalendarDays, Copy, Check, Loader2, Users, LogOut, Ban,
-    RefreshCw, KeyRound, Sparkles,
+    RefreshCw, KeyRound, Sparkles, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -15,8 +15,9 @@ import {
     formatEventExpiry,
     isEventActive,
     getEventMembers,
+    listEventWorkspaces,
 } from '@/services/eventService';
-import type { EventListItem } from '@/services/eventService';
+import type { EventListItem, EventHostCapacity } from '@/services/eventService';
 import {
     EVENT_SEAT_DEFAULT,
     EVENT_SEAT_MAX,
@@ -24,10 +25,12 @@ import {
     DEFAULT_EVENT_DURATION_DAYS,
     EventMember,
 } from '@/types/eventWorkspace';
+import { createEventPackCheckoutSession, EVENT_PACK_PRICE } from '@/services/stripe';
 
 const Events: React.FC = () => {
     const navigate = useNavigate();
-    const { refreshUserProfile } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { refreshUserProfile, user } = useAuth();
     const { events, switchTo, refreshEvents, event: activeEvent, mode } = useWorkspace();
 
     const [name, setName] = useState('');
@@ -39,9 +42,20 @@ const Events: React.FC = () => {
     const [success, setSuccess] = useState('');
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
     const [membersByEvent, setMembersByEvent] = useState<Record<string, EventMember[]>>({});
+    const [capacity, setCapacity] = useState<EventHostCapacity | null>(null);
+
+    const loadCapacity = async () => {
+        try {
+            const { capacity: cap } = await listEventWorkspaces();
+            setCapacity(cap);
+        } catch {
+            // ignore — events list still comes from context
+        }
+    };
 
     useEffect(() => {
         refreshEvents();
+        loadCapacity();
     }, []);
 
     useEffect(() => {
@@ -55,6 +69,57 @@ const Events: React.FC = () => {
             }
         });
     }, [events.map((e) => e.id).join('|')]);
+
+    // Stripe Event pack return — honest pending/confirm (webhook grants credits)
+    useEffect(() => {
+        const payment = searchParams.get('payment');
+        if (!payment) return;
+
+        const clear = () => {
+            const next = new URLSearchParams(searchParams);
+            next.delete('payment');
+            setSearchParams(next, { replace: true });
+        };
+
+        if (payment === 'canceled') {
+            setError('Checkout canceled. No charge was made.');
+            clear();
+            return;
+        }
+
+        if (payment !== 'success') return;
+
+        let cancelled = false;
+        const confirm = async () => {
+            setSuccess('Checkout complete. Confirming Event pack credits…');
+            clear();
+            const before = user?.eventPackCredits ?? 0;
+            for (let i = 0; i < 5 && !cancelled; i++) {
+                if (i > 0) await new Promise((r) => setTimeout(r, 2000));
+                try {
+                    const profile = await refreshUserProfile();
+                    const credits = profile?.eventPackCredits ?? 0;
+                    if (credits > before) {
+                        if (!cancelled) {
+                            flashSuccess(`Event pack unlocked — ${credits} host slot${credits === 1 ? '' : 's'} from packs.`);
+                            await loadCapacity();
+                            await refreshEvents();
+                        }
+                        return;
+                    }
+                } catch {
+                    // keep polling
+                }
+            }
+            if (!cancelled) {
+                setSuccess('Payment received. Credits appear once billing confirms — refresh in a minute if needed.');
+                await loadCapacity();
+            }
+        };
+        void confirm();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const flashSuccess = (msg: string) => {
         setSuccess(msg);
@@ -75,13 +140,29 @@ const Events: React.FC = () => {
         setBusy(false);
         if (!result.success || !result.eventId) {
             setError(result.message);
+            if (result.message.toLowerCase().includes('event pack') || result.message.toLowerCase().includes('host slot')) {
+                await loadCapacity();
+            }
             return;
         }
         setName('');
         await refreshUserProfile();
         await refreshEvents();
+        await loadCapacity();
         switchTo('event', result.eventId);
         flashSuccess(`Event created. Share code ${result.joinCode}`);
+    };
+
+    const handleBuyEventPack = async () => {
+        setBusy(true);
+        setError('');
+        try {
+            const url = await createEventPackCheckoutSession();
+            window.location.href = url;
+        } catch (err: any) {
+            setError(err.message || 'Could not start Event pack checkout');
+            setBusy(false);
+        }
     };
 
     const handleJoin = async (e: React.FormEvent) => {
@@ -180,8 +261,41 @@ const Events: React.FC = () => {
                     <p className="text-xs text-slate-500 leading-relaxed">
                         Spin up a temporary shared space for 2–{EVENT_SEAT_MAX} people at one trade show.
                         Share a short code — no enterprise request. Contacts and claims stay in the event until it ends.
-                        Paid “Event pack” Stripe SKU is a follow-up when prices are defined.
                     </p>
+                </div>
+
+                {/* Host capacity + Event pack purchase */}
+                <div className="card-elevated rounded-2xl p-4 space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Host capacity</p>
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-400">Active events you host</span>
+                        <span className="font-medium">
+                            {capacity
+                                ? `${capacity.activeHosted} / ${capacity.hostLimit}`
+                                : `${user?.eventPackCredits ?? 0} pack credit(s)`}
+                        </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                        Includes {capacity?.freeHostSlots ?? 1} free slot
+                        {(capacity?.eventPackCredits ?? user?.eventPackCredits ?? 0) > 0
+                            ? ` + ${capacity?.eventPackCredits ?? user?.eventPackCredits} from Event packs`
+                            : ''}.
+                        Buy a one-time Event pack to host another concurrent show.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={handleBuyEventPack}
+                        disabled={busy || !EVENT_PACK_PRICE.id}
+                        className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-brand-950 rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {busy ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                        Buy Event pack ({EVENT_PACK_PRICE.amountLabel})
+                    </button>
+                    {!EVENT_PACK_PRICE.id && (
+                        <p className="text-[11px] text-amber-400/80">
+                            Set VITE_STRIPE_EVENT_PACK_PRICE_ID to enable checkout (placeholder price ID).
+                        </p>
+                    )}
                 </div>
 
                 {error && (

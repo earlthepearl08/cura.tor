@@ -71,10 +71,34 @@ function getTierFromPriceId(priceId: string): PaidTier | null {
   return null;
 }
 
+function eventPackPriceIds(): string[] {
+  const server = (process.env.STRIPE_EVENT_PACK_PRICE_IDS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const client = process.env.VITE_STRIPE_EVENT_PACK_PRICE_ID?.trim();
+  const ids = [...server];
+  if (client && !ids.includes(client)) ids.push(client);
+  return ids;
+}
+
+function isValidOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    return isLocal || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Create a Stripe Checkout session for the authenticated user.
  * Requires Authorization: Bearer <Firebase ID token>.
- * Body: { priceId, origin } — firebaseUid/email/tier from the client are ignored.
+ *
+ * Body:
+ * - { priceId, origin } — Pioneer/Pro subscription (tier from allowlisted price)
+ * - { product: 'event_pack', priceId, origin } — one-time Event pack (mode=payment)
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -92,25 +116,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const { priceId, origin } = req.body || {};
+  const { priceId, origin, product } = req.body || {};
   if (!priceId || !origin || typeof priceId !== 'string' || typeof origin !== 'string') {
     return res.status(400).json({ error: 'Missing required fields: priceId, origin' });
   }
 
-  // Basic origin allowlist: must be https (or localhost for local/dev)
-  try {
-    const url = new URL(origin);
-    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    if (!isLocal && url.protocol !== 'https:') {
-      return res.status(400).json({ error: 'Invalid origin' });
-    }
-  } catch {
+  if (!isValidOrigin(origin)) {
     return res.status(400).json({ error: 'Invalid origin' });
-  }
-
-  const tier = getTierFromPriceId(priceId);
-  if (!tier) {
-    return res.status(400).json({ error: 'Unrecognized priceId' });
   }
 
   let adminDb: FirebaseFirestore.Firestore;
@@ -119,6 +131,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err: any) {
     console.error('Firebase Admin init failed:', err.message);
     return res.status(500).json({ error: 'Server configuration error', details: err.message });
+  }
+
+  // --- One-time Event pack ---
+  if (product === 'event_pack') {
+    const allowed = eventPackPriceIds();
+    if (allowed.length === 0) {
+      return res.status(500).json({
+        error: 'Event pack price not configured (set VITE_STRIPE_EVENT_PACK_PRICE_ID / STRIPE_EVENT_PACK_PRICE_IDS)',
+      });
+    }
+    if (!allowed.includes(priceId)) {
+      return res.status(400).json({ error: 'Unrecognized Event pack priceId' });
+    }
+
+    try {
+      const userSnap = await adminDb.collection('users').doc(auth.uid).get();
+      if (!userSnap.exists) {
+        return res.status(404).json({ error: 'User profile not found' });
+      }
+      const userData = userSnap.data()!;
+      const email = auth.email || userData.email;
+      if (!email) {
+        return res.status(400).json({ error: 'User email required for checkout' });
+      }
+
+      const existingCustomerId =
+        typeof userData.stripe?.customerId === 'string' && userData.stripe.customerId
+          ? userData.stripe.customerId
+          : undefined;
+
+      const stripe = new Stripe(stripeSecretKey);
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: ['card'],
+        ...(existingCustomerId
+          ? { customer: existingCustomerId }
+          : { customer_email: email }),
+        line_items: [{ price: priceId, quantity: 1 }],
+        client_reference_id: auth.uid,
+        metadata: { firebaseUid: auth.uid, product: 'event_pack' },
+        success_url: `${origin}/events?payment=success`,
+        cancel_url: `${origin}/events?payment=canceled`,
+      });
+
+      return res.status(200).json({ url: session.url });
+    } catch (err: any) {
+      console.error('Event pack checkout failed:', err);
+      return res.status(500).json({ error: err.message || 'Failed to create Event pack checkout' });
+    }
+  }
+
+  // --- Pioneer / Pro subscription ---
+  const tier = getTierFromPriceId(priceId);
+  if (!tier) {
+    return res.status(400).json({ error: 'Unrecognized priceId' });
   }
 
   try {

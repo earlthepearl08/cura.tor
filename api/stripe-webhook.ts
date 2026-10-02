@@ -56,6 +56,19 @@ function getTierFromPriceId(priceId: string): PaidTier | null {
   return null;
 }
 
+const EVENT_PACK_CREDITS_PER_PURCHASE = 1;
+
+function eventPackPriceIds(): string[] {
+  const server = (process.env.STRIPE_EVENT_PACK_PRICE_IDS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const client = process.env.VITE_STRIPE_EVENT_PACK_PRICE_ID?.trim();
+  const ids = [...server];
+  if (client && !ids.includes(client)) ids.push(client);
+  return ids;
+}
+
 /** Contact storage for paid tiers (mirrors src/types/user.ts TIER_LIMITS) */
 function contactLimitForTier(tier: PaidTier): number | null {
   return tier === 'pro' ? null : 50;
@@ -152,6 +165,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (!firebaseUid) {
           console.error('Missing firebaseUid metadata in checkout session:', session.id);
+          break;
+        }
+
+        // One-time Event pack (mode=payment) — grant host credits, skip subscription path
+        if (session.metadata?.product === 'event_pack' || session.mode === 'payment') {
+          if (session.metadata?.product !== 'event_pack') {
+            console.error('Payment checkout missing product=event_pack metadata:', session.id);
+            break;
+          }
+
+          // Optional allowlist check when line items are expanded
+          const allowed = eventPackPriceIds();
+          const linePrice = (session as any).line_items?.data?.[0]?.price?.id
+            || (typeof session.metadata?.priceId === 'string' ? session.metadata.priceId : null);
+          if (allowed.length > 0 && linePrice && !allowed.includes(linePrice)) {
+            console.error('Event pack checkout used non-allowlisted price:', session.id, linePrice);
+            break;
+          }
+
+          const userRef = adminDb.collection('users').doc(firebaseUid);
+          await adminDb.runTransaction(async (tx) => {
+            const snap = await tx.get(userRef);
+            const data = snap.data() || {};
+            const credits = typeof data.eventPackCredits === 'number' ? data.eventPackCredits : 0;
+            const purchased = typeof data.eventPackPurchased === 'number' ? data.eventPackPurchased : 0;
+            tx.set(userRef, {
+              eventPackCredits: credits + EVENT_PACK_CREDITS_PER_PURCHASE,
+              eventPackPurchased: purchased + 1,
+              ...(session.customer
+                ? { 'stripe.customerId': session.customer as string }
+                : {}),
+              updatedAt: FieldValue.serverTimestamp(),
+            }, { merge: true });
+          });
+
+          console.log(`User ${firebaseUid} granted Event pack credit via checkout ${session.id}`);
           break;
         }
 
