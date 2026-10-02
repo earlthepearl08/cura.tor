@@ -468,9 +468,15 @@ const LogScan: React.FC = () => {
     if (!canUseBulkScan()) {
         return (
             <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
+<<<<<<< /tmp/meld/23-main-LogScan.tsx
+                <div className="flex items-center justify-between glass sticky top-0 z-10 p-4">
+                    <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                        <ArrowLeft size={24} />
+=======
                 <header className="flex items-center justify-between glass sticky top-0 z-10 p-4">
                     <button type="button" onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Back to home">
                         <ArrowLeft size={24} aria-hidden="true" />
+>>>>>>> /tmp/meld/23-pr-LogScan.tsx
                     </button>
                     <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
                     <div className="w-10" aria-hidden="true" />
@@ -496,9 +502,15 @@ const LogScan: React.FC = () => {
     return (
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
+<<<<<<< /tmp/meld/23-main-LogScan.tsx
+            <div className="flex items-center justify-between glass sticky top-0 z-10 p-4">
+                <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <ArrowLeft size={24} />
+=======
             <header className="flex items-center justify-between glass sticky top-0 z-10 p-4">
                 <button type="button" onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Back to home">
                     <ArrowLeft size={24} aria-hidden="true" />
+>>>>>>> /tmp/meld/23-pr-LogScan.tsx
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
                 <div className="w-10" aria-hidden="true" />

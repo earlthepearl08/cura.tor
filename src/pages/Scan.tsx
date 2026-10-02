@@ -107,6 +107,11 @@ const Scanner: React.FC = () => {
     return (
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
+<<<<<<< /tmp/meld/23-main-Scan.tsx
+            <div className="flex items-center justify-between p-4 glass sticky top-0 z-10">
+                <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <ArrowLeft size={24} />
+=======
             <header className="flex items-center justify-between p-4 glass sticky top-0 z-10">
                 <button
                     type="button"
@@ -115,6 +120,7 @@ const Scanner: React.FC = () => {
                     aria-label="Back to home"
                 >
                     <ArrowLeft size={24} aria-hidden="true" />
+>>>>>>> /tmp/meld/23-pr-Scan.tsx
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">
                     {batchMode ? `Batch Scan${batchCount > 0 ? ` (${batchCount})` : ''}` : 'Scan Card'}
