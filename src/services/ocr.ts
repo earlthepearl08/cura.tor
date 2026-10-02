@@ -2,7 +2,24 @@
 import { createWorker } from 'tesseract.js';
 import { auth } from '../config/firebase';
 import { reportGeminiHttpError, reportScanFailure } from './observability';
-import { ScanApiError } from '@/utils/friendlyScanError';
+import {
+    enrichConfidence,
+    extractVisionWords,
+    averageVisionConfidence,
+    GEMINI_CONFIDENCE_PROMPT,
+    GEMINI_CONFIDENCE_SCHEMA_PROPS,
+    type ContactFieldKey,
+    type ConfidenceSource,
+    type FieldConfidenceMap,
+} from './ocrConfidence';
+
+export type { ContactFieldKey, ConfidenceSource, FieldConfidenceMap };
+export {
+    entryNeedsReview,
+    FIELD_REVIEW_THRESHOLD,
+    ENTRY_REVIEW_THRESHOLD,
+    CONTACT_FIELD_KEYS,
+} from './ocrConfidence';
 
 async function authHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -52,39 +69,11 @@ const GEMINI_CORE_RULES = `## Extraction Rules
 
 9. Do NOT invent or guess information that is not present in the text or visible in the image.`;
 
-// Compute a heuristic confidence score (0-95) based on how many fields were
-// successfully extracted. Replaces the old hardcoded 85% for flows that don't
-// have real word-level OCR confidence from Cloud Vision.
-function computeHeuristicConfidence(entry: {
-    name?: string;
-    company?: string;
-    position?: string;
-    phone?: string[] | string;
-    email?: string[] | string;
-    address?: string;
-    notes?: string;
-}): number {
-    let score = 55;
-    const has = (v: unknown): boolean => {
-        if (Array.isArray(v)) return v.length > 0 && v.some(x => typeof x === 'string' && x.trim().length > 0);
-        return typeof v === 'string' && v.trim().length > 0;
-    };
-    if (has(entry.name)) score += 12;
-    if (has(entry.company)) score += 10;
-    if (has(entry.phone)) score += 8;
-    if (has(entry.email)) score += 8;
-    if (has(entry.position)) score += 4;
-    if (has(entry.address)) score += 3;
-    if (has(entry.notes)) score += 2;
-    return Math.max(0, Math.min(95, score));
-}
-
 // Shared fetch + retry wrapper for all Gemini calls. Retries on transient
 // failures (429/500/502/503/504, "high demand" / "overloaded" messages,
 // network errors) with exponential backoff (1s, 2s, 4s — 3 attempts total).
 // Flows that don't use this helper (anything directly calling /api/gemini)
 // will fall back to the rule-based parser on the first failure.
-// User-facing copy is applied via classifyScanError / friendlyScanErrorMessage.
 async function callGeminiWithRetry(opts: {
     body: string;
     flowName: string;
@@ -92,7 +81,7 @@ async function callGeminiWithRetry(opts: {
 }): Promise<any> {
     const timeoutMs = opts.timeoutMs ?? 90000;
     const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
-    const RETRY_MESSAGE_RE = /high demand|overloaded|temporarily unavailable|try again later|resource.?exhausted/i;
+    const RETRY_MESSAGE_RE = /high demand|overloaded|temporarily unavailable|try again later/i;
     const MAX_ATTEMPTS = 3;
     const BACKOFF_MS = [1000, 2000, 4000];
 
@@ -114,24 +103,11 @@ async function callGeminiWithRetry(opts: {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 const nestedMsg = errorData.details?.error?.message; // Google upstream error shape
-                const flatDetails = typeof errorData.details === 'string' ? errorData.details : null;
-                const reason = typeof errorData.reason === 'string' ? errorData.reason : undefined;
-                // Keep internals in logs; throw a short structured error for the UI layer.
-                console.warn(
-                    `[${opts.flowName}] API ${response.status}`,
-                    { reason, nestedMsg, flatDetails, error: errorData.error }
-                );
-                const publicMsg = errorData.error || `Gemini API error: ${response.status}`;
-                const logMsg = [nestedMsg, flatDetails, reason ? `[${reason}]` : null].filter(Boolean).join(' — ');
-                const fullMsg = logMsg || publicMsg;
-                const retryable =
-                    // Don't auto-retry tier quota — user must upgrade / wait for reset
-                    reason !== 'quota-exceeded' &&
-                    (RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(logMsg || publicMsg));
-                const apiError = new ScanApiError(publicMsg, {
-                    status: response.status,
-                    reason,
-                });
+                const flatDetails = typeof errorData.details === 'string' ? errorData.details : null; // our own server error shape
+                const baseMsg = nestedMsg || errorData.error || `Gemini API error: ${response.status}`;
+                const parts = [baseMsg, flatDetails, errorData.reason ? `[${errorData.reason}]` : null].filter(Boolean);
+                const fullMsg = parts.join(' — ');
+                const retryable = RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg);
                 if (retryable && attempt < MAX_ATTEMPTS - 1) {
                     console.log(`[${opts.flowName}] Transient error ${response.status}, retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
                     reportGeminiHttpError({
@@ -143,7 +119,7 @@ async function callGeminiWithRetry(opts: {
                         final: false,
                     });
                     await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
-                    lastError = apiError;
+                    lastError = new Error(fullMsg);
                     continue;
                 }
                 reportGeminiHttpError({
@@ -154,7 +130,9 @@ async function callGeminiWithRetry(opts: {
                     attempt: attempt + 1,
                     final: true,
                 });
-                throw apiError;
+                const httpErr = new Error(fullMsg) as Error & { __observabilityReported?: boolean };
+                httpErr.__observabilityReported = true;
+                throw httpErr;
             }
 
             const data = await response.json();
@@ -163,8 +141,6 @@ async function callGeminiWithRetry(opts: {
             return text;
         } catch (error: any) {
             clearTimeout(timeout);
-            // Structured API errors already decided retry vs throw above
-            if (error instanceof ScanApiError) throw error;
             const msg = error?.message || String(error);
             const isNetworkError = error?.name === 'AbortError' || /failed to fetch|network|timeout/i.test(msg);
             const isMessageRetryable = RETRY_MESSAGE_RE.test(msg);
@@ -202,6 +178,12 @@ export interface OCRResult {
     notes: string;
     rawText: string;
     confidence: number;
+    /** Where the overall score came from */
+    confidenceSource?: ConfidenceSource;
+    /** Per-field scores 0–100 when known */
+    fieldConfidence?: FieldConfidenceMap;
+    /** Fields the user should verify before saving */
+    needsReviewFields?: ContactFieldKey[];
 }
 
 export type OCREngine = 'tesseract' | 'cloud-vision';
@@ -390,6 +372,9 @@ export class OCRService {
             notes: first.notes,
             rawText: '',
             confidence: first.confidence,
+            confidenceSource: first.confidenceSource,
+            fieldConfidence: first.fieldConfidence,
+            needsReviewFields: first.needsReviewFields,
         };
     }
 
@@ -413,18 +398,9 @@ export class OCRService {
                 const errorData = await response.json().catch(() => ({}));
                 const nestedMsg = errorData.details?.error?.message;
                 const flatDetails = typeof errorData.details === 'string' ? errorData.details : null;
-                const reason = typeof errorData.reason === 'string' ? errorData.reason : undefined;
-                console.warn('[Cloud Vision] API error', {
-                    status: response.status,
-                    reason,
-                    nestedMsg,
-                    flatDetails,
-                    error: errorData.error,
-                });
-                throw new ScanApiError(errorData.error || `Cloud Vision API error: ${response.status}`, {
-                    status: response.status,
-                    reason,
-                });
+                const baseMsg = nestedMsg || errorData.error || `Cloud Vision API error: ${response.status}`;
+                const parts = [baseMsg, flatDetails, errorData.reason ? `[${errorData.reason}]` : null].filter(Boolean);
+                throw new Error(parts.join(' — '));
             }
 
             const data = await response.json();
@@ -448,47 +424,48 @@ export class OCRService {
             }
 
             // Extract real confidence from Cloud Vision word-level data
-            let realConfidence = 90;
-            try {
-                const pages = fullTextAnnotation?.pages;
-                if (pages && pages.length > 0) {
-                    const wordConfidences: number[] = [];
-                    for (const page of pages) {
-                        for (const block of page.blocks || []) {
-                            for (const paragraph of block.paragraphs || []) {
-                                for (const word of paragraph.words || []) {
-                                    if (word.confidence !== undefined) {
-                                        wordConfidences.push(word.confidence);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (wordConfidences.length > 0) {
-                        realConfidence = Math.round(
-                            (wordConfidences.reduce((a: number, b: number) => a + b, 0) / wordConfidences.length) * 100
-                        );
-                    }
-                }
-            } catch (e) {
-                console.log('[Cloud Vision] Could not extract confidence scores, using default');
-            }
-            console.log('[Cloud Vision] Confidence:', realConfidence + '%');
+            const visionWords = extractVisionWords(fullTextAnnotation);
+            const visionOverall = averageVisionConfidence(visionWords);
+            let realConfidence = visionOverall ?? 90;
+            console.log('[Cloud Vision] Confidence:', realConfidence + '%', `(${visionWords.length} words)`);
 
             // Try AI parsing first (Gemini), fallback to rule-based parser
             let parsedData;
+            let geminiMeta: { uncertainFields?: unknown; fieldConfidence?: unknown } = {};
             try {
-                parsedData = await this.parseWithGemini(fullText, imageSrc);
-                console.log('[Cloud Vision] Gemini AI parsing succeeded:', parsedData);
+                const geminiResult = await this.parseWithGemini(fullText, imageSrc);
+                console.log('[Cloud Vision] Gemini AI parsing succeeded:', geminiResult);
+                parsedData = geminiResult;
+                geminiMeta = {
+                    uncertainFields: geminiResult.uncertainFields,
+                    fieldConfidence: geminiResult.fieldConfidence,
+                };
             } catch (geminiError) {
                 console.log('[Cloud Vision] Gemini parsing failed, using rule-based parser:', geminiError);
                 parsedData = this.parseText(fullText);
             }
 
+            const enriched = enrichConfidence(parsedData, {
+                visionWords,
+                geminiUncertainFields: geminiMeta.uncertainFields,
+                geminiFieldConfidence: geminiMeta.fieldConfidence,
+                engineOverall: realConfidence,
+                baseSource: 'vision',
+            });
+
             return {
-                ...parsedData,
+                name: parsedData.name,
+                position: parsedData.position,
+                company: parsedData.company,
+                phone: parsedData.phone,
+                email: parsedData.email,
+                address: parsedData.address,
+                notes: parsedData.notes,
                 rawText: fullText,
-                confidence: realConfidence
+                confidence: enriched.confidence,
+                confidenceSource: enriched.confidenceSource,
+                fieldConfidence: enriched.fieldConfidence,
+                needsReviewFields: enriched.needsReviewFields,
             };
 
         } catch (error) {
@@ -502,12 +479,17 @@ export class OCRService {
      * Sends both the OCR text AND the original image for multimodal analysis.
      * Much more accurate than rule-based parsing for complex cards.
      */
-    async parseWithGemini(rawText: string, base64Image?: string): Promise<Omit<OCRResult, 'rawText' | 'confidence'>> {
+    async parseWithGemini(rawText: string, base64Image?: string): Promise<Omit<OCRResult, 'rawText' | 'confidence' | 'confidenceSource' | 'fieldConfidence' | 'needsReviewFields'> & {
+        uncertainFields?: string[];
+        fieldConfidence?: FieldConfidenceMap;
+    }> {
         console.log('[Gemini] Parsing single card with AI...');
 
         const prompt = `You are an expert business card data extractor. You are given the raw OCR text from a business card AND the original card image. Use the image as the source of truth when the OCR text is fragmented, ambiguous, or visually stacked across multiple lines. Extract structured contact information from both signals.
 
 ${GEMINI_CORE_RULES}
+
+${GEMINI_CONFIDENCE_PROMPT}
 
 ## Examples
 
@@ -536,7 +518,7 @@ Unit 3C-1 Seibu Tower, 6th Ave.,
 24th St., BGC Taguig City
 
 Output:
-{"name": "Earl Bryan Dy", "position": "VP Sales & Marketing", "company": "KINMO PW Corporation", "phone": ["+63968.7269310", "+63917.8878017", "+63977.8407799", "8703-5284", "8362-5820", "8251-0507", "8251-0508"], "email": ["earldy.kinmo@gmail.com"], "address": "Main Office: 1732 Jose Abad Santos St., Manila, Philippines | ShowRoom: 121 Scout Dr. Lazcano Street, Brgy. Sacred Heart, Quezon City | BGC Office: Unit 3C-1 Seibu Tower, 6th Ave., 24th St., BGC, Taguig City", "notes": "www.kinmo.com | www.facebook.com/kinmopwcorporation | Satisfying the needs of today and tomorrow"}
+{"name": "Earl Bryan Dy", "position": "VP Sales & Marketing", "company": "KINMO PW Corporation", "phone": ["+63968.7269310", "+63917.8878017", "+63977.8407799", "8703-5284", "8362-5820", "8251-0507", "8251-0508"], "email": ["earldy.kinmo@gmail.com"], "address": "Main Office: 1732 Jose Abad Santos St., Manila, Philippines | ShowRoom: 121 Scout Dr. Lazcano Street, Brgy. Sacred Heart, Quezon City | BGC Office: Unit 3C-1 Seibu Tower, 6th Ave., 24th St., BGC, Taguig City", "notes": "www.kinmo.com | www.facebook.com/kinmopwcorporation | Satisfying the needs of today and tomorrow", "uncertainFields": [], "fieldConfidence": {"name": 95, "company": 92, "position": 90, "phone": 88, "email": 96, "address": 85, "notes": 80}}
 
 ### Example 2: Brand mark above legal name, single address, fax line
 
@@ -619,9 +601,10 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
                         phone: { type: 'ARRAY', items: { type: 'STRING' } },
                         email: { type: 'ARRAY', items: { type: 'STRING' } },
                         address: { type: 'STRING' },
-                        notes: { type: 'STRING' }
+                        notes: { type: 'STRING' },
+                        ...GEMINI_CONFIDENCE_SCHEMA_PROPS,
                     },
-                    required: ['name', 'position', 'company', 'phone', 'email', 'address', 'notes']
+                    required: ['name', 'position', 'company', 'phone', 'email', 'address', 'notes', 'uncertainFields']
                 }
             }
         });
@@ -646,7 +629,9 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
             phone: Array.isArray(parsed.phone) ? parsed.phone : parsed.phone ? [parsed.phone] : [],
             email: Array.isArray(parsed.email) ? parsed.email : parsed.email ? [parsed.email] : [],
             address: parsed.address || '',
-            notes: parsed.notes || ''
+            notes: parsed.notes || '',
+            uncertainFields: Array.isArray(parsed.uncertainFields) ? parsed.uncertainFields : [],
+            fieldConfidence: parsed.fieldConfidence,
         };
     }
 
@@ -713,10 +698,18 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
             const parsedData = this.parseText(text);
             console.log('[OCR] Parsed data:', parsedData);
 
+            const enriched = enrichConfidence(parsedData, {
+                engineOverall: confidence,
+                baseSource: 'tesseract',
+            });
+
             return {
                 ...parsedData,
                 rawText: text,
-                confidence
+                confidence: enriched.confidence,
+                confidenceSource: enriched.confidenceSource,
+                fieldConfidence: enriched.fieldConfidence,
+                needsReviewFields: enriched.needsReviewFields,
             };
         } catch (error) {
             console.error('[OCR] Error during processing:', error);
@@ -1334,11 +1327,13 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
 3. For EACH row (each person), extract the data into the corresponding fields.
 4. If a column doesn't exist in the sheet, leave that field as an empty string or empty array.
 5. Skip any empty rows or header rows.
-6. Handle handwritten text as best you can — if unclear, make your best guess.
+6. Handle handwritten text as best you can — if unclear, make your best guess AND list that field in uncertainFields.
 7. Each row MUST be a separate entry in the output array.
 8. Do NOT merge data from different rows into one entry.
 
 ${GEMINI_CORE_RULES}
+
+${GEMINI_CONFIDENCE_PROMPT}
 
 ## Examples
 
@@ -1346,8 +1341,8 @@ ${GEMINI_CORE_RULES}
 
 Output:
 [
-  {"name": "Maria Santos", "company": "Acme Corp", "position": "Sales Manager", "phone": ["+63 917 555 1234"], "email": ["maria.santos@acme.com"], "address": "Makati City", "notes": "Booth interest"},
-  {"name": "Dr. John Lee, MD", "company": "Health First Inc.", "position": "Medical Director", "phone": ["+63 2 8888 9999", "0917-222-3333"], "email": ["jlee@healthfirst.ph"], "address": "Quezon City", "notes": ""}
+  {"name": "Maria Santos", "company": "Acme Corp", "position": "Sales Manager", "phone": ["+63 917 555 1234"], "email": ["maria.santos@acme.com"], "address": "Makati City", "notes": "Booth interest", "uncertainFields": [], "fieldConfidence": {"name": 88, "company": 90, "position": 85, "phone": 80, "email": 92, "address": 78, "notes": 70}},
+  {"name": "Dr. John Lee, MD", "company": "Health First Inc.", "position": "Medical Director", "phone": ["+63 2 8888 9999", "0917-222-3333"], "email": ["jlee@healthfirst.ph"], "address": "Quezon City", "notes": "", "uncertainFields": ["name", "phone"], "fieldConfidence": {"name": 55, "company": 82, "position": 75, "phone": 48, "email": 88, "address": 70}}
 ]
 
 ### Example 2: Stacked logo company name in a row
@@ -1385,9 +1380,10 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                             phone: { type: 'ARRAY', items: { type: 'STRING' } },
                             email: { type: 'ARRAY', items: { type: 'STRING' } },
                             address: { type: 'STRING' },
-                            notes: { type: 'STRING' }
+                            notes: { type: 'STRING' },
+                            ...GEMINI_CONFIDENCE_SCHEMA_PROPS,
                         },
-                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
+                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes', 'uncertainFields']
                     }
                 }
             }
@@ -1416,18 +1412,7 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                 const hasEmail = Array.isArray(e.email) ? e.email.some((p: string) => p?.trim()) : (typeof e.email === 'string' && e.email.trim());
                 return hasName || hasCompany || hasPhone || hasEmail;
             })
-            .map((e: any) => {
-                const entry = {
-                    name: smartCapitalize(e.name || ''),
-                    company: e.company || '',
-                    position: e.position || '',
-                    phone: Array.isArray(e.phone) ? e.phone.filter((p: string) => p?.trim()) : (e.phone ? [e.phone] : []),
-                    email: Array.isArray(e.email) ? e.email.filter((p: string) => p?.trim()) : (e.email ? [e.email] : []),
-                    address: e.address || '',
-                    notes: e.notes || '',
-                };
-                return { ...entry, confidence: computeHeuristicConfidence(entry) };
-            });
+            .map((e: any) => this.toLogSheetEntry(e, 'gemini'));
     }
 
     /**
@@ -1443,10 +1428,12 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
 1. Visually identify the boundaries of each SEPARATE business card in the image.
 2. For EACH card, extract the person's contact information independently.
 3. Each card MUST be a separate entry in the output array.
-4. If a card is partially visible or too blurry, extract what you can — do not invent missing data.
+4. If a card is partially visible or too blurry, extract what you can — do not invent missing data — and list uncertain fields.
 5. Do NOT merge data from different cards into one entry.
 
 ${GEMINI_CORE_RULES}
+
+${GEMINI_CONFIDENCE_PROMPT}
 
 ## Example
 
@@ -1485,9 +1472,10 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                             phone: { type: 'ARRAY', items: { type: 'STRING' } },
                             email: { type: 'ARRAY', items: { type: 'STRING' } },
                             address: { type: 'STRING' },
-                            notes: { type: 'STRING' }
+                            notes: { type: 'STRING' },
+                            ...GEMINI_CONFIDENCE_SCHEMA_PROPS,
                         },
-                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes']
+                        required: ['name', 'company', 'position', 'phone', 'email', 'address', 'notes', 'uncertainFields']
                     }
                 }
             }
@@ -1516,18 +1504,32 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
                 const hasEmail = Array.isArray(e.email) ? e.email.some((p: string) => p?.trim()) : (typeof e.email === 'string' && e.email.trim());
                 return hasName || hasCompany || hasPhone || hasEmail;
             })
-            .map((e: any) => {
-                const entry = {
-                    name: smartCapitalize(e.name || ''),
-                    company: e.company || '',
-                    position: e.position || '',
-                    phone: Array.isArray(e.phone) ? e.phone.filter((p: string) => p?.trim()) : (e.phone ? [e.phone] : []),
-                    email: Array.isArray(e.email) ? e.email.filter((p: string) => p?.trim()) : (e.email ? [e.email] : []),
-                    address: e.address || '',
-                    notes: e.notes || '',
-                };
-                return { ...entry, confidence: computeHeuristicConfidence(entry) };
-            });
+            .map((e: any) => this.toLogSheetEntry(e, 'gemini'));
+    }
+
+    /** Normalize a Gemini/raw entry into LogSheetEntry with enriched confidence. */
+    private toLogSheetEntry(e: any, baseSource: ConfidenceSource): LogSheetEntry {
+        const entry = {
+            name: smartCapitalize(e.name || ''),
+            company: e.company || '',
+            position: e.position || '',
+            phone: Array.isArray(e.phone) ? e.phone.filter((p: string) => p?.trim()) : (e.phone ? [e.phone] : []),
+            email: Array.isArray(e.email) ? e.email.filter((p: string) => p?.trim()) : (e.email ? [e.email] : []),
+            address: e.address || '',
+            notes: e.notes || '',
+        };
+        const enriched = enrichConfidence(entry, {
+            geminiUncertainFields: e.uncertainFields,
+            geminiFieldConfidence: e.fieldConfidence,
+            baseSource,
+        });
+        return {
+            ...entry,
+            confidence: enriched.confidence,
+            confidenceSource: enriched.confidenceSource,
+            fieldConfidence: enriched.fieldConfidence,
+            needsReviewFields: enriched.needsReviewFields,
+        };
     }
 
     async terminate(): Promise<void> {
@@ -1547,6 +1549,11 @@ export interface LogSheetEntry {
     address: string;
     notes: string;
     confidence: number;
+    confidenceSource?: ConfidenceSource;
+    fieldConfidence?: FieldConfidenceMap;
+    needsReviewFields?: ContactFieldKey[];
+    /** Set by review UI when the user confirmed/corrected the row */
+    reviewResolved?: boolean;
 }
 
 export const ocrService = new OCRService();

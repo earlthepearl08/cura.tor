@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus, Lock, HelpCircle } from 'lucide-react';
-import { ocrService, LogSheetEntry } from '@/services/ocr';
+import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Lock } from 'lucide-react';
+import { ocrService, LogSheetEntry, entryNeedsReview, ContactFieldKey } from '@/services/ocr';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
@@ -10,9 +10,19 @@ import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import BatchNamingModal from '@/components/BatchNamingModal';
-import ScanTipsOnboarding from '@/components/ScanTipsOnboarding';
-import { useScanOnboarding } from '@/hooks/useScanOnboarding';
 import { compressForOCR } from '@/utils/compressPhoto';
+
+type ReviewFilter = 'needs-review' | 'all' | 'ready';
+
+const FIELD_LABELS: Record<ContactFieldKey, string> = {
+    name: 'Name',
+    company: 'Company',
+    position: 'Position',
+    phone: 'Phone',
+    email: 'Email',
+    address: 'Address',
+    notes: 'Notes',
+};
 
 const LogScan: React.FC = () => {
     const navigate = useNavigate();
@@ -22,7 +32,6 @@ const LogScan: React.FC = () => {
     const addMoreGalRef = useRef<HTMLInputElement>(null);
     const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canUseBulkScan } = useAuth();
     const { storage } = useWorkspace();
-    const { open: showScanTips, dismiss: dismissScanTips, reopen: reopenScanTips } = useScanOnboarding(canUseBulkScan());
 
     const [imageData, setImageData] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -42,6 +51,8 @@ const LogScan: React.FC = () => {
     const [showBatchNaming, setShowBatchNaming] = useState(false);
     const [scanTimestamp, setScanTimestamp] = useState<number>(Date.now());
     const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
+    const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('needs-review');
+    const [importWarning, setImportWarning] = useState<string | null>(null);
 
     useEffect(() => {
         const loadFolders = async () => {
@@ -52,6 +63,44 @@ const LogScan: React.FC = () => {
         };
         loadFolders();
     }, []);
+
+    const reviewStats = useMemo(() => {
+        if (!entries) return { needsReview: 0, ready: 0, total: 0 };
+        let needsReview = 0;
+        for (const e of entries) {
+            if (entryNeedsReview(e.needsReviewFields, e.confidence, e.reviewResolved)) needsReview++;
+        }
+        return { needsReview, ready: entries.length - needsReview, total: entries.length };
+    }, [entries]);
+
+    /** Display order: uncertain rows first, then by ascending confidence. Indices stay original. */
+    const displayedIndices = useMemo(() => {
+        if (!entries) return [] as number[];
+        const idxs = entries.map((_, i) => i);
+        const filtered = idxs.filter(i => {
+            const e = entries[i];
+            const needs = entryNeedsReview(e.needsReviewFields, e.confidence, e.reviewResolved);
+            if (reviewFilter === 'needs-review') return needs;
+            if (reviewFilter === 'ready') return !needs;
+            return true;
+        });
+        return filtered.sort((a, b) => {
+            const ea = entries[a];
+            const eb = entries[b];
+            const na = entryNeedsReview(ea.needsReviewFields, ea.confidence, ea.reviewResolved) ? 0 : 1;
+            const nb = entryNeedsReview(eb.needsReviewFields, eb.confidence, eb.reviewResolved) ? 0 : 1;
+            if (na !== nb) return na - nb;
+            return ea.confidence - eb.confidence;
+        });
+    }, [entries, reviewFilter]);
+
+    // Prefer Needs review tab when uncertain rows appear; fall back to All if none
+    useEffect(() => {
+        if (!entries) return;
+        if (reviewStats.needsReview === 0 && reviewFilter === 'needs-review') {
+            setReviewFilter('all');
+        }
+    }, [entries, reviewStats.needsReview, reviewFilter]);
 
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -346,10 +395,23 @@ const LogScan: React.FC = () => {
         });
     };
 
-    const handleImport = async () => {
+    const handleImport = async (force = false) => {
         if (!entries) return;
         const toImport = entries.filter((_, i) => selectedEntries.has(i));
         if (toImport.length === 0) return;
+
+        const unresolved = toImport.filter(e =>
+            entryNeedsReview(e.needsReviewFields, e.confidence, e.reviewResolved)
+        );
+        if (unresolved.length > 0 && !force) {
+            setImportWarning(
+                `${unresolved.length} selected entr${unresolved.length === 1 ? 'y still needs' : 'ies still need'} review. Fix highlighted fields first, or import anyway.`
+            );
+            setReviewFilter('needs-review');
+            return;
+        }
+
+        setImportWarning(null);
         setIsImporting(true);
         await storage.batchSave(entriesToContacts(toImport));
         if (importFolder !== 'Uncategorized') {
@@ -406,6 +468,8 @@ const LogScan: React.FC = () => {
         setSheetCount(0);
         setShowBatchNaming(false);
         setCurrentBatchId(null);
+        setReviewFilter('needs-review');
+        setImportWarning(null);
     };
 
     const openEntryEdit = (index: number) => {
@@ -424,6 +488,23 @@ const LogScan: React.FC = () => {
 
     const splitCsv = (s: string): string[] => s.split(',').map(p => p.trim()).filter(Boolean);
 
+    const fieldNeedsReview = (entry: LogSheetEntry, field: ContactFieldKey): boolean => {
+        if (entry.reviewResolved) return false;
+        return (entry.needsReviewFields || []).includes(field);
+    };
+
+    const markEntryReviewed = (index: number) => {
+        if (!entries) return;
+        const updated = [...entries];
+        updated[index] = {
+            ...updated[index],
+            needsReviewFields: [],
+            reviewResolved: true,
+            confidence: Math.max(updated[index].confidence, 90),
+        };
+        setEntries(updated);
+    };
+
     const saveEntryEdit = () => {
         if (editingIndex === null || !entries) return;
         const updated = [...entries];
@@ -437,10 +518,23 @@ const LogScan: React.FC = () => {
             email: splitCsv(editForm.email),
             address: editForm.address,
             notes: editForm.notes,
+            // User corrected the row — clear review queue for this entry
+            needsReviewFields: [],
+            reviewResolved: true,
+            confidence: Math.max(original.confidence, 90),
         };
         setEntries(updated);
         setEditingIndex(null);
+        setImportWarning(null);
     };
+
+    const editInputClass = (entry: LogSheetEntry, field: ContactFieldKey) =>
+        `w-full glass border rounded-lg py-2 px-3 text-sm ${
+            fieldNeedsReview(entry, field)
+                ? 'border-amber-500/60 ring-1 ring-amber-500/30 bg-amber-500/5'
+                : 'border-brand-700'
+        }`;
+
 
     const deleteEntry = (index: number) => {
         if (!entries) return;
@@ -503,15 +597,7 @@ const LogScan: React.FC = () => {
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
-                <button
-                    type="button"
-                    onClick={reopenScanTips}
-                    className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400"
-                    aria-label="Scan tips"
-                    title="Scan tips"
-                >
-                    <HelpCircle size={22} />
-                </button>
+                <div className="w-10" />
             </div>
 
             <div className="flex-1 p-4">
@@ -545,21 +631,12 @@ const LogScan: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="glass border border-brand-800 rounded-xl p-4 max-w-sm mt-4 w-full">
-                            <div className="flex items-center justify-between mb-2">
-                                <p className="text-[10px] text-brand-500 uppercase tracking-wider font-bold">Tips</p>
-                                <button
-                                    type="button"
-                                    onClick={reopenScanTips}
-                                    className="text-[10px] font-semibold text-brand-400 hover:text-brand-300 uppercase tracking-wider"
-                                >
-                                    Guide
-                                </button>
-                            </div>
+                        <div className="glass border border-brand-800 rounded-xl p-4 max-w-sm mt-4">
+                            <p className="text-[10px] text-brand-500 uppercase tracking-wider font-bold mb-2">Tips</p>
                             <ul className="text-xs text-brand-400 space-y-1">
-                                <li>- Flat sheet, even light, no glare</li>
-                                <li>- Square up edges; include all rows</li>
-                                <li>- Multi-page: pick several photos or Add More</li>
+                                <li>- Ensure the sheet is flat and well-lit</li>
+                                <li>- Printed sheets work best</li>
+                                <li>- Include all rows in the frame</li>
                             </ul>
                         </div>
                     </div>
@@ -629,6 +706,45 @@ const LogScan: React.FC = () => {
                                             Start Over
                                         </button>
                                     </div>
+
+                                    {/* Review queue summary */}
+                                    {reviewStats.needsReview > 0 && (
+                                        <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                                            <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                                            <div className="min-w-0">
+                                                <p className="text-sm text-amber-200 font-medium">
+                                                    {reviewStats.needsReview} entr{reviewStats.needsReview === 1 ? 'y needs' : 'ies need'} review
+                                                </p>
+                                                <p className="text-xs text-amber-400/80 mt-0.5">
+                                                    Uncertain rows are listed first. Check highlighted fields before import.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Filter tabs */}
+                                    <div className="flex gap-1 p-1 glass border border-brand-800 rounded-xl">
+                                        {([
+                                            { id: 'needs-review' as const, label: `Review (${reviewStats.needsReview})` },
+                                            { id: 'all' as const, label: `All (${reviewStats.total})` },
+                                            { id: 'ready' as const, label: `Ready (${reviewStats.ready})` },
+                                        ]).map(tab => (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setReviewFilter(tab.id)}
+                                                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                                                    reviewFilter === tab.id
+                                                        ? tab.id === 'needs-review'
+                                                            ? 'bg-amber-500/20 text-amber-300'
+                                                            : 'bg-brand-500/20 text-brand-200'
+                                                        : 'text-brand-500 hover:text-brand-300'
+                                                }`}
+                                            >
+                                                {tab.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => addMoreCamRef.current?.click()}
@@ -662,25 +778,76 @@ const LogScan: React.FC = () => {
                                     </select>
                                 </div>
 
-                                {/* Entry list */}
+                                {importWarning && (
+                                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/40">
+                                        <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs text-amber-200">{importWarning}</p>
+                                            <div className="flex gap-2 mt-2">
+                                                <button
+                                                    onClick={() => handleImport(true)}
+                                                    className="px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-amber-500/20 text-amber-200 border border-amber-500/30"
+                                                >
+                                                    Import anyway
+                                                </button>
+                                                <button
+                                                    onClick={() => setImportWarning(null)}
+                                                    className="px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-brand-800 text-brand-300"
+                                                >
+                                                    Keep reviewing
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Entry list — uncertain first via displayedIndices */}
                                 <div className="space-y-2 max-h-[45vh] overflow-y-auto">
-                                    {entries.map((e, i) => {
+                                    {displayedIndices.length === 0 && (
+                                        <div className="text-center py-8 text-sm text-brand-500">
+                                            {reviewFilter === 'needs-review'
+                                                ? 'No rows need review — ready to import.'
+                                                : reviewFilter === 'ready'
+                                                ? 'No ready rows yet — fix uncertain fields first.'
+                                                : 'No entries.'}
+                                        </div>
+                                    )}
+                                    {displayedIndices.map((i) => {
+                                        const e = entries[i];
                                         const isDup = duplicateMap.has(i);
                                         const isSelected = selectedEntries.has(i);
+                                        const needs = entryNeedsReview(e.needsReviewFields, e.confidence, e.reviewResolved);
+                                        const uncertainLabels = (e.needsReviewFields || [])
+                                            .map(f => FIELD_LABELS[f])
+                                            .filter(Boolean);
                                         return (
-                                        <div key={i} className={`glass border rounded-xl p-3 transition-all ${isDup && !isSelected ? 'border-amber-500/30 opacity-60' : isSelected ? 'border-brand-800' : 'border-brand-800 opacity-60'}`}>
+                                        <div
+                                            key={i}
+                                            className={`glass border rounded-xl p-3 transition-all ${
+                                                needs
+                                                    ? 'border-amber-500/50 bg-amber-500/[0.04]'
+                                                    : isDup && !isSelected
+                                                    ? 'border-amber-500/30 opacity-60'
+                                                    : isSelected
+                                                    ? 'border-brand-800'
+                                                    : 'border-brand-800 opacity-60'
+                                            }`}
+                                        >
                                             {editingIndex === i ? (
                                                 <div className="space-y-2">
-                                                    <input type="text" value={editForm.name} onChange={(ev) => setEditForm({...editForm, name: ev.target.value})} placeholder="Name" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
-                                                    <input type="text" value={editForm.company} onChange={(ev) => setEditForm({...editForm, company: ev.target.value})} placeholder="Company" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
-                                                    <input type="text" value={editForm.position} onChange={(ev) => setEditForm({...editForm, position: ev.target.value})} placeholder="Position" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
-                                                    <input type="text" value={editForm.phone} onChange={(ev) => setEditForm({...editForm, phone: ev.target.value})} placeholder="Phone" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
-                                                    <input type="text" value={editForm.email} onChange={(ev) => setEditForm({...editForm, email: ev.target.value})} placeholder="Email" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
-                                                    <input type="text" value={editForm.address} onChange={(ev) => setEditForm({...editForm, address: ev.target.value})} placeholder="Address" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
-                                                    <input type="text" value={editForm.notes} onChange={(ev) => setEditForm({...editForm, notes: ev.target.value})} placeholder="Notes" className="w-full glass border border-brand-700 rounded-lg py-2 px-3 text-sm" />
+                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80">
+                                                        Correct uncertain fields, then save
+                                                    </p>
+                                                    <input type="text" value={editForm.name} onChange={(ev) => setEditForm({...editForm, name: ev.target.value})} placeholder="Name" className={editInputClass(e, 'name')} />
+                                                    <input type="text" value={editForm.company} onChange={(ev) => setEditForm({...editForm, company: ev.target.value})} placeholder="Company" className={editInputClass(e, 'company')} />
+                                                    <input type="text" value={editForm.position} onChange={(ev) => setEditForm({...editForm, position: ev.target.value})} placeholder="Position" className={editInputClass(e, 'position')} />
+                                                    <input type="text" value={editForm.phone} onChange={(ev) => setEditForm({...editForm, phone: ev.target.value})} placeholder="Phone" className={editInputClass(e, 'phone')} />
+                                                    <input type="text" value={editForm.email} onChange={(ev) => setEditForm({...editForm, email: ev.target.value})} placeholder="Email" className={editInputClass(e, 'email')} />
+                                                    <input type="text" value={editForm.address} onChange={(ev) => setEditForm({...editForm, address: ev.target.value})} placeholder="Address" className={editInputClass(e, 'address')} />
+                                                    <input type="text" value={editForm.notes} onChange={(ev) => setEditForm({...editForm, notes: ev.target.value})} placeholder="Notes" className={editInputClass(e, 'notes')} />
                                                     <div className="flex gap-2 pt-1">
                                                         <button onClick={saveEntryEdit} className="flex-1 flex items-center justify-center gap-1 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs font-medium text-emerald-400">
-                                                            <Check size={12} /> Save
+                                                            <Check size={12} /> Save & mark reviewed
                                                         </button>
                                                         <button onClick={() => setEditingIndex(null)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-brand-800 rounded-lg text-xs font-medium text-slate-400">
                                                             <X size={12} /> Cancel
@@ -696,27 +863,60 @@ const LogScan: React.FC = () => {
                                                         </div>
                                                     </button>
                                                     <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEntryEdit(i)}>
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-2 flex-wrap">
                                                             <p className="font-medium text-sm text-slate-100 truncate">{e.name || 'No name'}</p>
+                                                            {needs && (
+                                                                <span className="flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded text-[9px] font-bold text-amber-400">
+                                                                    <AlertTriangle size={9} />
+                                                                    REVIEW
+                                                                </span>
+                                                            )}
                                                             {isDup && (
                                                                 <span className="flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded text-[9px] font-bold text-amber-400">
                                                                     <AlertCircle size={9} />
                                                                     DUP
                                                                 </span>
                                                             )}
+                                                            <span className={`flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                                                e.confidence >= 80
+                                                                    ? 'bg-emerald-500/15 text-emerald-400'
+                                                                    : e.confidence >= 50
+                                                                    ? 'bg-amber-500/15 text-amber-400'
+                                                                    : 'bg-red-500/15 text-red-400'
+                                                            }`}>
+                                                                {Math.round(e.confidence)}%
+                                                            </span>
                                                         </div>
+                                                        {needs && uncertainLabels.length > 0 && (
+                                                            <p className="text-[10px] text-amber-400/80 mt-0.5">
+                                                                Check: {uncertainLabels.join(', ')}
+                                                            </p>
+                                                        )}
                                                         {isDup && duplicateMap.get(i) && (
                                                             <p className="text-[10px] text-amber-400/70 truncate">
                                                                 Matches "{duplicateMap.get(i)!.matchedContact?.name}" — {duplicateMap.get(i)!.matchReasons.join(', ')}
                                                             </p>
                                                         )}
-                                                        {e.company && <p className="text-xs text-brand-400 truncate">{e.company}</p>}
-                                                        {e.position && <p className="text-xs text-slate-500 truncate">{e.position}</p>}
-                                                        {e.phone.length > 0 && <p className="text-xs text-slate-500 truncate">{e.phone.join(', ')}</p>}
-                                                        {e.email.length > 0 && <p className="text-xs text-slate-500 truncate">{e.email.join(', ')}</p>}
+                                                        {e.company && (
+                                                            <p className={`text-xs truncate ${fieldNeedsReview(e, 'company') ? 'text-amber-300' : 'text-brand-400'}`}>
+                                                                {e.company}
+                                                            </p>
+                                                        )}
+                                                        {e.position && <p className={`text-xs truncate ${fieldNeedsReview(e, 'position') ? 'text-amber-300' : 'text-slate-500'}`}>{e.position}</p>}
+                                                        {e.phone.length > 0 && <p className={`text-xs truncate ${fieldNeedsReview(e, 'phone') ? 'text-amber-300' : 'text-slate-500'}`}>{e.phone.join(', ')}</p>}
+                                                        {e.email.length > 0 && <p className={`text-xs truncate ${fieldNeedsReview(e, 'email') ? 'text-amber-300' : 'text-slate-500'}`}>{e.email.join(', ')}</p>}
                                                         {e.notes && <p className="text-xs text-amber-400/70 truncate mt-1">{e.notes}</p>}
                                                     </div>
                                                     <div className="flex flex-col gap-1 flex-shrink-0">
+                                                        {needs && (
+                                                            <button
+                                                                onClick={() => markEntryReviewed(i)}
+                                                                title="Mark as reviewed"
+                                                                className="p-1.5 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                            >
+                                                                <Check size={14} className="text-emerald-400" />
+                                                            </button>
+                                                        )}
                                                         <button onClick={() => openEntryEdit(i)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
                                                             <Edit3 size={14} className="text-brand-400" />
                                                         </button>
@@ -740,7 +940,7 @@ const LogScan: React.FC = () => {
             {entries && entries.length > 0 && !isProcessing && (
                 <div className="sticky bottom-0 glass border-t border-brand-800 p-4 space-y-2 z-10">
                     <button
-                        onClick={handleImport}
+                        onClick={() => handleImport()}
                         disabled={isImporting || selectedEntries.size === 0}
                         className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95"
                     >
@@ -787,10 +987,6 @@ const LogScan: React.FC = () => {
                     onSave={handleSaveBatch}
                     onSkip={handleSkipBatch}
                 />
-            )}
-
-            {showScanTips && (
-                <ScanTipsOnboarding variant="both" onDismiss={dismissScanTips} />
             )}
 
         </div>
