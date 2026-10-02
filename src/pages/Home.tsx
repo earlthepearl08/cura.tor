@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
+<<<<<<< /tmp/meld/26-main-Home.tsx
+import { Link } from 'react-router-dom';
+import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers, Lock } from 'lucide-react';
+=======
 import { useNavigate, Link } from 'react-router-dom';
 import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers, Lock, CalendarDays } from 'lucide-react';
+>>>>>>> /tmp/meld/26-pr-Home.tsx
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -15,9 +20,8 @@ const Home = () => {
     const [weekCount, setWeekCount] = useState(0);
     const [folderCount, setFolderCount] = useState(0);
     const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
-    const { isConnected, user: driveUser, isSyncing } = useGoogleDrive();
+    const { isConnected, isSyncing } = useGoogleDrive();
     const { user, scansRemaining, canUseBulkScan } = useAuth();
-    const navigate = useNavigate();
     const [upgradeFeature, setUpgradeFeature] = useState<'bulk-scan' | null>(null);
     const isBulkLocked = !canUseBulkScan();
 
@@ -77,9 +81,6 @@ const Home = () => {
                         <text x="60" y="42" fontFamily="Inter, sans-serif" fontSize="28" fontWeight="800" fill="#ffffff" letterSpacing="-1">CURA</text>
                         <text x="138" y="42" fontFamily="Inter, sans-serif" fontSize="28" fontWeight="800" fill="url(#logoGrad)" letterSpacing="-1">.TOR</text>
                     </svg>
-                    <div className="absolute -top-1 right-8 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg animate-pulse">
-                        BETA
-                    </div>
                 </div>
                 <p className="text-slate-500 text-xs tracking-widest uppercase">Smart Contact Curation</p>
             </div>
@@ -139,9 +140,83 @@ const Home = () => {
                 )}
             </div>
 
-            {/* Primary Actions */}
+            {/* Primary differentiators — Log Sheet + Multi-Card */}
             <div className="w-full max-w-md mb-6">
-                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Quick Actions</p>
+                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Primary workflows</p>
+                <div className="space-y-3">
+                    {isBulkLocked ? (
+                        <button
+                            onClick={() => setUpgradeFeature('bulk-scan')}
+                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20"
+                        >
+                            <div className="absolute top-3 right-3 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                <Lock size={8} className="text-amber-400" />
+                                <span className="text-[8px] font-bold text-amber-400">PRO</span>
+                            </div>
+                            <div className="w-14 h-14 bg-gradient-to-br from-amber-500/25 to-orange-600/25 rounded-2xl flex items-center justify-center shrink-0">
+                                <FileSpreadsheet className="w-7 h-7 text-amber-400" />
+                            </div>
+                            <div className="flex-1 min-w-0 pr-10">
+                                <span className="font-bold text-base text-white block">Log Sheet</span>
+                                <span className="text-xs text-slate-400 mt-0.5 block">AI-read sign-in sheets &amp; handwritten leads</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+                        </button>
+                    ) : (
+                        <Link
+                            to="/log-scan"
+                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20"
+                        >
+                            <div className="w-14 h-14 bg-gradient-to-br from-amber-500/25 to-orange-600/25 rounded-2xl flex items-center justify-center shrink-0">
+                                <FileSpreadsheet className="w-7 h-7 text-amber-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <span className="font-bold text-base text-white block">Log Sheet</span>
+                                <span className="text-xs text-slate-400 mt-0.5 block">AI-read sign-in sheets &amp; handwritten leads</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+                        </Link>
+                    )}
+
+                    {isBulkLocked ? (
+                        <button
+                            onClick={() => setUpgradeFeature('bulk-scan')}
+                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20"
+                        >
+                            <div className="absolute top-3 right-3 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                <Lock size={8} className="text-amber-400" />
+                                <span className="text-[8px] font-bold text-amber-400">PRO</span>
+                            </div>
+                            <div className="w-14 h-14 bg-gradient-to-br from-pink-500/25 to-rose-600/25 rounded-2xl flex items-center justify-center shrink-0">
+                                <Layers className="w-7 h-7 text-pink-400" />
+                            </div>
+                            <div className="flex-1 min-w-0 pr-10">
+                                <span className="font-bold text-base text-white block">Multi-Card</span>
+                                <span className="text-xs text-slate-400 mt-0.5 block">Split &amp; parse several cards from one photo</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+                        </button>
+                    ) : (
+                        <Link
+                            to="/multi-card"
+                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20"
+                        >
+                            <div className="w-14 h-14 bg-gradient-to-br from-pink-500/25 to-rose-600/25 rounded-2xl flex items-center justify-center shrink-0">
+                                <Layers className="w-7 h-7 text-pink-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <span className="font-bold text-base text-white block">Multi-Card</span>
+                                <span className="text-xs text-slate-400 mt-0.5 block">Split &amp; parse several cards from one photo</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+                        </Link>
+                    )}
+                </div>
+            </div>
+
+            {/* Single-card capture */}
+            <div className="w-full max-w-md mb-6">
+                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Single card</p>
                 <div className="grid grid-cols-2 gap-3">
                     <Link
                         to="/scan"
@@ -151,9 +226,26 @@ const Home = () => {
                             <Camera className="w-5 h-5 text-sky-400" />
                         </div>
                         <span className="font-semibold text-sm text-white">Scan Card</span>
-                        <span className="text-[10px] text-slate-500">OCR Camera</span>
+                        <span className="text-[10px] text-slate-500">Online AI camera</span>
                     </Link>
 
+                    <Link
+                        to="/upload"
+                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-xl flex items-center justify-center">
+                            <Upload className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <span className="font-semibold text-sm text-white">Upload</span>
+                        <span className="text-[10px] text-slate-500">From gallery</span>
+                    </Link>
+                </div>
+            </div>
+
+            {/* Secondary capture */}
+            <div className="w-full max-w-md mb-6">
+                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">More ways to add</p>
+                <div className="grid grid-cols-2 gap-3">
                     <Link
                         to="/qr-scan"
                         className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
@@ -166,17 +258,6 @@ const Home = () => {
                     </Link>
 
                     <Link
-                        to="/upload"
-                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-xl flex items-center justify-center">
-                            <Upload className="w-5 h-5 text-emerald-400" />
-                        </div>
-                        <span className="font-semibold text-sm text-white">Upload</span>
-                        <span className="text-[10px] text-slate-500">Images</span>
-                    </Link>
-
-                    <Link
                         to="/manual"
                         className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
                     >
@@ -186,62 +267,6 @@ const Home = () => {
                         <span className="font-semibold text-sm text-white">Manual</span>
                         <span className="text-[10px] text-slate-500">Entry</span>
                     </Link>
-
-                    {isBulkLocked ? (
-                        <button
-                            onClick={() => setUpgradeFeature('bulk-scan')}
-                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 relative opacity-60"
-                        >
-                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
-                                <Lock size={8} className="text-amber-400" />
-                                <span className="text-[8px] font-bold text-amber-400">PRO</span>
-                            </div>
-                            <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-orange-600/20 rounded-xl flex items-center justify-center">
-                                <FileSpreadsheet className="w-5 h-5 text-amber-400" />
-                            </div>
-                            <span className="font-semibold text-sm text-white">Log Sheet</span>
-                            <span className="text-[10px] text-slate-500">Sign-in Sheets</span>
-                        </button>
-                    ) : (
-                        <Link
-                            to="/log-scan"
-                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                        >
-                            <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-orange-600/20 rounded-xl flex items-center justify-center">
-                                <FileSpreadsheet className="w-5 h-5 text-amber-400" />
-                            </div>
-                            <span className="font-semibold text-sm text-white">Log Sheet</span>
-                            <span className="text-[10px] text-slate-500">Sign-in Sheets</span>
-                        </Link>
-                    )}
-
-                    {isBulkLocked ? (
-                        <button
-                            onClick={() => setUpgradeFeature('bulk-scan')}
-                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 relative opacity-60"
-                        >
-                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
-                                <Lock size={8} className="text-amber-400" />
-                                <span className="text-[8px] font-bold text-amber-400">PRO</span>
-                            </div>
-                            <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-rose-600/20 rounded-xl flex items-center justify-center">
-                                <Layers className="w-5 h-5 text-pink-400" />
-                            </div>
-                            <span className="font-semibold text-sm text-white">Multi-Card</span>
-                            <span className="text-[10px] text-slate-500">Batch Cards</span>
-                        </button>
-                    ) : (
-                        <Link
-                            to="/multi-card"
-                            className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                        >
-                            <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-rose-600/20 rounded-xl flex items-center justify-center">
-                                <Layers className="w-5 h-5 text-pink-400" />
-                            </div>
-                            <span className="font-semibold text-sm text-white">Multi-Card</span>
-                            <span className="text-[10px] text-slate-500">Batch Cards</span>
-                        </Link>
-                    )}
                 </div>
             </div>
 
@@ -346,7 +371,7 @@ const Home = () => {
                         </div>
                     </div>
                     <span className="text-[10px] text-slate-500 px-2 py-1 bg-slate-800/50 rounded-md">
-                        Cloud Vision + Gemini
+                        Online AI scan
                     </span>
                 </div>
             </div>

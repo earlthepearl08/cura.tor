@@ -1,12 +1,37 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
+<<<<<<< /tmp/meld/26-main-create-checkout.ts
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+=======
+>>>>>>> /tmp/meld/26-pr-create-checkout.ts
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '';
 const FIREBASE_JWKS = createRemoteJWKSet(
   new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
 );
 
+<<<<<<< /tmp/meld/26-main-create-checkout.ts
+function getAdminDb() {
+  if (!getApps().length) {
+    const projectId = (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID)?.trim();
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
+    const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
+    const privateKey = privateKeyRaw?.replace(/\\n/g, '\n').trim();
+    if (!projectId) throw new Error('FIREBASE_PROJECT_ID env var missing or empty');
+    if (!clientEmail) throw new Error('FIREBASE_CLIENT_EMAIL env var missing or empty');
+    if (!privateKey) throw new Error('FIREBASE_PRIVATE_KEY env var missing or empty');
+    if (!privateKey.includes('BEGIN PRIVATE KEY')) {
+      throw new Error('FIREBASE_PRIVATE_KEY does not look like a PEM key');
+    }
+    initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+  }
+  return getFirestore();
+}
+
+=======
+>>>>>>> /tmp/meld/26-pr-create-checkout.ts
 type AuthOk = { ok: true; uid: string; email: string | null };
 type AuthFail = { ok: false; reason: string };
 
@@ -29,6 +54,63 @@ async function verifyAuth(req: VercelRequest): Promise<AuthOk | AuthFail> {
     return { ok: false, reason: `jwt-${err?.code || err?.message || 'unknown'}` };
   }
 }
+<<<<<<< /tmp/meld/26-main-create-checkout.ts
+
+type PaidTier = 'early_access' | 'pro';
+
+/** Resolve tier from an allowlisted price ID (never trust client-supplied tier) */
+function getTierFromPriceId(priceId: string): PaidTier | null {
+  const pioneerPrices = (process.env.STRIPE_PIONEER_PRICE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const proPrices = (process.env.STRIPE_PRO_PRICE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  // Fallback: also accept the Vite client price IDs if server lists aren't set yet
+  const clientPioneer = [
+    process.env.VITE_STRIPE_PIONEER_MONTHLY_PRICE_ID,
+    process.env.VITE_STRIPE_PIONEER_YEARLY_PRICE_ID,
+  ].filter(Boolean) as string[];
+  const clientPro = [
+    process.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID,
+    process.env.VITE_STRIPE_PRO_YEARLY_PRICE_ID,
+  ].filter(Boolean) as string[];
+
+  if (pioneerPrices.includes(priceId) || clientPioneer.includes(priceId)) return 'early_access';
+  if (proPrices.includes(priceId) || clientPro.includes(priceId)) return 'pro';
+  return null;
+}
+
+/**
+ * Create a Stripe Checkout session for the authenticated user.
+ * Requires Authorization: Bearer <Firebase ID token>.
+ * Body: { priceId, origin } — firebaseUid/email/tier from the client are ignored.
+ */
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const auth = await verifyAuth(req);
+  if (!auth.ok) {
+    return res.status(401).json({ error: 'Unauthorized', reason: auth.reason });
+  }
+
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    console.error('STRIPE_SECRET_KEY not found in environment variables');
+    return res.status(500).json({ error: 'Stripe not configured' });
+  }
+
+  const { priceId, origin } = req.body || {};
+  if (!priceId || !origin || typeof priceId !== 'string' || typeof origin !== 'string') {
+    return res.status(400).json({ error: 'Missing required fields: priceId, origin' });
+  }
+
+  // Basic origin allowlist: must be https (or localhost for local/dev)
+  try {
+    const url = new URL(origin);
+    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if (!isLocal && url.protocol !== 'https:') {
+      return res.status(400).json({ error: 'Invalid origin' });
+=======
 
 function eventPackPriceIds(): string[] {
   const server = (process.env.STRIPE_EVENT_PACK_PRICE_IDS || '')
@@ -76,8 +158,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const auth = await verifyAuth(req);
     if (!auth.ok) {
       return res.status(401).json({ error: 'Unauthorized', reason: auth.reason });
+>>>>>>> /tmp/meld/26-pr-create-checkout.ts
+    }
+  } catch {
+    return res.status(400).json({ error: 'Invalid origin' });
+  }
+
+<<<<<<< /tmp/meld/26-main-create-checkout.ts
+  const tier = getTierFromPriceId(priceId);
+  if (!tier) {
+    return res.status(400).json({ error: 'Unrecognized priceId' });
+  }
+
+  let adminDb: FirebaseFirestore.Firestore;
+  try {
+    adminDb = getAdminDb();
+  } catch (err: any) {
+    console.error('Firebase Admin init failed:', err.message);
+    return res.status(500).json({ error: 'Server configuration error', details: err.message });
+  }
+
+  try {
+    const userSnap = await adminDb.collection('users').doc(auth.uid).get();
+    if (!userSnap.exists) {
+      return res.status(404).json({ error: 'User profile not found' });
+    }
+    const userData = userSnap.data()!;
+    const email = auth.email || userData.email;
+    if (!email) {
+      return res.status(400).json({ error: 'User email required for checkout' });
     }
 
+    // Enterprise seats are provisioned outside Stripe
+    if (userData.tier === 'enterprise') {
+      return res.status(400).json({ error: 'Enterprise accounts are managed separately' });
+    }
+
+    const existingCustomerId =
+      typeof userData.stripe?.customerId === 'string' && userData.stripe.customerId
+        ? userData.stripe.customerId
+        : undefined;
+
+    const stripe = new Stripe(stripeSecretKey);
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      ...(existingCustomerId
+        ? { customer: existingCustomerId }
+        : { customer_email: email }),
+      line_items: [{ price: priceId, quantity: 1 }],
+      client_reference_id: auth.uid,
+      metadata: { firebaseUid: auth.uid, tier },
+      subscription_data: {
+        metadata: { firebaseUid: auth.uid, tier },
+      },
+=======
     const { priceId, origin } = body;
     if (!priceId || !origin || typeof priceId !== 'string' || typeof origin !== 'string') {
       return res.status(400).json({ error: 'Missing required fields: priceId, origin' });
@@ -132,6 +267,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       customer_email: email,
       line_items: [{ price: priceId, quantity: 1 }],
       metadata: { firebaseUid, tier },
+>>>>>>> /tmp/meld/26-pr-create-checkout.ts
       success_url: `${origin}/settings?payment=success`,
       cancel_url: `${origin}/settings?payment=canceled`,
     });
