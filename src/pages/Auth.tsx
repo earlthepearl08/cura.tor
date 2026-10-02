@@ -25,6 +25,10 @@ const BENEFITS: { icon: React.ComponentType<{ className?: string }>; label: stri
     { icon: UsersIcon, label: 'Never lose a lead', detail: 'Saved on your device, optional Google Drive sync' },
     { icon: FileDown, label: 'Export anywhere', detail: 'vCard, CSV, or Excel — no retyping' },
     { icon: HardDrive, label: 'Offline view & edit', detail: 'Browse, edit, and export saved contacts without signal' },
+    { icon: ScanLine, label: 'Scan in seconds', detail: 'AI reads even stylized or crumpled cards (needs a connection)' },
+    { icon: UsersIcon, label: 'Never lose a lead', detail: 'Saved to your device, synced to Google Drive' },
+    { icon: FileDown, label: 'Export anywhere', detail: 'vCard, CSV, or Excel — no retyping' },
+    { icon: WifiOff, label: 'Contacts work offline', detail: 'View, edit, and export saved contacts without signal — new scans need a connection' },
 ];
 
 type AuthMode = 'signin' | 'signup' | 'reset';
