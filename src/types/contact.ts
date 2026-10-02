@@ -7,6 +7,8 @@ export interface Contact {
     email: string[];      // Multiple emails
     address: string;
     notes: string;        // User notes (e.g., what they're inquiring about)
+    /** Extra event-sheet fields (Booth #, Interest, Budget, …) from column mapping */
+    customFields?: Record<string, string>;
     folder?: string;      // Folder/group name (default: "Uncategorized")
     rawText: string;      // Original OCR output
     imageData: string;    // Base64 image
