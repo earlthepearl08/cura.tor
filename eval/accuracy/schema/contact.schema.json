@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://curator-app.local/schemas/contact.schema.json",
+  "title": "ExpectedContact",
+  "description": "Golden expected fields for a single calling card (matches OCRResult / LogSheetEntry core fields).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "company", "position", "phone", "email", "address", "notes"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Person full name including credentials (e.g. Dr. Maria Santos, MD)."
+    },
+    "company": {
+      "type": "string",
+      "description": "Full registered business name; recombine stacked logo lines."
+    },
+    "position": {
+      "type": "string",
+      "description": "Job title / role."
+    },
+    "phone": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "One entry per distinct number; split on / | ,."
+    },
+    "email": {
+      "type": "array",
+      "items": { "type": "string", "format": "email" }
+    },
+    "address": {
+      "type": "string",
+      "description": "Single address, or Label: addr | Label: addr for multi-address cards."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Websites, socials, taglines — pipe-separated. Empty string if none."
+    },
+    "_meta": {
+      "type": "object",
+      "description": "Fixture metadata (ignored by scorer).",
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string" },
+        "difficulty": { "enum": ["easy", "medium", "hard"] },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

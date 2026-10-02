@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480" role="img" aria-label="Placeholder business card  stacked logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="480" fill="url(#bg)"/>
+  <text x="40" y="42" fill="#64748b" font-family="ui-sans-serif,system-ui,sans-serif" font-size="14" font-weight="700" letter-spacing="2">PLACEHOLDER · SWAP WITH REAL PHOTO</text>
+  <rect x="80" y="80" width="640" height="340" rx="12" fill="url(#card)" stroke="#94a3b8" stroke-width="2"/>
+  <text x="120" y="140" fill="#0f172a" font-family="ui-sans-serif,system-ui,sans-serif" font-size="28" font-weight="700">ENGR. MARIA SANTOS</text>
+  <text x="120" y="172" fill="#334155" font-family="ui-sans-serif,system-ui,sans-serif" font-size="16">REE, PEE · Senior Sales Manager</text>
+  <text x="120" y="230" fill="#0f172a" font-family="ui-sans-serif,system-ui,sans-serif" font-size="26" font-weight="800" letter-spacing="3">KINMO PW</text>
+  <text x="120" y="258" fill="#0f172a" font-family="ui-sans-serif,system-ui,sans-serif" font-size="18" font-weight="600" letter-spacing="4">CORPORATION</text>
+  <text x="120" y="310" fill="#475569" font-family="ui-sans-serif,system-ui,sans-serif" font-size="14">+63 917 555 1234  ·  8703-5284 / 8362-5820</text>
+  <text x="120" y="338" fill="#475569" font-family="ui-sans-serif,system-ui,sans-serif" font-size="14">maria.santos@kinmopw.com</text>
+  <text x="120" y="366" fill="#64748b" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">Main Office: BGC Tower, Taguig  |  Branch: Cebu Business Park</text>
+  <rect x="520" y="100" width="160" height="80" rx="8" fill="#0ea5e9" opacity="0.15"/>
+  <text x="600" y="148" text-anchor="middle" fill="#0369a1" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="700">STACKED</text>
+  <text x="600" y="166" text-anchor="middle" fill="#0369a1" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="700">LOGO</text>
+</svg>

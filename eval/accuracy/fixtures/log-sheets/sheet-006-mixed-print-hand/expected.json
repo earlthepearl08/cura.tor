@@ -1,0 +1,67 @@
+{
+  "entries": [
+    {
+      "name": "Iris Mendoza",
+      "company": "QuickShip Express Inc.",
+      "position": "Customer Success Lead",
+      "phone": [
+        "+63 917 111 0001"
+      ],
+      "email": [
+        "iris.m@quickship.ph"
+      ],
+      "address": "Pasay",
+      "notes": ""
+    },
+    {
+      "name": "Gina Morales",
+      "company": "",
+      "position": "Freelance Designer",
+      "phone": [
+        "0917-666-7777"
+      ],
+      "email": [
+        "gina.morales.design@gmail.com"
+      ],
+      "address": "Pasig",
+      "notes": "card follow-up"
+    },
+    {
+      "name": "Benito Aquino",
+      "company": "SteelForm Manufacturing",
+      "position": "Plant Manager",
+      "phone": [
+        "046-430-8899"
+      ],
+      "email": [
+        "baquino@steelform.ph"
+      ],
+      "address": "Cavite",
+      "notes": ""
+    },
+    {
+      "name": "Michelle Ang",
+      "company": "ExpoCraft Philippines Inc.",
+      "position": "Event Lead",
+      "phone": [
+        "+63 917 555 3030"
+      ],
+      "email": [
+        "michelle.ang@expocraft.ph"
+      ],
+      "address": "Pasay",
+      "notes": "Booth A-18"
+    }
+  ],
+  "_meta": {
+    "id": "sheet-006-mixed-print-hand",
+    "difficulty": "hard",
+    "handwriting": true,
+    "tags": [
+      "ph",
+      "handwriting",
+      "partial-fields",
+      "trade-show"
+    ]
+  }
+}

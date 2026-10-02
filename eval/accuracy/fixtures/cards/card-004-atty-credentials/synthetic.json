@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-004-atty-credentials",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Lim & Associates Law",
+    "Atty. Beatrice Lim, CPA",
+    "Managing Partner",
+    "+63 2 8899 1122 / 0917-444-5566",
+    "blim@limlaw.ph",
+    "Ortigas Center, Pasig",
+    "www.limlaw.ph"
+  ]
+}

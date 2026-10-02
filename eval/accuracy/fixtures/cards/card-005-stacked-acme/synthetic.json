@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-005-stacked-acme",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "ACME Industries Inc.",
+    "Rico Tan",
+    "VP of Sales & Marketing",
+    "8703-1111 / 8703-2222",
+    "rico.tan@acmeind.ph",
+    "Head Office: Alabang, Muntinlupa",
+    "Tagline: Building Tomorrow"
+  ]
+}

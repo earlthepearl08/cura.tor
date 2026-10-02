@@ -1,0 +1,27 @@
+# Cura.tor crawler rules
+# Replace the Sitemap origin with your production host (see public/SEO.md).
+
+User-agent: *
+Allow: /
+Allow: /welcome
+Allow: /accuracy
+Allow: /legal
+Allow: /auth
+
+# Authenticated app surfaces (not marketing targets)
+Disallow: /app
+Disallow: /scan
+Disallow: /upload
+Disallow: /contacts
+Disallow: /manual
+Disallow: /settings
+Disallow: /qr-scan
+Disallow: /log-scan
+Disallow: /multi-card
+Disallow: /batch-history
+Disallow: /team
+Disallow: /invite
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://cura-tor.vercel.app/sitemap.xml

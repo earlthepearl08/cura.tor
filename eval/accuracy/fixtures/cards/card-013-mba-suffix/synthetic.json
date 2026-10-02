@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-013-mba-suffix",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Summit Capital Partners",
+    "Clara Sy, MBA",
+    "Investment Analyst",
+    "+63 2 7777 1212",
+    "clara.sy@summitcap.ph",
+    "Makati CBD",
+    "linkedin.com/in/clarasy"
+  ]
+}
