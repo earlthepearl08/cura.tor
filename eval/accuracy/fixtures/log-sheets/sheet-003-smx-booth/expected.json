@@ -1,0 +1,64 @@
+{
+  "entries": [
+    {
+      "name": "Paolo Villanueva",
+      "company": "Sunrise Logistics Inc.",
+      "position": "Operations Manager",
+      "phone": [
+        "+63 918 100 2000"
+      ],
+      "email": [
+        "paolo.v@sunriselog.ph"
+      ],
+      "address": "Makati",
+      "notes": "Booth 22"
+    },
+    {
+      "name": "Sofia Navarro",
+      "company": "BrightPath Solutions",
+      "position": "Account Executive",
+      "phone": [
+        "+63 999 888 7777"
+      ],
+      "email": [
+        "sofia@brightpath.ph"
+      ],
+      "address": "Cebu",
+      "notes": ""
+    },
+    {
+      "name": "Jun Rivera",
+      "company": "Island Coffee Co.",
+      "position": "Owner",
+      "phone": [
+        "0917-333-4444"
+      ],
+      "email": [],
+      "address": "Davao",
+      "notes": "sample request"
+    },
+    {
+      "name": "Hannah Reyes",
+      "company": "Pacific Marine Ltd.",
+      "position": "Fleet Coordinator",
+      "phone": [
+        "0917-777-8888"
+      ],
+      "email": [
+        "hannah.r@pacificmarine.ph"
+      ],
+      "address": "Mandaue",
+      "notes": ""
+    }
+  ],
+  "_meta": {
+    "id": "sheet-003-smx-booth",
+    "difficulty": "medium",
+    "handwriting": false,
+    "tags": [
+      "ph",
+      "trade-show",
+      "tabular"
+    ]
+  }
+}

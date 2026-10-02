@@ -1,0 +1,21 @@
+{
+  "name": "Dr. Amelia Torres, PhD",
+  "company": "National Research Labs",
+  "position": "Principal Scientist",
+  "phone": [
+    "+63 2 8123 4567"
+  ],
+  "email": [
+    "atorres@nrl.ph"
+  ],
+  "address": "UP Diliman, Quezon City",
+  "notes": "",
+  "_meta": {
+    "id": "card-017-dr-phd",
+    "difficulty": "easy",
+    "tags": [
+      "credentials",
+      "ph"
+    ]
+  }
+}

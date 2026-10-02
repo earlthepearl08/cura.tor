@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-003-simple-makati",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Sunrise Logistics Inc.",
+    "Paolo Villanueva",
+    "Operations Manager",
+    "+63 918 100 2000",
+    "paolo.v@sunriselog.ph",
+    "Makati City"
+  ]
+}

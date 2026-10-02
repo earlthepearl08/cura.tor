@@ -1,0 +1,23 @@
+{
+  "name": "Trevor Blake",
+  "company": "Harbor Tech LLC",
+  "position": "Solutions Architect",
+  "phone": [
+    "+1 415 555 0198",
+    "+63 917 444 0198"
+  ],
+  "email": [
+    "trevor@harbortech.io"
+  ],
+  "address": "Branch: Makati",
+  "notes": "www.harbortech.io",
+  "_meta": {
+    "id": "card-023-llc-style",
+    "difficulty": "medium",
+    "tags": [
+      "multi-phone",
+      "intl",
+      "ph"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-027-website-only-notes",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "PixelForge Studios",
+    "Owen Garcia",
+    "Creative Director",
+    "0917-123-9876",
+    "owen@pixelforge.ph",
+    "Quezon City",
+    "www.pixelforge.ph | behance.net/owengarcia"
+  ]
+}
