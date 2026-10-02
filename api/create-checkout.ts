@@ -86,7 +86,21 @@ function isValidOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
     const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    return isLocal || url.protocol === 'https:';
+    if (isLocal) return url.protocol === 'http:' || url.protocol === 'https:';
+    if (url.protocol !== 'https:') return false;
+    // When APP_URL is set, only allow that host (plus optional www) for success/cancel redirects.
+    const appUrl = (process.env.APP_URL || '').trim();
+    if (appUrl) {
+      try {
+        const allowed = new URL(appUrl);
+        return url.hostname === allowed.hostname
+          || url.hostname === `www.${allowed.hostname}`
+          || `www.${url.hostname}` === allowed.hostname;
+      } catch {
+        // fall through to https-any if APP_URL is malformed
+      }
+    }
+    return true;
   } catch {
     return false;
   }

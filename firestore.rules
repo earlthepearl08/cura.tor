@@ -3,122 +3,117 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- Users ---
+    // Entitlements (tier, contactLimit, lifetimeLimit, stripe, event packs, org,
+    // trial expiry) are server-only (Admin SDK: Stripe webhook, redeem/bootstrap
+    // APIs, grant-trial, provision-enterprise). Clients must not self-upgrade.
     match /users/{userId} {
-      // Can only read your own doc
       allow read: if request.auth != null && request.auth.uid == userId;
 
-      // Can only create your own doc, must start as free or pro
+      // New accounts always start free with free-tier caps.
       allow create: if request.auth != null
                     && request.auth.uid == userId
                     && request.resource.data.uid == userId
-                    && request.resource.data.tier in ['free', 'pro'];
+                    && request.resource.data.tier == 'free'
+                    && request.resource.data.contactLimit == 25
+                    && request.resource.data.scanUsage.count == 0
+                    && request.resource.data.scanUsage.lifetimeCount == 0
+                    && request.resource.data.scanUsage.lifetimeLimit == null
+                    && request.resource.data.get('eventPackCredits', 0) == 0
+                    && request.resource.data.get('eventPackPurchased', 0) == 0
+                    && request.resource.data.get('organizationId', null) == null;
 
-      // Updates: authenticated user on own doc, with restrictions
       allow update: if request.auth != null
                     && request.auth.uid == userId
-                    // Tier can stay the same or upgrade (free → early_access/pro), never downgrade
-                    && (
-                      request.resource.data.tier == resource.data.tier
-                      || (resource.data.tier == 'free' && request.resource.data.tier in ['early_access', 'pro'])
-                    )
-                    // Lifetime scan count can only go up (never reset)
-                    && request.resource.data.scanUsage.lifetimeCount >= resource.data.scanUsage.lifetimeCount
-                    // Monthly count: can go up OR reset to 0 (monthly reset)
-                    && (
-                      request.resource.data.scanUsage.count >= resource.data.scanUsage.count
-                      || request.resource.data.scanUsage.count == 0
-                    );
+                    && request.resource.data.uid == resource.data.uid
+                    // Tier / paid entitlements immutable from client
+                    && request.resource.data.tier == resource.data.tier
+                    && request.resource.data.contactLimit == resource.data.contactLimit
+                    && request.resource.data.scanUsage.lifetimeLimit
+                         == resource.data.scanUsage.lifetimeLimit
+                    // Scan counters may only increase (monthly reset + quota via Admin SDK)
+                    && request.resource.data.scanUsage.lifetimeCount
+                         >= resource.data.scanUsage.lifetimeCount
+                    && request.resource.data.scanUsage.count
+                         >= resource.data.scanUsage.count
+                    // Billing / packs / org / trial fields immutable from client
+                    && request.resource.data.get('stripe', null)
+                         == resource.data.get('stripe', null)
+                    && request.resource.data.get('eventPackCredits', 0)
+                         == resource.data.get('eventPackCredits', 0)
+                    && request.resource.data.get('eventPackPurchased', 0)
+                         == resource.data.get('eventPackPurchased', 0)
+                    && request.resource.data.get('expiresAt', null)
+                         == resource.data.get('expiresAt', null)
+                    && request.resource.data.get('trialSourceTier', null)
+                         == resource.data.get('trialSourceTier', null)
+                    && request.resource.data.get('organizationId', null)
+                         == resource.data.get('organizationId', null)
+                    && request.resource.data.get('orgRole', null)
+                         == resource.data.get('orgRole', null)
+                    && request.resource.data.get('accessCode', null)
+                         == resource.data.get('accessCode', null);
 
-      // No deletes
       allow delete: if false;
     }
 
     // --- Access Codes ---
     match /accessCodes/{codeId} {
-      // Any authenticated user can read codes (needed for redemption transaction)
+      // Any authenticated user can read codes (needed for redemption lookup UX;
+      // redemption writes go through Admin SDK — api/account redeem-access-code).
       allow read: if request.auth != null;
 
-      // Updates: only allow incrementing currentUses + adding to redeemedBy
-      // Cannot change code metadata (isActive, maxUses, scanLimit, tier, code)
-      allow update: if request.auth != null
-                    && request.resource.data.currentUses == resource.data.currentUses + 1
-                    && request.resource.data.isActive == resource.data.isActive
-                    && request.resource.data.code == resource.data.code
-                    && request.resource.data.maxUses == resource.data.maxUses
-                    && request.resource.data.scanLimit == resource.data.scanLimit
-                    && request.resource.data.tier == resource.data.tier;
-
-      // No create or delete (admin only via Firebase Console)
-      allow create, delete: if false;
+      // No client writes — redemption is server-side only.
+      allow create, update, delete: if false;
     }
 
     // --- Organizations (Enterprise) ---
     match /organizations/{orgId} {
-      // Helper: caller is a member of this org
       function isMember() {
         return request.auth != null
                && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
       }
 
-      // Helper: caller is an org admin (role stored on members/{uid})
       function isOrgAdmin() {
         return isMember()
                && get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'admin';
       }
 
-      // Read org metadata if member; writes only via Admin SDK
       allow read: if isMember();
       allow write: if false;
 
-      // Members subcollection — read if member, writes only via Admin SDK
       match /members/{uid} {
         allow read: if isMember();
         allow write: if false;
       }
 
-      // Contacts subcollection — read/write if member (client SDK for performance).
-      // Claim enforcement for regular members:
-      //   1) claim fields unchanged, or
-      //   2) claim unclaimed contact as self, or
-      //   3) release own claim
-      // Org admins may override/reassign/clear any claim (admin claim override).
-      // Follow-up fields (followUpStatus / followUpDueAt / followUpUpdatedAt) may
-      // change while claimedBy stays the same — covered by the "claim unchanged" arm.
+      // Contacts — claim rules; org admins may override claims.
       match /contacts/{contactId} {
         allow read: if isMember();
         allow create: if isMember();
         allow delete: if isMember();
         allow update: if isMember()
                       && (
-                        // Claim unchanged
                         request.resource.data.get('claimedBy', null) == resource.data.get('claimedBy', null)
-                        // Setting claim to self (was unclaimed)
                         || (resource.data.get('claimedBy', null) == null
                             && request.resource.data.claimedBy == request.auth.uid)
-                        // Releasing own claim
                         || (resource.data.get('claimedBy', null) == request.auth.uid
                             && request.resource.data.get('claimedBy', null) == null)
-                        // Admin override / reassign / force-release
                         || isOrgAdmin()
                       );
       }
 
-      // Folders subcollection — read/write if member
       match /folders/{folderId} {
         allow read, write: if isMember();
       }
 
-      // Batches subcollection — read/write if member
       match /batches/{batchId} {
         allow read, write: if isMember();
       }
 
-      // OCR correction glossary — shared per org; members can teach/apply
       match /corrections/{correctionId} {
         allow read, write: if isMember();
       }
 
-      // Invites subcollection — read if member; writes only via Admin SDK
       match /invites/{code} {
         allow read: if isMember();
         allow write: if false;
@@ -126,8 +121,6 @@ service cloud.firestore {
     }
 
     // --- Event workspaces (lightweight trade-show packs) ---
-    // Short-lived shared spaces (2–10 seats). Metadata create/join/end via Admin SDK
-    // (api/events.ts). Members read/write contacts with claim rules similar to orgs.
     match /eventWorkspaces/{eventId} {
       function isEventMember() {
         return request.auth != null
@@ -185,9 +178,6 @@ service cloud.firestore {
 
     // --- Enterprise Requests ---
     match /enterpriseRequests/{requestId} {
-      // Any signed-in user can create a request for themselves.
-      // Locked down: exact allowed fields, status must be 'pending', size caps
-      // to prevent DoS via huge strings or unexpected fields.
       allow create: if request.auth != null
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.status == 'pending'
@@ -211,7 +201,6 @@ service cloud.firestore {
                     && request.resource.data.teamSize >= 1
                     && request.resource.data.teamSize <= 100000;
 
-      // No reads/updates/deletes from the client — admin list/approve/reject go through the API
       allow read, update, delete: if false;
     }
 

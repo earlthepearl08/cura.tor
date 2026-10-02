@@ -2,12 +2,16 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '';
 const FIREBASE_JWKS = createRemoteJWKSet(
   new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
 );
+
+/** Free-tier contact cap — mirrors src/types/user.ts TIER_LIMITS.free */
+const FREE_CONTACT_LIMIT = 25;
+const EARLY_ACCESS_CONTACT_LIMIT = 50;
 
 function getAdminDb() {
   if (!getApps().length) {
@@ -56,15 +60,20 @@ function isOwnerEmail(email: string | null): boolean {
   return owners.includes(email.toLowerCase());
 }
 
+function contactLimitForTier(tier: string): number | null {
+  if (tier === 'pro' || tier === 'enterprise') return null;
+  if (tier === 'early_access') return EARLY_ACCESS_CONTACT_LIMIT;
+  return FREE_CONTACT_LIMIT;
+}
+
 /**
- * Delete the caller's account server-side: clean up org membership,
- * revoke their pending invites, delete any enterpriseRequests they opened,
- * and delete their user doc. Owner emails are whitelisted — we don't want
- * to accidentally wipe the founder.
+ * Account endpoint (consolidated to stay under Vercel Hobby function caps).
  *
- * The client completes the deletion by calling firebase/auth deleteUser()
- * after this endpoint returns 200. (We don't use firebase-admin/auth here
- * because it doesn't bundle correctly on this Vercel project.)
+ * POST with no action / action=delete → delete caller's account (existing behavior).
+ * POST { action: 'redeem-access-code', code } → Admin-SDK tier upgrade via access code.
+ * POST { action: 'bootstrap-owner' } → OWNER_EMAILS only: ensure founder is pro.
+ *
+ * Client Firebase Auth deletion still happens after delete returns 200.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -72,11 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const auth = await verifyAuth(req);
   if (!auth.ok) return res.status(401).json({ error: 'Unauthorized', reason: auth.reason });
 
-  if (isOwnerEmail(auth.email)) {
-    return res.status(403).json({
-      error: 'Owner accounts cannot be deleted through the app. Contact support or remove the email from OWNER_EMAILS first.',
-    });
-  }
+  const action = typeof req.body?.action === 'string' ? req.body.action : 'delete';
 
   let adminDb: FirebaseFirestore.Firestore;
   try {
@@ -86,16 +91,128 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Server configuration error', details: err.message });
   }
 
-    const uid = auth.uid;
+  if (action === 'bootstrap-owner') {
+    if (!isOwnerEmail(auth.email)) {
+      return res.status(403).json({ error: 'Owner access required' });
+    }
+    try {
+      const userRef = adminDb.collection('users').doc(auth.uid);
+      const snap = await userRef.get();
+      if (!snap.exists) {
+        return res.status(404).json({ error: 'User profile not found' });
+      }
+      const data = snap.data()!;
+      if (data.tier === 'pro' || data.tier === 'enterprise') {
+        return res.status(200).json({ ok: true, tier: data.tier, changed: false });
+      }
+      await userRef.update({
+        tier: 'pro',
+        contactLimit: null,
+        'scanUsage.lifetimeLimit': null,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return res.status(200).json({ ok: true, tier: 'pro', changed: true });
+    } catch (err: any) {
+      console.error('bootstrap-owner error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to bootstrap owner' });
+    }
+  }
+
+  if (action === 'redeem-access-code') {
+    const rawCode = req.body?.code;
+    if (!rawCode || typeof rawCode !== 'string' || !rawCode.trim()) {
+      return res.status(400).json({ error: 'Missing code' });
+    }
+    const code = rawCode.trim().toUpperCase();
+
+    try {
+      const result = await adminDb.runTransaction(async (tx) => {
+        const codeRef = adminDb.collection('accessCodes').doc(code);
+        const codeSnap = await tx.get(codeRef);
+        if (!codeSnap.exists) {
+          return { ok: false as const, status: 404, error: 'Invalid access code' };
+        }
+        const codeData = codeSnap.data()!;
+        if (!codeData.isActive) {
+          return { ok: false as const, status: 400, error: 'This code has expired' };
+        }
+        const maxUses = typeof codeData.maxUses === 'number' ? codeData.maxUses : 0;
+        const currentUses = typeof codeData.currentUses === 'number' ? codeData.currentUses : 0;
+        if (maxUses > 0 && currentUses >= maxUses) {
+          return { ok: false as const, status: 400, error: 'This code has reached its usage limit' };
+        }
+        const redeemedBy: string[] = Array.isArray(codeData.redeemedBy) ? codeData.redeemedBy : [];
+        if (redeemedBy.includes(auth.uid)) {
+          return { ok: false as const, status: 400, error: 'You have already used this code' };
+        }
+
+        const userRef = adminDb.collection('users').doc(auth.uid);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists) {
+          return { ok: false as const, status: 404, error: 'User not found' };
+        }
+        const userData = userSnap.data()!;
+        if (userData.tier === 'pro' || userData.tier === 'enterprise') {
+          return { ok: false as const, status: 400, error: 'You already have Pro access' };
+        }
+
+        const tier = codeData.tier === 'pro' ? 'pro' : 'early_access';
+        const scanLimit = codeData.scanLimit === undefined ? null : codeData.scanLimit;
+        if (scanLimit !== null && (typeof scanLimit !== 'number' || scanLimit < 1)) {
+          return { ok: false as const, status: 500, error: 'Access code misconfigured (scanLimit)' };
+        }
+
+        tx.update(userRef, {
+          tier,
+          'scanUsage.lifetimeLimit': scanLimit,
+          contactLimit: contactLimitForTier(tier),
+          accessCode: { code, redeemedAt: Date.now() },
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        tx.update(codeRef, {
+          currentUses: currentUses + 1,
+          redeemedBy: FieldValue.arrayUnion(auth.uid),
+        });
+
+        const message = scanLimit
+          ? `Access code redeemed! You now have ${scanLimit} scans.`
+          : 'Access code redeemed! Pioneer features unlocked — unlimited scans and up to 50 contacts.';
+
+        return { ok: true as const, tier, message };
+      });
+
+      if (!result.ok) {
+        return res.status(result.status).json({ error: result.error });
+      }
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        tier: result.tier,
+      });
+    } catch (err: any) {
+      console.error('redeem-access-code error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to redeem code' });
+    }
+  }
+
+  if (action !== 'delete') {
+    return res.status(400).json({ error: `Unknown action: ${action}` });
+  }
+
+  // --- Delete account (legacy default) ---
+  if (isOwnerEmail(auth.email)) {
+    return res.status(403).json({
+      error: 'Owner accounts cannot be deleted through the app. Contact support or remove the email from OWNER_EMAILS first.',
+    });
+  }
+
+  const uid = auth.uid;
   const userRef = adminDb.collection('users').doc(uid);
 
   try {
     const userSnap = await userRef.get();
-    // If there's no user doc we can still let the client proceed to delete
-    // the Firebase Auth record — nothing to clean up on our side.
     const userData = userSnap.exists ? userSnap.data()! : null;
 
-    // --- Cancel Stripe subscription before wiping the user doc ---
     const subscriptionId =
       typeof userData?.stripe?.subscriptionId === 'string'
         ? userData.stripe.subscriptionId
@@ -113,7 +230,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const stripe = new Stripe(stripeSecretKey);
         await stripe.subscriptions.cancel(subscriptionId);
       } catch (err: any) {
-        // Already gone / already canceled — safe to continue
         const code = err?.code || err?.raw?.code;
         const status = err?.statusCode || err?.status;
         if (code !== 'resource_missing' && status !== 404) {
@@ -126,7 +242,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // --- Org cleanup ---
     if (userData?.organizationId) {
       const orgId = userData.organizationId;
       const orgRef = adminDb.collection('organizations').doc(orgId);
@@ -137,7 +252,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const isOwner = orgData.ownerId === uid;
 
         if (isOwner) {
-          // Count other members
           const membersSnap = await orgRef.collection('members').get();
           const others = membersSnap.docs.filter(d => d.id !== uid);
           if (others.length > 0) {
@@ -145,7 +259,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               error: `You're the owner of ${orgData.name} and there are still ${others.length} other member(s). Transfer ownership or remove all members before deleting your account.`,
             });
           }
-          // Sole-owner solo org: nuke the whole org
           const invitesSnap = await orgRef.collection('invites').get();
           const contactsSnap = await orgRef.collection('contacts').get();
           const foldersSnap = await orgRef.collection('folders').get();
@@ -159,13 +272,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           batch.delete(orgRef);
           await batch.commit();
         } else {
-          // Member leaving — just remove their member doc
           await orgRef.collection('members').doc(uid).delete();
         }
       }
     }
 
-    // --- Revoke invites sent by this user ---
     const sentInvitesSnap = await adminDb.collectionGroup('invites')
       .where('invitedBy', '==', uid)
       .where('status', '==', 'pending')
@@ -176,7 +287,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await batch.commit();
     }
 
-    // --- Delete any enterpriseRequests this user opened ---
     const requestsSnap = await adminDb.collection('enterpriseRequests')
       .where('uid', '==', uid).get();
     if (!requestsSnap.empty) {
@@ -185,7 +295,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await batch.commit();
     }
 
-    // --- Delete the user doc itself ---
     if (userSnap.exists) {
       await userRef.delete();
     }
@@ -198,7 +307,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('Account deletion error:', err);
     return res.status(500).json({
       error: err.message || 'Failed to delete account',
-      phase: 'server-cleanup',
     });
   }
 }

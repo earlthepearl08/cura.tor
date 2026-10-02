@@ -104,6 +104,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized', reason: auth.reason });
   }
 
+  // Shared private-app token writes into ONE HubSpot portal. Until per-user OAuth
+  // exists, only OWNER_EMAILS may use this path (otherwise any customer dumps into Earl's CRM).
+  const owners = (process.env.OWNER_EMAILS || 'earldy.kinmo@gmail.com')
+    .split(',').map(e => e.trim().toLowerCase());
+  if (!auth.email || !owners.includes(auth.email.toLowerCase())) {
+    return res.status(403).json({
+      error: 'HubSpot export uses a shared server token and is limited to the operator account until per-user HubSpot OAuth is enabled.',
+      code: 'hubspot_owner_only',
+      docs: 'HUBSPOT.md',
+    });
+  }
+
   const accessToken = (process.env.HUBSPOT_ACCESS_TOKEN || '').trim();
   if (!accessToken) {
     return res.status(503).json(setupErrorResponse());
