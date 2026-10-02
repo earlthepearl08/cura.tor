@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Lock, Layers, Plus, Sun } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Lock, Layers, Plus, Sun, HelpCircle } from 'lucide-react';
 import { ocrService, LogSheetEntry, LogSheetParseResult, entryNeedsReview, ContactFieldKey } from '@/services/ocr';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { exportService } from '@/services/export';
@@ -763,7 +763,13 @@ const LogScan: React.FC = () => {
                         <ArrowLeft size={24} />
                     </button>
                     <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
-                    <div className="w-10" />
+                    <button
+                        onClick={() => navigate('/help?clip=log-sheet')}
+                        className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-500 hover:text-brand-300"
+                        aria-label="Help"
+                    >
+                        <HelpCircle size={20} />
+                    </button>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                     <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mb-4">
@@ -790,7 +796,14 @@ const LogScan: React.FC = () => {
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
-                <div className="w-10" />
+                <button
+                    onClick={() => navigate('/help?clip=log-sheet')}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-500 hover:text-brand-300"
+                    title="Help: log sheet scan"
+                    aria-label="Help"
+                >
+                    <HelpCircle size={20} />
+                </button>
             </div>
 
             <div className="flex-1 p-4">
@@ -802,6 +815,13 @@ const LogScan: React.FC = () => {
                             <p className="text-sm text-brand-400 max-w-xs mx-auto">
                                 Align the table in the frame. Each row becomes a contact — add more pages after the first sheet.
                             </p>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/help?clip=log-sheet')}
+                                className="text-xs text-brand-500 hover:text-brand-300 underline-offset-2 hover:underline"
+                            >
+                                Watch log sheet tip
+                            </button>
                         </div>
 
                         <div className="w-full max-w-sm aspect-[3/4] rounded-2xl overflow-hidden relative border-2 border-brand-500/40 bg-gradient-to-b from-brand-900 to-brand-950">

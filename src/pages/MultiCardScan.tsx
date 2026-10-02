@@ -326,7 +326,13 @@ const MultiCardScan: React.FC = () => {
                         <ArrowLeft size={24} />
                     </button>
                     <h1 className="text-lg font-semibold gradient-text">Multi-Card Scan</h1>
-                    <div className="w-10" />
+                    <button
+                        onClick={() => navigate('/help?clip=multi-card')}
+                        className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-500 hover:text-brand-300"
+                        aria-label="Help"
+                    >
+                        <HelpCircle size={20} />
+                    </button>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                     <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mb-4">
@@ -355,10 +361,10 @@ const MultiCardScan: React.FC = () => {
                 <h1 className="text-lg font-semibold gradient-text">Multi-Card Scan</h1>
                 <button
                     type="button"
-                    onClick={reopenScanTips}
+                    onClick={() => navigate('/help?clip=multi-card')}
                     className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400"
-                    aria-label="Scan tips"
-                    title="Scan tips"
+                    aria-label="Help"
+                    title="Help: multi-card layout"
                 >
                     <HelpCircle size={22} />
                 </button>
