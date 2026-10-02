@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers, Shield, UserPlus } from 'lucide-react';
 import { exportService } from '@/services/export';
 import { exportContactsToHubSpot, type HubSpotSetupError } from '@/services/hubspot';
 import { googleSheets } from '@/services/googleSheets';
@@ -14,9 +14,11 @@ import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
 import OfflineStatusBanner from '@/components/OfflineStatusBanner';
+import { getMembers } from '@/services/organizationService';
+import { OrgMember } from '@/types/organization';
 
 const Contacts: React.FC = () => {
-    const { storage, mode: workspaceMode, organization } = useWorkspace();
+    const { storage, mode: workspaceMode, organization, isAdmin } = useWorkspace();
     const isTeamMode = workspaceMode === 'team';
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -66,6 +68,9 @@ const Contacts: React.FC = () => {
     const [selectedScanner, setSelectedScanner] = useState<string>('all'); // 'all' or uid
     const [claimFilter, setClaimFilter] = useState<'all' | 'mine' | 'unclaimed' | 'theirs'>('all');
     const [claimActionId, setClaimActionId] = useState<string | null>(null); // contact id currently being claimed/released
+    const [reassignContact, setReassignContact] = useState<Contact | null>(null);
+    const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
+    const [loadingMembers, setLoadingMembers] = useState(false);
     const [moveTargetFolder, setMoveTargetFolder] = useState('Uncategorized');
     const [moveNewFolder, setMoveNewFolder] = useState('');
     const [editPersonPhoto, setEditPersonPhoto] = useState<string | null>(null);
@@ -481,6 +486,39 @@ const Contacts: React.FC = () => {
         }
     };
 
+    /** Admin: take / reassign / force-release another member's claim */
+    const handleAdminOverrideClaim = async (
+        contact: Contact,
+        assignee: { uid: string; displayName: string } | null
+    ) => {
+        if (!isTeamMode || !isAdmin || !('adminOverrideClaim' in storage)) return;
+        setClaimActionId(contact.id);
+        try {
+            await storage.adminOverrideClaim(contact.id, assignee);
+            setReassignContact(null);
+            await loadContacts();
+        } catch (err: any) {
+            alert(err.message || 'Failed to update claim');
+        } finally {
+            setClaimActionId(null);
+        }
+    };
+
+    const openReassignModal = async (contact: Contact) => {
+        if (!organization?.id) return;
+        setReassignContact(contact);
+        setLoadingMembers(true);
+        try {
+            const members = await getMembers(organization.id);
+            setOrgMembers(members);
+        } catch (err) {
+            console.error('Failed to load members:', err);
+            setOrgMembers([]);
+        } finally {
+            setLoadingMembers(false);
+        }
+    };
+
     const filteredContacts = contacts.filter(c => {
         const q = searchQuery.toLowerCase();
         const matchesSearch = !q ||
@@ -669,6 +707,43 @@ const Contacts: React.FC = () => {
                                     <CheckSquare size={14} className="text-emerald-400" />
                                     <span className="text-xs font-medium text-emerald-400">Claim</span>
                                 </button>
+                            ) : isAdmin ? (
+                                <>
+                                    <button
+                                        onClick={() => handleAdminOverrideClaim(contact, {
+                                            uid: currentUid!,
+                                            displayName: user?.displayName || user?.email?.split('@')[0] || 'Admin',
+                                        })}
+                                        disabled={claimActionId === contact.id || !currentUid}
+                                        className="flex items-center justify-center gap-1.5 px-2 py-2 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-lg transition-colors active:scale-95 disabled:opacity-50"
+                                        title={`Take claim from ${contact.claimedByName || 'member'}`}
+                                    >
+                                        <Shield size={14} className="text-sky-400" />
+                                        <span className="text-xs font-medium text-sky-400">Take</span>
+                                    </button>
+                                    <button
+                                        onClick={() => openReassignModal(contact)}
+                                        disabled={claimActionId === contact.id}
+                                        className="flex items-center justify-center gap-1.5 px-2 py-2 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 rounded-lg transition-colors active:scale-95 disabled:opacity-50"
+                                        title="Reassign claim to another member"
+                                    >
+                                        <UserPlus size={14} className="text-violet-400" />
+                                        <span className="text-xs font-medium text-violet-400">Reassign</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm(`Force-release claim held by ${contact.claimedByName || 'another member'}?`)) {
+                                                handleAdminOverrideClaim(contact, null);
+                                            }
+                                        }}
+                                        disabled={claimActionId === contact.id}
+                                        className="flex items-center justify-center gap-1.5 px-2 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-colors active:scale-95 disabled:opacity-50"
+                                        title="Force-release this claim"
+                                    >
+                                        <XCircle size={14} className="text-amber-400" />
+                                        <span className="text-xs font-medium text-amber-400">Unclaim</span>
+                                    </button>
+                                </>
                             ) : null
                         )}
                     </div>
@@ -1177,6 +1252,87 @@ const Contacts: React.FC = () => {
                                 Create
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Admin claim reassign modal */}
+            {reassignContact && (
+                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 p-6" role="dialog" aria-modal="true">
+                    <div className="bg-brand-900 rounded-2xl p-6 max-w-sm w-full border border-brand-800 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Shield size={18} className="text-sky-400" />
+                                <h3 className="text-lg font-bold">Reassign claim</h3>
+                            </div>
+                            <button
+                                onClick={() => setReassignContact(null)}
+                                className="p-1.5 hover:bg-white/10 rounded-lg text-slate-500"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <p className="text-sm text-brand-400 mb-1">
+                            {reassignContact.name || 'Contact'}
+                        </p>
+                        <p className="text-xs text-slate-500 mb-4">
+                            Currently claimed by {reassignContact.claimedByName || 'another member'}.
+                            Pick a teammate to follow up, or force-release.
+                        </p>
+
+                        {loadingMembers ? (
+                            <p className="text-xs text-slate-500 py-4 text-center">Loading members…</p>
+                        ) : (
+                            <div className="space-y-1.5 max-h-64 overflow-y-auto mb-4">
+                                {orgMembers.map((member) => {
+                                    const isCurrentClaimer = member.uid === reassignContact.claimedBy;
+                                    return (
+                                        <button
+                                            key={member.uid}
+                                            disabled={isCurrentClaimer || claimActionId === reassignContact.id}
+                                            onClick={() => handleAdminOverrideClaim(reassignContact, {
+                                                uid: member.uid,
+                                                displayName: member.displayName || member.email,
+                                            })}
+                                            className={`w-full text-left px-3 py-2.5 rounded-xl text-sm flex items-center justify-between gap-2 transition-colors disabled:opacity-40 ${
+                                                isCurrentClaimer
+                                                    ? 'bg-brand-800/40 border border-brand-700'
+                                                    : 'glass border border-brand-800 hover:bg-white/5'
+                                            }`}
+                                        >
+                                            <span className="truncate font-medium">
+                                                {member.displayName || member.email}
+                                                {member.uid === currentUid ? ' (you)' : ''}
+                                            </span>
+                                            <span className="text-[10px] text-slate-500 shrink-0">
+                                                {isCurrentClaimer ? 'Current' : member.role === 'admin' ? 'Admin' : 'Member'}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                                {orgMembers.length === 0 && (
+                                    <p className="text-xs text-slate-500 py-2 text-center">No members found</p>
+                                )}
+                            </div>
+                        )}
+
+                        <button
+                            onClick={() => {
+                                if (window.confirm('Force-release this claim?')) {
+                                    handleAdminOverrideClaim(reassignContact, null);
+                                }
+                            }}
+                            disabled={claimActionId === reassignContact.id}
+                            className="w-full py-2.5 mb-2 glass border border-amber-500/30 rounded-xl text-xs font-medium text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                        >
+                            Force-release (unclaim)
+                        </button>
+                        <button
+                            onClick={() => setReassignContact(null)}
+                            className="w-full py-2 text-xs text-slate-500 hover:text-slate-300"
+                        >
+                            Cancel
+                        </button>
                     </div>
                 </div>
             )}

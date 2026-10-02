@@ -82,7 +82,7 @@ export class TeamStorageService {
     }
 
     /** Claim a contact as "mine to follow up on". Respects Firestore rules
-     *  so only unclaimed contacts can be claimed. */
+     *  so only unclaimed contacts can be claimed by regular members. */
     async claimContact(contactId: string): Promise<void> {
         const orgId = this.requireOrg();
         const { uid, displayName } = this.getCurrentUserInfo();
@@ -117,6 +117,38 @@ export class TeamStorageService {
         delete updated.claimedByName;
         delete updated.claimedAt;
         await setDoc(ref, updated);
+    }
+
+    /**
+     * Org-admin claim override. Pass assignee to reassign (including to self);
+     * pass null to force-release. Firestore rules allow this only for org admins.
+     * Personal workspace has no claims — this is team-only.
+     */
+    async adminOverrideClaim(
+        contactId: string,
+        assignee: { uid: string; displayName: string } | null
+    ): Promise<void> {
+        const orgId = this.requireOrg();
+        const ref = doc(db, 'organizations', orgId, 'contacts', contactId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error('Contact not found');
+        const data = snap.data();
+
+        if (assignee === null) {
+            const updated = { ...data };
+            delete updated.claimedBy;
+            delete updated.claimedByName;
+            delete updated.claimedAt;
+            await setDoc(ref, updated);
+            return;
+        }
+
+        await setDoc(ref, {
+            ...data,
+            claimedBy: assignee.uid,
+            claimedByName: assignee.displayName,
+            claimedAt: Date.now(),
+        });
     }
 
     /** Remove base64 image fields — team workspace stores parsed data only to keep docs small and reduce legal surface */

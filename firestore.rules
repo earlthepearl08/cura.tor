@@ -60,6 +60,12 @@ service cloud.firestore {
                && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
       }
 
+      // Helper: caller is an org admin (role stored on members/{uid})
+      function isOrgAdmin() {
+        return isMember()
+               && get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'admin';
+      }
+
       // Read org metadata if member; writes only via Admin SDK
       allow read: if isMember();
       allow write: if false;
@@ -71,10 +77,11 @@ service cloud.firestore {
       }
 
       // Contacts subcollection — read/write if member (client SDK for performance).
-      // Claim enforcement: when claimedBy is being set, it must equal the caller's
-      // uid; when clearing, the caller must be the current claimer. Prevents
-      // members from stealing claims via the UI. (Admins can override via a
-      // separate admin-only path; not implemented in v1.)
+      // Claim enforcement for regular members:
+      //   1) claim fields unchanged, or
+      //   2) claim unclaimed contact as self, or
+      //   3) release own claim
+      // Org admins may override/reassign/clear any claim (admin claim override).
       match /contacts/{contactId} {
         allow read: if isMember();
         allow create: if isMember();
@@ -89,6 +96,8 @@ service cloud.firestore {
                         // Releasing own claim
                         || (resource.data.get('claimedBy', null) == request.auth.uid
                             && request.resource.data.get('claimedBy', null) == null)
+                        // Admin override / reassign / force-release
+                        || isOrgAdmin()
                       );
       }
 
