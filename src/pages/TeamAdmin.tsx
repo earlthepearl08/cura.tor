@@ -217,7 +217,7 @@ const TeamAdmin: React.FC = () => {
                         <p className="text-sm font-medium text-white">Enable claims</p>
                         <p className="text-xs text-slate-500">
                             Members can "claim" contacts they'll follow up on, so teammates don't double-contact the same lead.
-                            Teammates always see all contacts either way.
+                            Teammates always see all contacts either way. Admins can take, reassign, or force-release any claim.
                         </p>
                     </div>
                 </label>
