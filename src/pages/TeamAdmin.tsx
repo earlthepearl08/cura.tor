@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, UserPlus, Trash2, Shield, ShieldCheck, Copy, Check, RefreshCw, X, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Users, UserPlus, Trash2, Shield, ShieldCheck, Copy, Check, RefreshCw, X, Loader2, AlertCircle, Radio } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { OrgMember, OrgInvite, OrgRole } from '@/types/organization';
+import { useTeamAdmin } from '@/hooks/useTeamAdmin';
+import { OrgMember, OrgRole } from '@/types/organization';
 import {
-    getMembers,
-    getInvites,
     createInvite,
     removeMember,
     updateMemberRole,
@@ -18,9 +17,14 @@ const TeamAdmin: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { organization, isAdmin, refreshOrganization } = useWorkspace();
-    const [members, setMembers] = useState<OrgMember[]>([]);
-    const [invites, setInvites] = useState<OrgInvite[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const orgId = organization?.id;
+    const {
+        members,
+        invites,
+        isLoading,
+        error: liveError,
+        isLive,
+    } = useTeamAdmin(orgId);
     const [error, setError] = useState<string | null>(null);
 
     // Invite form state
@@ -30,33 +34,16 @@ const TeamAdmin: React.FC = () => {
     const [generatedInvite, setGeneratedInvite] = useState<{ code: string; url: string } | null>(null);
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-    const orgId = organization?.id;
-
-    const loadData = useCallback(async () => {
-        if (!orgId) return;
-        setIsLoading(true);
-        setError(null);
-        try {
-            const [m, i] = await Promise.all([getMembers(orgId), getInvites(orgId)]);
-            setMembers(m);
-            setInvites(i);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load team data');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [orgId]);
-
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
-
     // Redirect non-admins
     useEffect(() => {
         if (!isLoading && !isAdmin) {
             navigate('/settings');
         }
     }, [isLoading, isAdmin, navigate]);
+
+    useEffect(() => {
+        if (liveError) setError(liveError);
+    }, [liveError]);
 
     if (!organization) {
         return (
@@ -82,7 +69,7 @@ const TeamAdmin: React.FC = () => {
             if (result.success && result.code && result.inviteUrl) {
                 setGeneratedInvite({ code: result.code, url: result.inviteUrl });
                 setInviteEmail('');
-                await loadData();
+                // Snapshot picks up the new invite
             } else {
                 setError(result.message);
             }
@@ -102,7 +89,6 @@ const TeamAdmin: React.FC = () => {
             const result = await createInvite(orgId, null, inviteRole);
             if (result.success && result.code && result.inviteUrl) {
                 setGeneratedInvite({ code: result.code, url: result.inviteUrl });
-                await loadData();
             } else {
                 setError(result.message);
             }
@@ -127,9 +113,7 @@ const TeamAdmin: React.FC = () => {
         if (!orgId) return;
         if (!confirm(`Remove ${name} from the team? They will lose access to all team contacts.`)) return;
         const result = await removeMember(orgId, uid);
-        if (result.success) {
-            await loadData();
-        } else {
+        if (!result.success) {
             setError(result.message);
         }
     };
@@ -138,9 +122,7 @@ const TeamAdmin: React.FC = () => {
         if (!orgId) return;
         const newRole: OrgRole = member.role === 'admin' ? 'member' : 'admin';
         const result = await updateMemberRole(orgId, member.uid, newRole);
-        if (result.success) {
-            await loadData();
-        } else {
+        if (!result.success) {
             setError(result.message);
         }
     };
@@ -149,9 +131,7 @@ const TeamAdmin: React.FC = () => {
         if (!orgId) return;
         if (!confirm('Revoke this invite? The link will stop working.')) return;
         const result = await revokeInvite(orgId, code);
-        if (result.success) {
-            await loadData();
-        } else {
+        if (!result.success) {
             setError(result.message);
         }
     };
@@ -170,13 +150,21 @@ const TeamAdmin: React.FC = () => {
                     <ArrowLeft size={20} />
                     <span className="text-sm">Settings</span>
                 </button>
-                <button
-                    onClick={loadData}
-                    className="p-2 text-slate-400 hover:text-slate-200 transition-colors"
-                    title="Refresh"
-                >
-                    <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-                </button>
+                <div className="flex items-center gap-2">
+                    {isLive && (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400/80" title="Live sync active">
+                            <Radio size={12} className="animate-pulse" />
+                            Live
+                        </span>
+                    )}
+                    <button
+                        onClick={() => refreshOrganization()}
+                        className="p-2 text-slate-400 hover:text-slate-200 transition-colors"
+                        title="Refresh organization settings"
+                    >
+                        <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+                    </button>
+                </div>
             </div>
 
             {/* Org info */}
