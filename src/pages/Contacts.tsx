@@ -742,21 +742,21 @@ const Contacts: React.FC = () => {
                                         className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors flex items-center justify-between ${!canExportCSV() ? 'opacity-60' : ''}`}
                                     >
                                         Export as CSV
-                                        {!canExportCSV() && <Lock size={12} className="text-amber-400" />}
+                                        {!canExportCSV() && <span className="text-amber-400 text-[10px] font-medium flex items-center gap-1"><Lock size={12} /> Pioneer+</span>}
                                     </button>
                                     <button
                                         onClick={() => handleExport('excel')}
                                         className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportExcel() ? 'opacity-60' : ''}`}
                                     >
                                         Export as Excel
-                                        {!canExportExcel() && <Lock size={12} className="text-amber-400" />}
+                                        {!canExportExcel() && <span className="text-amber-400 text-[10px] font-medium flex items-center gap-1"><Lock size={12} /> Pioneer+</span>}
                                     </button>
                                     <button
                                         onClick={() => handleExport('vcard')}
                                         className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportBulkVCard() ? 'opacity-60' : ''}`}
                                     >
                                         Export as vCard (.vcf)
-                                        {!canExportBulkVCard() && <Lock size={12} className="text-amber-400" />}
+                                        {!canExportBulkVCard() && <span className="text-amber-400 text-[10px] font-medium flex items-center gap-1"><Lock size={12} /> Pioneer+</span>}
                                     </button>
                                     <button
                                         onClick={() => handleExport('crm-csv')}

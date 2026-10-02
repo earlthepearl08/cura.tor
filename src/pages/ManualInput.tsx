@@ -23,6 +23,7 @@ const ManualInput: React.FC = () => {
     const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [storageContactCount, setStorageContactCount] = useState(0);
     const { canSaveContact, user } = useAuth();
     const { storage } = useWorkspace();
 
@@ -67,6 +68,7 @@ const ManualInput: React.FC = () => {
         // Check contact storage limit
         const existingContacts = await storage.getAllContacts();
         if (!canSaveContact(existingContacts.length)) {
+            setStorageContactCount(existingContacts.length);
             setShowUpgradePrompt(true);
             return;
         }
@@ -230,7 +232,8 @@ const ManualInput: React.FC = () => {
                 <UpgradePrompt
                     feature="storage"
                     onDismiss={() => setShowUpgradePrompt(false)}
-                    contactLimit={user?.contactLimit || 25}
+                    contactCount={storageContactCount}
+                    contactLimit={user?.contactLimit ?? undefined}
                 />
             )}
 

@@ -5,6 +5,7 @@ import { Contact } from '@/types/contact';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { exportService } from '@/services/export';
+import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
@@ -39,6 +40,7 @@ const FIELD_LABELS: Record<ContactFieldKey, string> = {
 const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onCancel, onSave, onScanAnother, onDelete, reviewOnly, initialNotes, initialFolder }) => {
     const { canExportVCard } = useAuth();
     const { storage } = useWorkspace();
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const [formData, setFormData] = useState({
         name: ocrResult.name,
         position: ocrResult.position,
@@ -630,7 +632,10 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         )}
                         <button
                             onClick={() => {
-                                if (!canExportVCard()) return;
+                                if (!canExportVCard()) {
+                                    setShowUpgradePrompt(true);
+                                    return;
+                                }
                                 exportService.toVCard(savedContact);
                             }}
                             className={`flex items-center justify-center gap-2 py-3 border rounded-xl text-sm font-medium active:scale-95 transition-all ${
@@ -640,7 +645,7 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                             }`}
                         >
                             {canExportVCard() ? <Download size={16} /> : <Lock size={16} />}
-                            {canExportVCard() ? 'Save vCard' : 'vCard (Pro)'}
+                            {canExportVCard() ? 'Save vCard' : 'vCard (Pioneer+)'}
                         </button>
                     </div>
 
@@ -666,6 +671,9 @@ const ContactReview: React.FC<ContactReviewProps> = ({ ocrResult, imageData, onC
                         </button>
                     </div>
                 </div>
+            )}
+            {showUpgradePrompt && (
+                <UpgradePrompt feature="export" onDismiss={() => setShowUpgradePrompt(false)} />
             )}
         </div>
     );
