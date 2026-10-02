@@ -1,0 +1,21 @@
+{
+  "name": "Paolo Villanueva",
+  "company": "Sunrise Logistics Inc.",
+  "position": "Operations Manager",
+  "phone": [
+    "+63 918 100 2000"
+  ],
+  "email": [
+    "paolo.v@sunriselog.ph"
+  ],
+  "address": "Makati City",
+  "notes": "",
+  "_meta": {
+    "id": "card-003-simple-makati",
+    "difficulty": "easy",
+    "tags": [
+      "ph",
+      "simple"
+    ]
+  }
+}

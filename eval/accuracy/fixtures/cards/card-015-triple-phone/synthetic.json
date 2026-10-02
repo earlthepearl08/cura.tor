@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-015-triple-phone",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "QuickShip Express Inc.",
+    "Iris Mendoza",
+    "Customer Success Lead",
+    "+63 917 111 0001 / +63 917 111 0002 / 02-8555-1212",
+    "iris.m@quickship.ph",
+    "Pasay City"
+  ]
+}

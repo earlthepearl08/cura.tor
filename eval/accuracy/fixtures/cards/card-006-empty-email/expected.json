@@ -1,0 +1,19 @@
+{
+  "name": "Jun Rivera",
+  "company": "Island Coffee Co.",
+  "position": "Owner",
+  "phone": [
+    "0917-333-4444"
+  ],
+  "email": [],
+  "address": "Davao City",
+  "notes": "Walk-in wholesale",
+  "_meta": {
+    "id": "card-006-empty-email",
+    "difficulty": "easy",
+    "tags": [
+      "partial-fields",
+      "ph"
+    ]
+  }
+}

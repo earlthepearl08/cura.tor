@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-010-corp-suffix-only-trap",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Nimbus Cloud Corporation",
+    "Kevin Ong",
+    "CTO",
+    "+63 928 111 2222",
+    "kevin.ong@nimbuscloud.ph",
+    "Bonifacio Global City, Taguig",
+    "www.nimbuscloud.ph"
+  ]
+}

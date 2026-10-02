@@ -586,7 +586,7 @@ const Contacts: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col glass sticky top-0 z-10 p-4 gap-4">
                 <div className="flex items-center justify-between">
-                    <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                         <ArrowLeft size={24} />
                     </button>
                     <div className="text-center">
@@ -617,6 +617,8 @@ const Contacts: React.FC = () => {
                         {/* Export */}
                         <div className="relative">
                             <button
+                                type="button"
+                                aria-label="Export contacts"
                                 onClick={() => setShowExportOptions(!showExportOptions)}
                                 className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400 hover:text-white"
                             >
