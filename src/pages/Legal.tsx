@@ -84,13 +84,23 @@ const Li: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const TermsOfService = () => (
     <div>
         <h1 className="text-xl font-bold text-white mb-1">Terms of Service</h1>
-        <p className="text-[10px] text-slate-600 mb-6">Last updated: October 1, 2026</p>
+        <p className="text-[10px] text-slate-600 mb-6">Last updated: October 2, 2026</p>
 
         <P>
             Welcome to Cura.tor ("Service"), a business card scanning and contact management application
             operated by Kinmo PW Corporation ("Company", "we", "us", or "our"). By accessing or using
             the Service, you agree to be bound by these Terms of Service ("Terms"). If you do not agree
             to these Terms, do not use the Service.
+        </P>
+
+        <SectionTitle>Paid beta</SectionTitle>
+        <P>
+            Cura.tor is offered as a <strong className="text-slate-300">paid beta / early access</strong> product.
+            Features, limits, pricing, and availability may change. We may interrupt or discontinue beta
+            features with reasonable notice when practicable. Paid plans during beta still grant the
+            entitlements described at purchase for the billing period you paid for, subject to these Terms.
+            Public accuracy samples and field scores labeled &quot;synthetic&quot; are demo metrics — not a
+            guarantee of production OCR performance on your cards or sheets.
         </P>
 
         <SectionTitle>1. Service Description</SectionTitle>
@@ -154,7 +164,13 @@ const TermsOfService = () => (
             The Service uses Google Gemini and Google Cloud Vision (reached through our hosted API on Vercel)
             to extract text and structure contact fields from card, multi-card, and log-sheet images. A
             device-side OCR fallback may also run in the browser. We do not guarantee error-free extraction;
-            you must verify parsed data before relying on it.
+            you must verify parsed data before relying on it for outreach, CRM import, or compliance use.
+        </P>
+        <P>
+            Marketing pages and the in-app Accuracy gallery may show <strong className="text-slate-300">synthetic</strong>{' '}
+            fixtures and field-level scores. Those are labeled demo materials. They are not certified
+            benchmarks against your real cards, venues, or handwriting, and they do not expand the warranty
+            disclaimer below.
         </P>
         <P>
             Scan images are sent for processing as described in our Privacy Policy. We do not operate a
@@ -212,21 +228,43 @@ const TermsOfService = () => (
             Privacy Policy.
         </P>
 
-        <SectionTitle>13. Governing Law</SectionTitle>
+        <SectionTitle>13. Billing, cancellation, and refunds</SectionTitle>
+        <P>
+            Paid Pioneer and Pro subscriptions are billed through Stripe. You can cancel or update payment
+            methods via <strong className="text-slate-300">Settings → Manage Subscription</strong> (Stripe
+            Customer Portal). Cancellation stops future renewals; access generally continues through the end
+            of the current paid period unless otherwise stated in Stripe.
+        </P>
+        <P>
+            One-time purchases (for example Event packs) are charged when checkout completes. Unused host
+            credits remain on your account until consumed or the Service ends that SKU.
+        </P>
+        <P>
+            <strong className="text-slate-300">Refunds:</strong> During paid beta we review refund requests
+            case-by-case. Email{' '}
+            <a href="mailto:support@curator-app.com" className="text-brand-400 underline hover:text-brand-300">
+                support@curator-app.com
+            </a>{' '}
+            within 7 days of a charge with your account email and Stripe receipt. Chargebacks without first
+            contacting support may result in account suspension. This is product/ops policy, not legal advice
+            and not a consumer-law waiver where non-waivable rights apply.
+        </P>
+
+        <SectionTitle>14. Governing Law</SectionTitle>
         <P>
             These Terms shall be governed by and construed in accordance with the laws of the Republic of the
             Philippines, without regard to its conflict of law provisions. Any disputes arising from these
             Terms shall be subject to the exclusive jurisdiction of the courts located in the Philippines.
         </P>
 
-        <SectionTitle>14. Changes to Terms</SectionTitle>
+        <SectionTitle>15. Changes to Terms</SectionTitle>
         <P>
             We reserve the right to modify these Terms at any time. We will notify users of material changes
             through the Service. Your continued use of the Service after changes are posted constitutes
             acceptance of the modified Terms.
         </P>
 
-        <SectionTitle>15. Contact</SectionTitle>
+        <SectionTitle>16. Contact</SectionTitle>
         <P>
             If you have any questions about these Terms, please contact us at:
         </P>
@@ -248,7 +286,7 @@ const TermsOfService = () => (
 const PrivacyPolicy = () => (
     <div>
         <h1 className="text-xl font-bold text-white mb-1">Privacy Policy</h1>
-        <p className="text-[10px] text-slate-600 mb-6">Last updated: October 1, 2026</p>
+        <p className="text-[10px] text-slate-600 mb-6">Last updated: October 2, 2026</p>
 
         <P>
             Kinmo PW Corporation ("Company", "we", "us", or "our") operates the Cura.tor application
@@ -382,9 +420,9 @@ const PrivacyPolicy = () => (
                 <strong className="text-slate-300">Account profile:</strong> Kept in Firestore for the life of the
                 account. In Settings you can delete your account: we remove your user document and related
                 cleanup (org membership / solo-org data, pending invites you sent, enterprise requests you
-                opened); the client then deletes your Firebase Auth user. Owner accounts and some team-admin
-                cases follow in-app restrictions. Stripe subscription cancellation may not complete
-                automatically until billing fulfillment is fully wired—contact us if a charge continues.
+                opened); when a Stripe subscription ID is on the profile we attempt to cancel it before
+                deletion; the client then deletes your Firebase Auth user. Owner accounts and some team-admin
+                cases follow in-app restrictions. If a charge continues after delete, email support@curator-app.com.
             </Li>
             <Li>
                 <strong className="text-slate-300">Scan images in AI pipelines:</strong> Not retained by us as a

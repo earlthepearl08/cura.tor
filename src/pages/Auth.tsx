@@ -283,7 +283,7 @@ const Auth: React.FC = () => {
                                 </Link>
                                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 mb-5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" aria-hidden="true" />
-                                    <span className="text-[10px] font-medium text-sky-400 tracking-wide uppercase">In testing — early access</span>
+                                    <span className="text-[10px] font-medium text-sky-400 tracking-wide uppercase">Paid beta — early access</span>
                                 </div>
                                 <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">
                                     Every card. Every contact. One scan.
