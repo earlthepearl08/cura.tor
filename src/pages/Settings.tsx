@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Cpu } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
@@ -43,7 +43,6 @@ const Settings = () => {
     const [ocrEngine, setOcrEngineState] = useState<OCREngine>(getOCREngine());
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [engineSaved, setEngineSaved] = useState(false);
-    const [advancedOpen, setAdvancedOpen] = useState(false);
     const { isConnected, user: driveUser, isSyncing, syncProgress, lastSyncTime, connect, disconnect, syncContacts, error } = useGoogleDrive();
     const { user, firebaseUser, signOut, canUseGoogleDrive, scansRemaining, refreshUserProfile } = useAuth();
 
@@ -52,11 +51,6 @@ const Settings = () => {
     const [upgradeError, setUpgradeError] = useState('');
     const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled' | 'pending'; text: string } | null>(null);
     const [showDeleteAccount, setShowDeleteAccount] = useState(false);
-
-    const selectOcrEngine = (engine: OCREngine) => {
-        setOcrEngineState(engine);
-        setOCREngine(engine);
-    };
     const isOwnerAccount = !!user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
 
     const tierBadge = TIER_BADGES[user?.tier || 'free'];
@@ -632,59 +626,6 @@ const Settings = () => {
                                             <p className="font-medium text-sm text-white">Online AI (Gemini)</p>
                                             {ocrEngine === 'cloud-vision' && (
                                                 <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
-                {/* Advanced — OCR engine choice hidden from default buyers */}
-                <div className="space-y-3">
-                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Advanced</p>
-                    <div className="card-elevated rounded-2xl overflow-hidden">
-                        <button
-                            type="button"
-                            onClick={() => setAdvancedOpen(o => !o)}
-                            className="w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left"
-                            aria-expanded={advancedOpen}
-                        >
-                            <div className="w-10 h-10 rounded-xl bg-brand-800/60 flex items-center justify-center">
-                                <Cpu className="w-5 h-5 text-slate-400" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-sm text-slate-200">OCR engine</p>
-                                <p className="text-xs text-slate-500">
-                                    Power-user options · default Gemini
-                                </p>
-                            </div>
-                            <ChevronRight
-                                size={16}
-                                className={`text-slate-500 shrink-0 transition-transform ${advancedOpen ? 'rotate-90' : ''}`}
-                            />
-                        </button>
-
-                        {advancedOpen && (
-                            <div className="border-t border-brand-800 p-4 space-y-3">
-                                <p className="text-xs text-slate-500 px-0.5">
-                                    Most users should leave Gemini selected. Tesseract is a legacy on-device fallback.
-                                </p>
-
-                                <button
-                                    type="button"
-                                    onClick={() => selectOcrEngine('cloud-vision')}
-                                    className={`w-full p-4 rounded-xl transition-all flex items-start gap-3 text-left ${
-                                        ocrEngine === 'cloud-vision'
-                                            ? 'bg-sky-500/10 border border-sky-500/40'
-                                            : 'glass border border-brand-800 hover:border-brand-700'
-                                    }`}
-                                >
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                                        ocrEngine === 'cloud-vision' ? 'bg-sky-500/20' : 'bg-brand-800/50'
-                                    }`}>
-                                        <Sparkles className={`w-5 h-5 ${ocrEngine === 'cloud-vision' ? 'text-sky-400' : 'text-slate-500'}`} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                                            <span className="font-semibold text-sm">Gemini AI</span>
-                                            <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
-                                                RECOMMENDED
-                                            </span>
-                                            {ocrEngine === 'cloud-vision' && (
-                                                <span className="text-[10px] px-2 py-0.5 bg-sky-500/20 text-sky-400 rounded-full">
                                                     ACTIVE
                                                 </span>
                                             )}
@@ -714,37 +655,6 @@ const Settings = () => {
                                             <p className="font-medium text-sm text-white">Offline (Tesseract)</p>
                                             {ocrEngine === 'tesseract' && (
                                                 <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">
-                                        <p className="text-xs text-slate-500">
-                                            Default path for cards, multi-card, and log sheets
-                                        </p>
-                                    </div>
-                                    {ocrEngine === 'cloud-vision' && (
-                                        <Check size={18} className="text-sky-400 shrink-0 mt-1" />
-                                    )}
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => selectOcrEngine('tesseract')}
-                                    className={`w-full p-4 rounded-xl transition-all flex items-start gap-3 text-left ${
-                                        ocrEngine === 'tesseract'
-                                            ? 'bg-brand-500/10 border border-brand-500/40'
-                                            : 'glass border border-brand-800 hover:border-brand-700'
-                                    }`}
-                                >
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                                        ocrEngine === 'tesseract' ? 'bg-brand-500/20' : 'bg-brand-800/50'
-                                    }`}>
-                                        <Cpu className={`w-5 h-5 ${ocrEngine === 'tesseract' ? 'text-brand-400' : 'text-slate-500'}`} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                                            <span className="font-semibold text-sm">Tesseract.js</span>
-                                            <span className="text-[10px] px-2 py-0.5 bg-slate-500/20 text-slate-400 rounded-full">
-                                                LEGACY
-                                            </span>
-                                            {ocrEngine === 'tesseract' && (
-                                                <span className="text-[10px] px-2 py-0.5 bg-brand-500/20 text-brand-400 rounded-full">
                                                     ACTIVE
                                                 </span>
                                             )}
@@ -757,17 +667,6 @@ const Settings = () => {
                             </button>
                         </div>
                     )}
-                                        <p className="text-xs text-slate-500">
-                                            On-device OCR · lower quality, no Gemini parsing
-                                        </p>
-                                    </div>
-                                    {ocrEngine === 'tesseract' && (
-                                        <Check size={18} className="text-brand-400 shrink-0 mt-1" />
-                                    )}
-                                </button>
-                            </div>
-                        )}
-                    </div>
                 </div>
 
                 {/* Google Drive Sync */}

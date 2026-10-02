@@ -123,6 +123,7 @@ async function callGeminiWithRetry(opts: {
                 );
                 const publicMsg = errorData.error || `Gemini API error: ${response.status}`;
                 const logMsg = [nestedMsg, flatDetails, reason ? `[${reason}]` : null].filter(Boolean).join(' — ');
+                const fullMsg = logMsg || publicMsg;
                 const retryable =
                     // Don't auto-retry tier quota — user must upgrade / wait for reset
                     reason !== 'quota-exceeded' &&
@@ -153,9 +154,6 @@ async function callGeminiWithRetry(opts: {
                     attempt: attempt + 1,
                     final: true,
                 });
-                const httpErr = new Error(fullMsg) as Error & { __observabilityReported?: boolean };
-                httpErr.__observabilityReported = true;
-                throw httpErr;
                 throw apiError;
             }
 
@@ -208,24 +206,18 @@ export interface OCRResult {
 
 export type OCREngine = 'tesseract' | 'cloud-vision';
 
-/** Default remains Gemini (`cloud-vision` label for stored prefs). */
 export const getOCREngine = (): OCREngine => {
     try {
         const stored = localStorage.getItem('ocr_engine');
         if (stored === 'tesseract' || stored === 'cloud-vision') return stored;
     } catch {
         // Ignore storage errors (private mode, etc.)
-        /* private mode */
     }
     return 'cloud-vision';
 };
 
 export const setOCREngine = (engine: OCREngine): void => {
-    try {
-        localStorage.setItem('ocr_engine', engine);
-    } catch {
-        /* private mode */
-    }
+    localStorage.setItem('ocr_engine', engine);
 };
 
 // Common job titles for position detection
