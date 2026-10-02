@@ -1,0 +1,55 @@
+{
+  "kind": "log-sheet",
+  "id": "sheet-007-medical-day",
+  "description": "Synthetic log-sheet rows — no photo required. Replace with image.jpg for live Gemini eval.",
+  "columns": [
+    "name",
+    "company",
+    "position",
+    "phone",
+    "email",
+    "address",
+    "notes"
+  ],
+  "rows": [
+    {
+      "name": "Dr. Amelia Torres, PhD",
+      "company": "National Research Labs",
+      "position": "Principal Scientist",
+      "phone": [
+        "+63 2 8123 4567"
+      ],
+      "email": [
+        "atorres@nrl.ph"
+      ],
+      "address": "QC",
+      "notes": ""
+    },
+    {
+      "name": "Nurse Joy Alcantara, RN",
+      "company": "CarePlus Medical Center",
+      "position": "Charge Nurse",
+      "phone": [
+        "0917-888-1212"
+      ],
+      "email": [
+        "jalcantara@careplus.ph"
+      ],
+      "address": "Mandaluyong",
+      "notes": "training interest"
+    },
+    {
+      "name": "Dr. John Lee, MD",
+      "company": "Health First Inc.",
+      "position": "Medical Director",
+      "phone": [
+        "0917-222-3333"
+      ],
+      "email": [
+        "jlee@healthfirst.ph"
+      ],
+      "address": "QC",
+      "notes": ""
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "Michelle Ang",
+  "company": "ExpoCraft Philippines Inc.",
+  "position": "Event Lead",
+  "phone": [
+    "+63 917 555 3030",
+    "0917-555-3031"
+  ],
+  "email": [
+    "michelle.ang@expocraft.ph",
+    "events@expocraft.ph"
+  ],
+  "address": "Showroom: SMX Convention Center vicinity, Pasay",
+  "notes": "Booth A-18 | www.expocraft.ph",
+  "_meta": {
+    "id": "card-030-trade-show-dense",
+    "difficulty": "medium",
+    "tags": [
+      "multi-phone",
+      "multi-email",
+      "ph",
+      "trade-show"
+    ]
+  }
+}

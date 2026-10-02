@@ -208,6 +208,22 @@ async function checkAndIncrementQuota(uid: string): Promise<QuotaResult> {
   });
 }
 
+/** Structured upstream error line for log drains / MONITORING.md alerts. */
+function logGeminiUpstreamError(status: number, errorText: string, mode: string) {
+  const name = status === 429 ? 'gemini_429' : status >= 500 ? 'gemini_5xx' : 'gemini_upstream_error';
+  console.warn(
+    JSON.stringify({
+      src: 'cura.tor.api.gemini',
+      name,
+      level: 'error',
+      status,
+      mode,
+      message: String(errorText || '').slice(0, 500),
+      timestamp: new Date().toISOString(),
+    })
+  );
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST requests
   if (req.method !== 'POST') {
@@ -223,6 +239,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const rl = await checkRateLimit(auth.uid);
     if (!rl.ok) {
+      console.warn(JSON.stringify({
+        src: 'cura.tor.api.gemini',
+        name: 'gemini_429',
+        level: 'warn',
+        reason: `rate-limit-${rl.window}`,
+        uid: auth.uid,
+        resetInMs: rl.resetIn,
+        timestamp: new Date().toISOString(),
+      }));
       return res.status(429).json({
         error: 'Rate limit exceeded',
         reason: `rate-limit-${rl.window}`,
@@ -246,6 +271,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const quota = await checkAndIncrementQuota(auth.uid);
     if (!quota.ok) {
       if (quota.reason === 'quota-exceeded') {
+        console.warn(JSON.stringify({
+          src: 'cura.tor.api.gemini',
+          name: 'gemini_429',
+          level: 'warn',
+          reason: 'quota-exceeded',
+          tier: quota.tier,
+          uid: auth.uid,
+          timestamp: new Date().toISOString(),
+        }));
         return res.status(429).json({
           error: 'Scan limit reached for your tier',
           reason: 'quota-exceeded',
@@ -291,6 +325,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Gemini API error:', response.status, errorText);
+        logGeminiUpstreamError(response.status, errorText, 'contents');
         try {
           const errorData = JSON.parse(errorText);
           return res.status(response.status).json({ error: 'Gemini API request failed', details: errorData });
@@ -344,6 +379,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Gemini API error:', response.status, errorText);
+      logGeminiUpstreamError(response.status, errorText, 'legacy');
       try {
         const errorData = JSON.parse(errorText);
         return res.status(response.status).json({ error: 'Gemini API request failed', details: errorData });

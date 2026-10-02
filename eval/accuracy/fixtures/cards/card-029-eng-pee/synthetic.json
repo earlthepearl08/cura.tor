@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-029-eng-pee",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "VoltEdge Engineering",
+    "Engr. Ramon dela Cruz, PEE",
+    "Project Engineer",
+    "+63 917 222 8899 / 02-8333-4455",
+    "rdelacruz@voltedge.ph",
+    "Las Piñas City"
+  ]
+}
