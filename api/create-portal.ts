@@ -79,8 +79,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const url = new URL(origin);
     const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    if (!isLocal && url.protocol !== 'https:') {
+    if (isLocal) {
+      // ok
+    } else if (url.protocol !== 'https:') {
       return res.status(400).json({ error: 'Invalid origin' });
+    } else {
+      const appUrl = (process.env.APP_URL || '').trim();
+      if (appUrl) {
+        try {
+          const allowed = new URL(appUrl);
+          const hostOk = url.hostname === allowed.hostname
+            || url.hostname === `www.${allowed.hostname}`
+            || `www.${url.hostname}` === allowed.hostname;
+          if (!hostOk) {
+            return res.status(400).json({ error: 'Invalid origin' });
+          }
+        } catch {
+          // APP_URL malformed — allow any https origin
+        }
+      }
     }
   } catch {
     return res.status(400).json({ error: 'Invalid origin' });

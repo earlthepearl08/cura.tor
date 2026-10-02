@@ -49,6 +49,13 @@ async function verifyAuth(req: VercelRequest): Promise<AuthOk | AuthFail> {
   }
 }
 
+function isOwnerEmail(email: string | null): boolean {
+  if (!email) return false;
+  const owners = (process.env.OWNER_EMAILS || 'earldy.kinmo@gmail.com')
+    .split(',').map(e => e.trim().toLowerCase());
+  return owners.includes(email.toLowerCase());
+}
+
 async function getOrgMembership(db: FirebaseFirestore.Firestore, orgId: string, uid: string): Promise<{ role: 'admin' | 'member' } | null> {
   const snap = await db.collection('organizations').doc(orgId).collection('members').doc(uid).get();
   if (!snap.exists) return null;
@@ -92,6 +99,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     switch (action) {
       case 'create': {
+        // Self-serve org create is disabled — enterprise orgs are provisioned by
+        // owner-only admin APIs (provision-enterprise / enterprise-requests approve).
+        // Keeping the action would let any signed-in free user mint a team workspace.
+        if (!isOwnerEmail(auth.email)) {
+          return res.status(403).json({
+            error: 'Organization create is owner-provisioned. Submit an Enterprise request from Settings.',
+          });
+        }
         const { name, seatLimit } = req.body;
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
           return res.status(400).json({ error: 'Missing required field: name' });

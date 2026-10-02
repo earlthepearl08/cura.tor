@@ -161,7 +161,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         const firebaseUid = session.metadata?.firebaseUid;
-        let tier = session.metadata?.tier as PaidTier | undefined;
 
         if (!firebaseUid) {
           console.error('Missing firebaseUid metadata in checkout session:', session.id);
@@ -211,10 +210,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
         const priceId = subscription.items.data[0]?.price?.id;
-        const priceTier = priceId ? getTierFromPriceId(priceId) : null;
-        // Prefer price→tier mapping; fall back to checkout metadata
-        if (priceTier) tier = priceTier;
-        if (tier !== 'early_access' && tier !== 'pro') {
+        const tier = priceId ? getTierFromPriceId(priceId) : null;
+        // Never trust client/checkout metadata alone — require allowlisted price → tier.
+        if (!tier) {
           console.error('Unrecognized tier/price for checkout session:', session.id, priceId);
           break;
         }

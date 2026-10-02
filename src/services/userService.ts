@@ -1,6 +1,6 @@
 import {
-    doc, getDoc, setDoc, updateDoc, increment, runTransaction,
-    serverTimestamp, arrayUnion, Timestamp
+    doc, getDoc, setDoc, updateDoc, increment,
+    serverTimestamp, Timestamp
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import { db, OWNER_EMAILS } from '@/config/firebase';
@@ -82,31 +82,39 @@ export async function getOrCreateUserDoc(firebaseUser: User): Promise<GetOrCreat
             }
         }
 
-        // Check if owner and upgrade if needed
-        if (OWNER_EMAILS.includes(firebaseUser.email || '') && profile.tier !== 'pro') {
-            await updateDoc(userRef, { tier: 'pro', contactLimit: null, updatedAt: serverTimestamp() });
-            return { profile: { ...profile, tier: 'pro', contactLimit: null }, isNew: false };
+        // Owner bootstrap is server-only (Admin SDK) — clients cannot write tier.
+        if (OWNER_EMAILS.includes(firebaseUser.email || '') && profile.tier !== 'pro' && profile.tier !== 'enterprise') {
+            try {
+                const res = await authFetch('/api/account', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'bootstrap-owner' }),
+                });
+                if (res.ok) {
+                    const refreshed = await getDoc(userRef);
+                    if (refreshed.exists()) profile = docToProfile(refreshed.data());
+                }
+            } catch (err) {
+                console.warn('Owner bootstrap failed (non-fatal):', err);
+            }
         }
         return { profile: await resetMonthlyScansIfNeeded(profile), isNew: false };
     }
 
-    // New user — determine tier
-    const isOwner = OWNER_EMAILS.includes(firebaseUser.email || '');
-    const tier: UserTier = isOwner ? 'pro' : 'free';
-
+    // New users always create as free. Owner bootstrap (if applicable) runs after create.
     const newUser = {
         uid: firebaseUser.uid,
         email: firebaseUser.email || '',
         displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
         photoURL: firebaseUser.photoURL || null,
-        tier,
+        tier: 'free' as UserTier,
         scanUsage: {
             count: 0,
             periodStart: serverTimestamp(),
             lifetimeCount: 0,
             lifetimeLimit: null,
         },
-        contactLimit: TIER_LIMITS[tier].contactStorage,
+        contactLimit: TIER_LIMITS.free.contactStorage,
         accessCode: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -114,21 +122,36 @@ export async function getOrCreateUserDoc(firebaseUser: User): Promise<GetOrCreat
 
     await setDoc(userRef, newUser);
 
-    return {
-        profile: {
-            ...newUser,
-            scanUsage: {
-                count: 0,
-                periodStart: Date.now(),
-                lifetimeCount: 0,
-                lifetimeLimit: null,
-            },
-            contactLimit: TIER_LIMITS[tier].contactStorage,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-        } as UserProfile,
-        isNew: true,
+    let profile: UserProfile = {
+        ...newUser,
+        scanUsage: {
+            count: 0,
+            periodStart: Date.now(),
+            lifetimeCount: 0,
+            lifetimeLimit: null,
+        },
+        contactLimit: TIER_LIMITS.free.contactStorage,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
     };
+
+    if (OWNER_EMAILS.includes(firebaseUser.email || '')) {
+        try {
+            const res = await authFetch('/api/account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'bootstrap-owner' }),
+            });
+            if (res.ok) {
+                const refreshed = await getDoc(userRef);
+                if (refreshed.exists()) profile = docToProfile(refreshed.data());
+            }
+        } catch (err) {
+            console.warn('Owner bootstrap after create failed (non-fatal):', err);
+        }
+    }
+
+    return { profile, isNew: true };
 }
 
 /** Get the next reset date: same day-of-month as periodStart, one month later */
@@ -145,7 +168,11 @@ function getNextResetDate(periodStart: number): number {
     return next.getTime();
 }
 
-/** Reset monthly scan count if we've passed the reset day (for free tier) */
+/**
+ * Free-tier monthly reset for local UI only.
+ * Authoritative reset happens in api/_lib/scanGuards (Admin SDK). Clients can no
+ * longer write scanUsage.count back to 0 (that was a quota-bypass vector).
+ */
 export async function resetMonthlyScansIfNeeded(profile: UserProfile): Promise<UserProfile> {
     if (profile.tier !== 'free') return profile;
 
@@ -153,12 +180,6 @@ export async function resetMonthlyScansIfNeeded(profile: UserProfile): Promise<U
     const nextReset = getNextResetDate(profile.scanUsage.periodStart);
 
     if (now >= nextReset) {
-        const userRef = doc(db, 'users', profile.uid);
-        await updateDoc(userRef, {
-            'scanUsage.count': 0,
-            'scanUsage.periodStart': serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        });
         return {
             ...profile,
             scanUsage: {
@@ -279,80 +300,32 @@ export function getScansRemaining(profile: UserProfile): number | null {
     return 0;
 }
 
-/** Redeem an access code */
+/** Redeem an access code (server-side — clients cannot write tier / accessCodes). */
 export async function redeemAccessCode(
     uid: string,
     code: string
 ): Promise<{ success: boolean; message: string; profile?: UserProfile }> {
     try {
-        const result = await runTransaction(db, async (transaction) => {
-            const codeRef = doc(db, 'accessCodes', code.toUpperCase());
-            const codeSnap = await transaction.get(codeRef);
-
-            if (!codeSnap.exists()) {
-                return { success: false, message: 'Invalid access code' };
-            }
-
-            const codeData = codeSnap.data();
-
-            if (!codeData.isActive) {
-                return { success: false, message: 'This code has expired' };
-            }
-
-            if (codeData.maxUses > 0 && codeData.currentUses >= codeData.maxUses) {
-                return { success: false, message: 'This code has reached its usage limit' };
-            }
-
-            if (codeData.redeemedBy?.includes(uid)) {
-                return { success: false, message: 'You have already used this code' };
-            }
-
-            const userRef = doc(db, 'users', uid);
-            const userSnap = await transaction.get(userRef);
-
-            if (!userSnap.exists()) {
-                return { success: false, message: 'User not found' };
-            }
-
-            const userData = userSnap.data();
-            if (userData.tier === 'pro') {
-                return { success: false, message: 'You already have Pro access' };
-            }
-
-            // Upgrade user. Pioneer is now unlimited scans (null = unlimited), capped only on contact storage.
-            // codeData.scanLimit is still honored if explicitly set on the access code doc (for legacy limited codes).
-            transaction.update(userRef, {
-                tier: codeData.tier || 'early_access',
-                'scanUsage.lifetimeLimit': codeData.scanLimit ?? null,
-                contactLimit: TIER_LIMITS[(codeData.tier || 'early_access') as UserTier].contactStorage,
-                accessCode: { code: code.toUpperCase(), redeemedAt: Date.now() },
-                updatedAt: serverTimestamp(),
-            });
-
-            // Update code usage
-            transaction.update(codeRef, {
-                currentUses: increment(1),
-                redeemedBy: arrayUnion(uid),
-            });
-
-            return {
-                success: true,
-                message: codeData.scanLimit
-                    ? `Access code redeemed! You now have ${codeData.scanLimit} scans.`
-                    : 'Access code redeemed! Pioneer features unlocked — unlimited scans and up to 50 contacts.',
-            };
+        const res = await authFetch('/api/account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'redeem-access-code', code }),
         });
-
-        // Refetch updated profile
-        if (result.success) {
-            const userRef = doc(db, 'users', uid);
-            const snap = await getDoc(userRef);
-            if (snap.exists()) {
-                return { ...result, profile: docToProfile(snap.data()) };
-            }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return { success: false, message: data.error || 'Failed to redeem code' };
         }
 
-        return result;
+        const userRef = doc(db, 'users', uid);
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+            return {
+                success: true,
+                message: data.message || 'Access code redeemed!',
+                profile: docToProfile(snap.data()),
+            };
+        }
+        return { success: true, message: data.message || 'Access code redeemed!' };
     } catch (error: any) {
         console.error('Failed to redeem code:', error);
         return { success: false, message: 'Failed to redeem code. Please try again.' };
