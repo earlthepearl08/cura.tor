@@ -1,11 +1,8 @@
 // @ts-ignore - Types available after npm install
 import { createWorker } from 'tesseract.js';
 import { auth } from '../config/firebase';
-<<<<<<< /tmp/meld/31-main-ocr.ts
 import { reportGeminiHttpError, reportScanFailure } from './observability';
-=======
 import { ScanApiError } from '@/utils/friendlyScanError';
->>>>>>> /tmp/meld/31-pr-ocr.ts
 
 async function authHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -148,7 +145,6 @@ async function callGeminiWithRetry(opts: {
                     lastError = apiError;
                     continue;
                 }
-<<<<<<< /tmp/meld/31-main-ocr.ts
                 reportGeminiHttpError({
                     flow: opts.flowName,
                     status: response.status,
@@ -160,9 +156,7 @@ async function callGeminiWithRetry(opts: {
                 const httpErr = new Error(fullMsg) as Error & { __observabilityReported?: boolean };
                 httpErr.__observabilityReported = true;
                 throw httpErr;
-=======
                 throw apiError;
->>>>>>> /tmp/meld/31-pr-ocr.ts
             }
 
             const data = await response.json();
