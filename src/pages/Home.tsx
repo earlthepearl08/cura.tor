@@ -134,10 +134,8 @@ const Home = () => {
 
             {/* Primary differentiators — Log Sheet + Multi-Card */}
             <div className="w-full max-w-md mb-6">
-<<<<<<< /tmp/meld/42-main-Home.tsx
                 <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Primary workflows</p>
                 <div className="space-y-3">
-=======
                 <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Quick Actions</p>
                 {!isOnline && (
                     <p className="text-[11px] text-amber-400/90 mb-2 px-1">
@@ -195,7 +193,6 @@ const Home = () => {
                         <span className="text-[10px] text-slate-500">Entry</span>
                     </Link>
 
->>>>>>> /tmp/meld/42-pr-Home.tsx
                     {isBulkLocked ? (
                         <button
                             onClick={() => setUpgradeFeature('bulk-scan')}
@@ -217,13 +214,10 @@ const Home = () => {
                     ) : (
                         <Link
                             to="/log-scan"
-<<<<<<< /tmp/meld/42-main-Home.tsx
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20"
-=======
                             aria-disabled={!isOnline}
                             title={!isOnline ? 'Log sheet scan requires a network connection' : undefined}
                             className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
->>>>>>> /tmp/meld/42-pr-Home.tsx
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-amber-500/25 to-orange-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <FileSpreadsheet className="w-7 h-7 text-amber-400" />
@@ -257,13 +251,10 @@ const Home = () => {
                     ) : (
                         <Link
                             to="/multi-card"
-<<<<<<< /tmp/meld/42-main-Home.tsx
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20"
-=======
                             aria-disabled={!isOnline}
                             title={!isOnline ? 'Multi-card scan requires a network connection' : undefined}
                             className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
->>>>>>> /tmp/meld/42-pr-Home.tsx
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-pink-500/25 to-rose-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <Layers className="w-7 h-7 text-pink-400" />
