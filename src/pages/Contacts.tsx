@@ -225,11 +225,12 @@ const Contacts: React.FC = () => {
         loadContacts();
     };
 
-    const handleExport = (type: 'csv' | 'excel' | 'vcard') => {
+    const handleExport = (type: 'csv' | 'excel' | 'vcard' | 'salesforce-csv') => {
         // Check tier permissions
         if (type === 'csv' && !canExportCSV()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
         if (type === 'excel' && !canExportExcel()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
         if (type === 'vcard' && !canExportBulkVCard()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
+        if (type === 'salesforce-csv' && !canExportCSV()) { setShowUpgradePrompt(true); setShowExportOptions(false); return; }
 
         const toExport = selectedIds.size > 0
             ? contacts.filter(c => selectedIds.has(c.id))
@@ -239,6 +240,7 @@ const Contacts: React.FC = () => {
         if (type === 'csv') exportService.toCSV(toExport, batchMap);
         else if (type === 'excel') exportService.toExcel(toExport, batchMap);
         else if (type === 'vcard') exportService.toVCardAll(toExport);
+        else if (type === 'salesforce-csv') exportService.toSalesforceCSV(toExport, batchMap);
         setShowExportOptions(false);
         setHubspotExportError(null);
         if (selectedIds.size > 0) {
@@ -713,11 +715,18 @@ const Contacts: React.FC = () => {
                                         {!canExportBulkVCard() && <Lock size={12} className="text-amber-400" />}
                                     </button>
                                     <button
-                                        onClick={() => { void handleHubSpotExport(); }}
+onClick={() => { void handleHubSpotExport(); }}
                                         disabled={isExportingHubSpot}
                                         className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between disabled:opacity-50 ${!canExportCSV() ? 'opacity-60' : ''}`}
                                     >
                                         {isExportingHubSpot ? 'Exporting to HubSpot…' : 'Export to HubSpot'}
+                                        {!canExportCSV() && <Lock size={12} className="text-amber-400" />}
+                                    </button>
+                                    <button
+                                        onClick={() => handleExport('salesforce-csv')}
+                                        className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-t border-brand-800 transition-colors flex items-center justify-between ${!canExportCSV() ? 'opacity-60' : ''}`}
+                                    >
+                                        Salesforce CSV
                                         {!canExportCSV() && <Lock size={12} className="text-amber-400" />}
                                     </button>
                                 </div>
