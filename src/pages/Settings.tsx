@@ -189,7 +189,7 @@ const Settings = () => {
         <div className="flex flex-col min-h-screen bg-brand-950 text-slate-200">
             {/* Header */}
             <div className="flex items-center justify-between p-4 glass sticky top-0 z-10">
-                <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">Settings</h1>
@@ -779,10 +779,17 @@ const Settings = () => {
                     </div>
                 </div>
 
-                {/* Legal */}
+                {/* Legal & trust */}
                 <div className="space-y-3">
-                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Legal</p>
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Legal & trust</p>
                     <div className="card-elevated rounded-2xl p-4 space-y-2">
+                        <button
+                            onClick={() => navigate('/accuracy')}
+                            className="w-full flex items-center gap-3 py-2 px-1 rounded-lg hover:bg-white/5 transition-colors"
+                        >
+                            <Sparkles size={16} className="text-sky-400" />
+                            <span className="text-sm text-slate-300">Accuracy samples</span>
+                        </button>
                         <button
                             onClick={() => navigate('/legal?tab=tos')}
                             className="w-full flex items-center gap-3 py-2 px-1 rounded-lg hover:bg-white/5 transition-colors"

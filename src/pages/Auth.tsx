@@ -44,7 +44,7 @@ const Auth: React.FC = () => {
 
     // Already signed in — redirect to home
     if (!isLoading && user) {
-        return <Navigate to="/" replace />;
+        return <Navigate to="/app" replace />;
     }
 
     const mapAuthError = (err: any): string => {
@@ -149,7 +149,9 @@ const Auth: React.FC = () => {
                 {/* --- Left panel: value prop (desktop) --- */}
                 <div className="hidden lg:flex flex-col justify-between p-12 bg-[radial-gradient(ellipse_at_top_left,rgba(56,189,248,0.08),transparent_55%)] border-r border-brand-800">
                     <div>
-                        <img src="/logo.svg" alt="Cura.tor" className="h-10" />
+                        <Link to="/">
+                            <img src="/logo.svg" alt="Cura.tor" className="h-10" />
+                        </Link>
                     </div>
 
                     <div className="max-w-lg">
@@ -186,7 +188,13 @@ const Auth: React.FC = () => {
                         <div className="w-full max-w-sm">
                             {/* Mobile header */}
                             <div className="lg:hidden text-center mb-8">
-                                <img src="/logo.svg" alt="Cura.tor" className="h-9 mx-auto mb-6" />
+                                <Link to="/">
+                                    <img src="/logo.svg" alt="Cura.tor" className="h-9 mx-auto mb-6" />
+                                </Link>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 mb-5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                                    <span className="text-[10px] font-medium text-sky-400 tracking-wide uppercase">In testing — early access</span>
+                                </div>
                                 <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">
                                     Every card. Every contact. One scan.
                                 </h1>
@@ -383,7 +391,13 @@ const Auth: React.FC = () => {
                     </div>
 
                     {/* Footer */}
-                    <div className="p-6 text-center">
+                    <div className="p-6 text-center space-y-2">
+                        <p className="text-xs text-slate-500">
+                            <Link to="/accuracy" className="text-sky-400/90 hover:text-sky-300 underline-offset-2 hover:underline transition-colors">
+                                See accuracy samples
+                            </Link>
+                            <span className="text-slate-600"> — PH cards & log sheets, before/after</span>
+                        </p>
                         <p className="text-xs text-slate-500">
                             By continuing, you agree to our{' '}
                             <Link to="/legal?tab=tos" className="text-slate-400 hover:text-sky-400 underline-offset-2 hover:underline transition-colors">Terms</Link>
