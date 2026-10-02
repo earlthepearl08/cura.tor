@@ -1,18 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
-<<<<<<< /tmp/meld/26-main-create-checkout.ts
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-=======
->>>>>>> /tmp/meld/26-pr-create-checkout.ts
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '';
 const FIREBASE_JWKS = createRemoteJWKSet(
   new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
 );
 
-<<<<<<< /tmp/meld/26-main-create-checkout.ts
 function getAdminDb() {
   if (!getApps().length) {
     const projectId = (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID)?.trim();
@@ -30,8 +26,6 @@ function getAdminDb() {
   return getFirestore();
 }
 
-=======
->>>>>>> /tmp/meld/26-pr-create-checkout.ts
 type AuthOk = { ok: true; uid: string; email: string | null };
 type AuthFail = { ok: false; reason: string };
 
@@ -54,7 +48,6 @@ async function verifyAuth(req: VercelRequest): Promise<AuthOk | AuthFail> {
     return { ok: false, reason: `jwt-${err?.code || err?.message || 'unknown'}` };
   }
 }
-<<<<<<< /tmp/meld/26-main-create-checkout.ts
 
 type PaidTier = 'early_access' | 'pro';
 
@@ -110,7 +103,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     if (!isLocal && url.protocol !== 'https:') {
       return res.status(400).json({ error: 'Invalid origin' });
-=======
 
 function eventPackPriceIds(): string[] {
   const server = (process.env.STRIPE_EVENT_PACK_PRICE_IDS || '')
@@ -158,13 +150,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const auth = await verifyAuth(req);
     if (!auth.ok) {
       return res.status(401).json({ error: 'Unauthorized', reason: auth.reason });
->>>>>>> /tmp/meld/26-pr-create-checkout.ts
     }
   } catch {
     return res.status(400).json({ error: 'Invalid origin' });
   }
 
-<<<<<<< /tmp/meld/26-main-create-checkout.ts
   const tier = getTierFromPriceId(priceId);
   if (!tier) {
     return res.status(400).json({ error: 'Unrecognized priceId' });
@@ -212,7 +202,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       subscription_data: {
         metadata: { firebaseUid: auth.uid, tier },
       },
-=======
     const { priceId, origin } = body;
     if (!priceId || !origin || typeof priceId !== 'string' || typeof origin !== 'string') {
       return res.status(400).json({ error: 'Missing required fields: priceId, origin' });
@@ -267,7 +256,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       customer_email: email,
       line_items: [{ price: priceId, quantity: 1 }],
       metadata: { firebaseUid, tier },
->>>>>>> /tmp/meld/26-pr-create-checkout.ts
       success_url: `${origin}/settings?payment=success`,
       cancel_url: `${origin}/settings?payment=canceled`,
     });

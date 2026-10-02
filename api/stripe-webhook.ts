@@ -10,14 +10,11 @@ export const config = {
   },
 };
 
-<<<<<<< /tmp/meld/26-main-stripe-webhook.ts
 type PaidTier = 'early_access' | 'pro';
 
 /** Lazily initialize Firebase Admin and return Firestore instance */
-=======
 const EVENT_PACK_CREDITS_PER_PURCHASE = 1;
 
->>>>>>> /tmp/meld/26-pr-stripe-webhook.ts
 function getAdminDb() {
   if (!getApps().length) {
     const projectId = (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID)?.trim();
@@ -35,17 +32,14 @@ function getAdminDb() {
   return getFirestore();
 }
 
-<<<<<<< /tmp/meld/26-main-stripe-webhook.ts
 /** Read raw body from the request (needed for Stripe signature verification) */
 async function getRawBody(req: VercelRequest): Promise<Buffer> {
   if (Buffer.isBuffer(req.body)) return req.body;
   if (typeof req.body === 'string') return Buffer.from(req.body);
   // Some runtimes parse JSON already — re-serialize only as a last resort (signature will fail).
-=======
 async function getRawBody(req: VercelRequest): Promise<Buffer> {
   if (Buffer.isBuffer(req.body)) return req.body;
   if (typeof req.body === 'string') return Buffer.from(req.body);
->>>>>>> /tmp/meld/26-pr-stripe-webhook.ts
   if (req.body && typeof req.body === 'object') {
     return Buffer.from(JSON.stringify(req.body));
   }
@@ -57,7 +51,6 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
   return Buffer.concat(chunks as unknown as Uint8Array[]);
 }
 
-<<<<<<< /tmp/meld/26-main-stripe-webhook.ts
 /** Determine tier from a Stripe price ID using server-side env vars */
 function getTierFromPriceId(priceId: string): PaidTier | null {
   const pioneerPrices = (process.env.STRIPE_PIONEER_PRICE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -117,7 +110,6 @@ async function findUserByCustomerId(adminDb: FirebaseFirestore.Firestore, custom
   return snapshot.empty ? null : snapshot.docs[0];
 }
 
-=======
 function eventPackPriceIds(): string[] {
   const server = (process.env.STRIPE_EVENT_PACK_PRICE_IDS || '')
     .split(',')
@@ -140,7 +132,6 @@ function eventPackPriceIds(): string[] {
  * When merging with PR #4, fold the event_pack branch of checkout.session.completed
  * into that file and keep a single /api/stripe-webhook endpoint.
  */
->>>>>>> /tmp/meld/26-pr-stripe-webhook.ts
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -156,10 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const stripe = new Stripe(stripeSecretKey);
 
-<<<<<<< /tmp/meld/26-main-stripe-webhook.ts
   // Verify webhook signature
-=======
->>>>>>> /tmp/meld/26-pr-stripe-webhook.ts
   let event: Stripe.Event;
   try {
     const rawBody = await getRawBody(req);
@@ -182,7 +170,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-<<<<<<< /tmp/meld/26-main-stripe-webhook.ts
     switch (event.type) {
       // --- User completes Stripe Checkout ---
       case 'checkout.session.completed': {
@@ -322,7 +309,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err: any) {
     console.error('Webhook handler error:', err);
     return res.status(500).json({ error: 'Webhook handler failed' });
-=======
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
       const product = session.metadata?.product;
@@ -387,6 +373,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err: any) {
     console.error('Webhook handler error:', err);
     return res.status(500).json({ error: err.message || 'Webhook failed' });
->>>>>>> /tmp/meld/26-pr-stripe-webhook.ts
   }
 }
