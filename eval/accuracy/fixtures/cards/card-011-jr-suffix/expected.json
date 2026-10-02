@@ -1,0 +1,21 @@
+{
+  "name": "Jose Ramirez Jr.",
+  "company": "Ramirez Trading",
+  "position": "General Manager",
+  "phone": [
+    "0918-555-6666"
+  ],
+  "email": [
+    "jose.jr@ramireztrading.com"
+  ],
+  "address": "Iloilo City",
+  "notes": "",
+  "_meta": {
+    "id": "card-011-jr-suffix",
+    "difficulty": "easy",
+    "tags": [
+      "credentials",
+      "ph"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-021-holdings-group",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Verde Holdings Group",
+    "Andre Castillo",
+    "Business Development Manager",
+    "+63 999 321 7654",
+    "andre.c@verdeholdings.ph",
+    "Head Office: Cebu Business Park",
+    "facebook.com/verdeholdings"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "Atty. Beatrice Lim, CPA",
+  "company": "Lim & Associates Law",
+  "position": "Managing Partner",
+  "phone": [
+    "+63 2 8899 1122",
+    "0917-444-5566"
+  ],
+  "email": [
+    "blim@limlaw.ph"
+  ],
+  "address": "Ortigas Center, Pasig",
+  "notes": "www.limlaw.ph",
+  "_meta": {
+    "id": "card-004-atty-credentials",
+    "difficulty": "medium",
+    "tags": [
+      "credentials",
+      "multi-phone",
+      "ph"
+    ]
+  }
+}

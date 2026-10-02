@@ -1,0 +1,77 @@
+{
+  "kind": "log-sheet",
+  "id": "sheet-009-messy-handwriting",
+  "description": "Synthetic log-sheet rows — no photo required. Replace with image.jpg for live Gemini eval.",
+  "columns": [
+    "name",
+    "company",
+    "position",
+    "phone",
+    "email",
+    "address",
+    "notes"
+  ],
+  "rows": [
+    {
+      "name": "Carlo Mendoza",
+      "company": "Bright Solar PH",
+      "position": "Owner",
+      "phone": [
+        "0917-111-2222"
+      ],
+      "email": [],
+      "address": "",
+      "notes": "quote asap"
+    },
+    {
+      "name": "Liza Cruz",
+      "company": "Metro Builders Co.",
+      "position": "Architect",
+      "phone": [
+        "02-8123-4567"
+      ],
+      "email": [],
+      "address": "",
+      "notes": ""
+    },
+    {
+      "name": "Jose Ramirez Jr.",
+      "company": "Ramirez Trading",
+      "position": "GM",
+      "phone": [
+        "0918-555-6666"
+      ],
+      "email": [
+        "jose.jr@ramireztrading.com"
+      ],
+      "address": "Iloilo",
+      "notes": "rice export"
+    },
+    {
+      "name": "Elena Gomez",
+      "company": "Horizon Design Studio",
+      "position": "Architect",
+      "phone": [
+        "+63 917 600 7000"
+      ],
+      "email": [
+        "elena@horizondesign.ph"
+      ],
+      "address": "QC",
+      "notes": ""
+    },
+    {
+      "name": "Rico Tan",
+      "company": "ACME Industries Inc.",
+      "position": "VP Sales",
+      "phone": [
+        "8703-1111"
+      ],
+      "email": [
+        "rico.tan@acmeind.ph"
+      ],
+      "address": "Alabang",
+      "notes": ""
+    }
+  ]
+}

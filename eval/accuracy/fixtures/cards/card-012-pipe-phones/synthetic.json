@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-012-pipe-phones",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Pacific Marine Ltd.",
+    "Hannah Reyes",
+    "Fleet Coordinator",
+    "+63 32 234 5678 / 0917-777-8888",
+    "hannah.r@pacificmarine.ph",
+    "Mandaue City, Cebu"
+  ]
+}

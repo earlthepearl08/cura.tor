@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-007-multi-email",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "BrightPath Solutions",
+    "Sofia Navarro",
+    "Account Executive",
+    "+63 999 888 7777",
+    "sofia@brightpath.ph ; sales@brightpath.ph",
+    "Cebu City"
+  ]
+}
