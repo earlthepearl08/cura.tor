@@ -13,6 +13,7 @@ import { auth, db } from '@/config/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/utils/authFetch';
 import { storage as personalStorage } from '@/services/storage';
+import { clearScanTipsSeen } from '@/services/onboarding';
 
 interface Props {
     onClose: () => void;
@@ -109,6 +110,7 @@ export default function DeleteAccountModal({ onClose }: Props) {
             personalStorage.switchUser(null);
             sessionStorage.clear();
             localStorage.removeItem('workspace_mode');
+            clearScanTipsSeen();
 
             // Step 4: sign out locally and redirect.
             await signOut();

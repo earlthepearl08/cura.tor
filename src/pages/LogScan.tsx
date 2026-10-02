@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus, Lock } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Upload, Download, Folder, RotateCcw, AlertTriangle, Edit3, Trash2, Check, X, AlertCircle, Plus, Lock, HelpCircle } from 'lucide-react';
 import { ocrService, LogSheetEntry } from '@/services/ocr';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { exportService } from '@/services/export';
@@ -10,8 +10,9 @@ import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import BatchNamingModal from '@/components/BatchNamingModal';
+import ScanTipsOnboarding from '@/components/ScanTipsOnboarding';
+import { useScanOnboarding } from '@/hooks/useScanOnboarding';
 import { compressForOCR } from '@/utils/compressPhoto';
-import { classifyScanError, type ScanErrorKind } from '@/utils/friendlyScanError';
 
 const LogScan: React.FC = () => {
     const navigate = useNavigate();
@@ -21,11 +22,11 @@ const LogScan: React.FC = () => {
     const addMoreGalRef = useRef<HTMLInputElement>(null);
     const { canPerformScan, incrementScanCount, canExportCSV, canExportExcel, canUseBulkScan } = useAuth();
     const { storage } = useWorkspace();
+    const { open: showScanTips, dismiss: dismissScanTips, reopen: reopenScanTips } = useScanOnboarding(canUseBulkScan());
 
     const [imageData, setImageData] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [errorKind, setErrorKind] = useState<ScanErrorKind | null>(null);
     const [entries, setEntries] = useState<LogSheetEntry[] | null>(null);
     const [importFolder, setImportFolder] = useState('Uncategorized');
     const [folders, setFolders] = useState<string[]>([]);
@@ -107,7 +108,6 @@ const LogScan: React.FC = () => {
 
         setIsProcessing(true);
         setError(null);
-        setErrorKind(null);
         if (!append) {
             setEntries(null);
             setDuplicateMap(new Map());
@@ -226,12 +226,15 @@ const LogScan: React.FC = () => {
         setSelectedEntries(selected);
     };
 
-    const applyScanError = (err: unknown) => {
-        console.error('[LogScan] scan failed:', err);
-        const friendly = classifyScanError(err);
-        setError(friendly.message);
-        setErrorKind(friendly.kind);
-        if (friendly.suggestUpgrade) setUpgradeFeature('scan');
+    const friendlyError = (err: unknown): string => {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('timed out') || msg.includes('abort'))
+            return 'The server took too long to respond. Tap retry to try again.';
+        if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
+            return 'The server is busy right now. Please wait a moment and try again.';
+        if (msg.includes('500') || msg.includes('503'))
+            return 'The server encountered a temporary issue. Tap retry to try again.';
+        return msg;
     };
 
     /** Try parsing with up to 2 silent retries before surfacing an error */
@@ -261,7 +264,6 @@ const LogScan: React.FC = () => {
 
         setIsProcessing(true);
         setError(null);
-        setErrorKind(null);
 
         try {
             const results = await parseWithRetry(base64Image);
@@ -276,7 +278,7 @@ const LogScan: React.FC = () => {
                 await checkEntriesForDuplicates(combined);
             }
         } catch (err) {
-            applyScanError(err);
+            setError(friendlyError(err));
         } finally {
             setProcessingProgress(null);
             setIsProcessing(false);
@@ -291,7 +293,6 @@ const LogScan: React.FC = () => {
 
         setIsProcessing(true);
         setError(null);
-        setErrorKind(null);
         setEntries(null);
         setDuplicateMap(new Map());
         setSelectedEntries(new Set());
@@ -310,7 +311,7 @@ const LogScan: React.FC = () => {
                 setShowBatchNaming(true);
             }
         } catch (err) {
-            applyScanError(err);
+            setError(friendlyError(err));
         } finally {
             setProcessingProgress(null);
             setIsProcessing(false);
@@ -398,7 +399,6 @@ const LogScan: React.FC = () => {
         setImageData(null);
         setEntries(null);
         setError(null);
-        setErrorKind(null);
         setIsProcessing(false);
         setEditingIndex(null);
         setDuplicateMap(new Map());
@@ -503,7 +503,15 @@ const LogScan: React.FC = () => {
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="text-lg font-semibold gradient-text">Log Sheet Scan</h1>
-                <div className="w-10" />
+                <button
+                    type="button"
+                    onClick={reopenScanTips}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400"
+                    aria-label="Scan tips"
+                    title="Scan tips"
+                >
+                    <HelpCircle size={22} />
+                </button>
             </div>
 
             <div className="flex-1 p-4">
@@ -537,12 +545,21 @@ const LogScan: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="glass border border-brand-800 rounded-xl p-4 max-w-sm mt-4">
-                            <p className="text-[10px] text-brand-500 uppercase tracking-wider font-bold mb-2">Tips</p>
+                        <div className="glass border border-brand-800 rounded-xl p-4 max-w-sm mt-4 w-full">
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-[10px] text-brand-500 uppercase tracking-wider font-bold">Tips</p>
+                                <button
+                                    type="button"
+                                    onClick={reopenScanTips}
+                                    className="text-[10px] font-semibold text-brand-400 hover:text-brand-300 uppercase tracking-wider"
+                                >
+                                    Guide
+                                </button>
+                            </div>
                             <ul className="text-xs text-brand-400 space-y-1">
-                                <li>- Ensure the sheet is flat and well-lit</li>
-                                <li>- Printed sheets work best</li>
-                                <li>- Include all rows in the frame</li>
+                                <li>- Flat sheet, even light, no glare</li>
+                                <li>- Square up edges; include all rows</li>
+                                <li>- Multi-page: pick several photos or Add More</li>
                             </ul>
                         </div>
                     </div>
@@ -577,22 +594,12 @@ const LogScan: React.FC = () => {
                         {error && (() => {
                             const isPartial = error.startsWith('partial:');
                             const displayMsg = isPartial ? error.slice(8) : error;
-                            const isQuota = errorKind === 'quota';
                             return (
                                 <div className={`flex items-center gap-3 p-4 rounded-xl ${isPartial ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
                                     <AlertTriangle size={20} className={`flex-shrink-0 ${isPartial ? 'text-amber-400' : 'text-red-400'}`} />
                                     <div>
                                         <p className={`text-sm ${isPartial ? 'text-amber-300' : 'text-red-300'}`}>{displayMsg}</p>
-                                        {!isPartial && isQuota && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setUpgradeFeature('scan')}
-                                                className="text-xs text-amber-400 underline mt-1"
-                                            >
-                                                View upgrade options
-                                            </button>
-                                        )}
-                                        {!isPartial && !isQuota && (
+                                        {!isPartial && (
                                             <button onClick={() => entries && entries.length > 0 ? processLogSheetAppend(imageData!) : processLogSheet(imageData!)} className="text-xs text-red-400 underline mt-1">
                                                 Retry
                                             </button>
@@ -780,6 +787,10 @@ const LogScan: React.FC = () => {
                     onSave={handleSaveBatch}
                     onSkip={handleSkipBatch}
                 />
+            )}
+
+            {showScanTips && (
+                <ScanTipsOnboarding variant="both" onDismiss={dismissScanTips} />
             )}
 
         </div>
