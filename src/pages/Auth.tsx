@@ -177,15 +177,12 @@ const Auth: React.FC = () => {
                         </div>
                     </div>
 
-<<<<<<< /tmp/meld/23-main-Auth.tsx
                     <p className="text-xs text-slate-600 flex items-center gap-1.5">
                         <ShieldCheck size={12} />
                         Contacts stay on your device. Card images go to Google AI only for extraction, then are not kept on our servers.
-=======
                     <p className="text-xs text-slate-500 flex items-center gap-1.5">
                         <ShieldCheck size={12} aria-hidden="true" />
                         Your scans stay on your device. We never read your contacts.
->>>>>>> /tmp/meld/23-pr-Auth.tsx
                     </p>
                 </aside>
 
@@ -210,7 +207,6 @@ const Auth: React.FC = () => {
                                 </p>
                             </div>
 
-<<<<<<< /tmp/meld/23-main-Auth.tsx
                             {mode === 'reset' ? (
                                 <>
                                     <button
@@ -243,7 +239,6 @@ const Auth: React.FC = () => {
                                     </button>
                                 </div>
                             )}
-=======
                             {/* Mode tabs */}
                             <div className="flex rounded-xl bg-brand-900 border border-brand-800 p-1 mb-6" role="tablist" aria-label="Authentication mode">
                                 <button
@@ -265,7 +260,6 @@ const Auth: React.FC = () => {
                                     Start free
                                 </button>
                             </div>
->>>>>>> /tmp/meld/23-pr-Auth.tsx
 
                             {/* Error */}
                             {error && (
@@ -284,20 +278,16 @@ const Auth: React.FC = () => {
                             )}
 
                             {/* In-app browser warning */}
-<<<<<<< /tmp/meld/23-main-Auth.tsx
                             {inAppBrowser && mode !== 'reset' && (
                                 <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-=======
                             {inAppBrowser && (
                                 <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30" role="status">
->>>>>>> /tmp/meld/23-pr-Auth.tsx
                                     <p className="text-xs text-amber-300">
                                         For Google sign-in, tap the menu and choose "Open in Chrome" or "Open in Safari". Email sign-in works here.
                                     </p>
                                 </div>
                             )}
 
-<<<<<<< /tmp/meld/23-main-Auth.tsx
                             {mode !== 'reset' && (
                                 <>
                                     {/* Primary: Google */}
@@ -337,7 +327,6 @@ const Auth: React.FC = () => {
                             {/* Email form */}
                             {(showEmailForm || mode === 'reset') && (
                                 <form onSubmit={handleEmailAuth} className="space-y-3 animate-in fade-in">
-=======
                             {/* Primary: Google */}
                             <button
                                 type="button"
@@ -378,7 +367,6 @@ const Auth: React.FC = () => {
                             {/* Email form (collapsed by default) */}
                             {showEmailForm && (
                                 <form id="email-auth-form" onSubmit={handleEmailAuth} className="space-y-3 animate-in fade-in" aria-label={mode === 'signin' ? 'Log in with email' : 'Create account with email'}>
->>>>>>> /tmp/meld/23-pr-Auth.tsx
                                     {mode === 'signup' && (
                                         <div className="relative">
                                             <label htmlFor="auth-display-name" className="sr-only">Full name</label>
@@ -411,7 +399,6 @@ const Auth: React.FC = () => {
                                         />
                                     </div>
 
-<<<<<<< /tmp/meld/23-main-Auth.tsx
                                     {mode !== 'reset' && (
                                         <div className="relative">
                                             <Lock className="absolute left-3 top-3.5 text-slate-500" size={18} />
@@ -447,7 +434,6 @@ const Auth: React.FC = () => {
                                             </button>
                                         </div>
                                     )}
-=======
                                     <div className="relative">
                                         <label htmlFor="auth-password" className="sr-only">Password</label>
                                         <Lock className="absolute left-3 top-3.5 text-slate-500" size={18} aria-hidden="true" />
@@ -472,7 +458,6 @@ const Auth: React.FC = () => {
                                             {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                                         </button>
                                     </div>
->>>>>>> /tmp/meld/23-pr-Auth.tsx
 
                                     <button
                                         type="submit"
@@ -481,15 +466,12 @@ const Auth: React.FC = () => {
                                         className="w-full py-3 bg-sky-500 hover:bg-sky-400 active:scale-[0.99] text-white rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                                     >
                                         {isSubmitting ? (
-<<<<<<< /tmp/meld/23-main-Auth.tsx
                                             <Loader2 className="animate-spin" size={18} />
                                         ) : mode === 'reset' ? (
                                             'Send reset link'
                                         ) : mode === 'signin' ? (
                                             'Log in'
-=======
                                             <Loader2 className="animate-spin" size={18} aria-hidden="true" />
->>>>>>> /tmp/meld/23-pr-Auth.tsx
                                         ) : (
                                             'Start free'
                                         )}
@@ -506,7 +488,6 @@ const Auth: React.FC = () => {
                     </div>
 
                     {/* Footer */}
-<<<<<<< /tmp/meld/23-main-Auth.tsx
                     <div className="p-6 text-center space-y-2">
                         <p className="text-xs text-slate-500">
                             <Link to="/accuracy#report" className="text-sky-400/90 hover:text-sky-300 underline-offset-2 hover:underline transition-colors">
@@ -514,9 +495,7 @@ const Auth: React.FC = () => {
                             </Link>
                             <span className="text-slate-600"> — synthetic field metrics + samples</span>
                         </p>
-=======
                     <footer className="p-6 text-center">
->>>>>>> /tmp/meld/23-pr-Auth.tsx
                         <p className="text-xs text-slate-500">
                             By continuing, you agree to our{' '}
                             <Link to="/legal?tab=tos" className="text-slate-400 hover:text-sky-400 underline-offset-2 hover:underline transition-colors">Terms</Link>

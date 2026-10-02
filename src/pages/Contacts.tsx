@@ -586,13 +586,10 @@ const Contacts: React.FC = () => {
             {/* Header */}
             <header className="flex flex-col glass sticky top-0 z-10 p-4 gap-4">
                 <div className="flex items-center justify-between">
-<<<<<<< /tmp/meld/23-main-Contacts.tsx
                     <button onClick={() => navigate('/app')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                         <ArrowLeft size={24} />
-=======
                     <button type="button" onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Back to home">
                         <ArrowLeft size={24} aria-hidden="true" />
->>>>>>> /tmp/meld/23-pr-Contacts.tsx
                     </button>
                     <div className="text-center">
                         <h1 className="text-lg font-semibold gradient-text">
@@ -628,10 +625,7 @@ const Contacts: React.FC = () => {
                         <div className="relative">
                             <button
                                 type="button"
-<<<<<<< /tmp/meld/23-main-Contacts.tsx
                                 aria-label="Export contacts"
-=======
->>>>>>> /tmp/meld/23-pr-Contacts.tsx
                                 onClick={() => setShowExportOptions(!showExportOptions)}
                                 className="p-2 hover:bg-white/10 rounded-full transition-colors text-brand-400 hover:text-white"
                                 aria-label="Export contacts"

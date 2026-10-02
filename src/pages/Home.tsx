@@ -125,12 +125,10 @@ const Home = () => {
                 </div>
             )}
 
-<<<<<<< /tmp/meld/23-main-Home.tsx
             {/* Primary differentiators — Log Sheet + Multi-Card */}
             <div className="w-full max-w-md mb-6">
                 <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Primary workflows</p>
                 <div className="space-y-3">
-=======
             {/* Primary Actions */}
             <nav className="w-full max-w-md mb-6" aria-label="Quick actions">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">Quick Actions</p>
@@ -183,12 +181,10 @@ const Home = () => {
                         <span className="text-[10px] text-slate-500">Entry</span>
                     </Link>
 
->>>>>>> /tmp/meld/23-pr-Home.tsx
                     {isBulkLocked ? (
                         <button
                             type="button"
                             onClick={() => setUpgradeFeature('bulk-scan')}
-<<<<<<< /tmp/meld/23-main-Home.tsx
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20"
                         >
                             <div className="absolute top-3 right-3 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
@@ -201,7 +197,6 @@ const Home = () => {
                             <div className="flex-1 min-w-0 pr-10">
                                 <span className="font-bold text-base text-white block">Log Sheet</span>
                                 <span className="text-xs text-slate-400 mt-0.5 block">AI-read sign-in sheets &amp; handwritten leads</span>
-=======
                             className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 relative opacity-60"
                             aria-label="Log Sheet scan — Pro feature, upgrade required"
                         >
@@ -211,19 +206,15 @@ const Home = () => {
                             </div>
                             <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-orange-600/20 rounded-xl flex items-center justify-center">
                                 <FileSpreadsheet className="w-5 h-5 text-amber-400" aria-hidden="true" />
->>>>>>> /tmp/meld/23-pr-Home.tsx
                             </div>
                             <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
                         </button>
                     ) : (
                         <Link
                             to="/log-scan"
-<<<<<<< /tmp/meld/23-main-Home.tsx
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20"
-=======
                             className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
                             aria-label="Log Sheet scan"
->>>>>>> /tmp/meld/23-pr-Home.tsx
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-amber-500/25 to-orange-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <FileSpreadsheet className="w-7 h-7 text-amber-400" />
@@ -240,7 +231,6 @@ const Home = () => {
                         <button
                             type="button"
                             onClick={() => setUpgradeFeature('bulk-scan')}
-<<<<<<< /tmp/meld/23-main-Home.tsx
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 relative text-left hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20"
                         >
                             <div className="absolute top-3 right-3 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
@@ -249,7 +239,6 @@ const Home = () => {
                             </div>
                             <div className="w-14 h-14 bg-gradient-to-br from-pink-500/25 to-rose-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <Layers className="w-7 h-7 text-pink-400" />
-=======
                             className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 relative opacity-60"
                             aria-label="Multi-Card scan — Pro feature, upgrade required"
                         >
@@ -259,7 +248,6 @@ const Home = () => {
                             </div>
                             <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-rose-600/20 rounded-xl flex items-center justify-center">
                                 <Layers className="w-5 h-5 text-pink-400" aria-hidden="true" />
->>>>>>> /tmp/meld/23-pr-Home.tsx
                             </div>
                             <div className="flex-1 min-w-0 pr-10">
                                 <span className="font-bold text-base text-white block">Multi-Card</span>
@@ -270,12 +258,9 @@ const Home = () => {
                     ) : (
                         <Link
                             to="/multi-card"
-<<<<<<< /tmp/meld/23-main-Home.tsx
                             className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20"
-=======
                             className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
                             aria-label="Multi-Card scan"
->>>>>>> /tmp/meld/23-pr-Home.tsx
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-pink-500/25 to-rose-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <Layers className="w-7 h-7 text-pink-400" />
