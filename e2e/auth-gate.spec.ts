@@ -8,8 +8,16 @@ test.describe('Auth gate (unauthenticated)', () => {
         await installApiMocks(page);
     });
 
-    test('protected routes redirect to /auth', async ({ page }) => {
+    test('public landing stays public without auth', async ({ page }) => {
         await page.goto('/');
+        await expect(page).toHaveURL(/\/$/);
+        await expect(page).not.toHaveURL(/\/auth/);
+        // Brand-forward public marketing surface (Phase A landing)
+        await expect(page.getByRole('link', { name: /Log in|Sign in/i }).first()).toBeVisible();
+    });
+
+    test('protected /app redirects to /auth', async ({ page }) => {
+        await page.goto('/app');
         await expect(page).toHaveURL(/\/auth/);
         await expect(page.getByRole('button', { name: /Log in/i })).toBeVisible();
         await expect(page.getByAltText('Cura.tor').first()).toBeVisible();
