@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, HelpCircle, Lightbulb } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
@@ -12,6 +12,8 @@ import AccessCodeInput from '@/components/AccessCodeInput';
 import RequestTeamAccessCard from '@/components/RequestTeamAccessCard';
 import RedeemTeamCodeCard from '@/components/RedeemTeamCodeCard';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
+import ScanTipsOnboarding from '@/components/ScanTipsOnboarding';
+import { useScanOnboarding } from '@/hooks/useScanOnboarding';
 import { OWNER_EMAILS } from '@/config/firebase';
 import { Trash2 } from 'lucide-react';
 
@@ -51,6 +53,7 @@ const Settings = () => {
     const [upgradeError, setUpgradeError] = useState('');
     const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'canceled' | 'pending'; text: string } | null>(null);
     const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+    const { open: showScanTips, dismiss: dismissScanTips, reopen: reopenScanTips } = useScanOnboarding(false);
     const isOwnerAccount = !!user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
 
     const tierBadge = TIER_BADGES[user?.tier || 'free'];
@@ -780,6 +783,26 @@ const Settings = () => {
                 </div>
 
                 {/* Legal & trust */}
+                {/* Help */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Help</p>
+                    <button
+                        type="button"
+                        onClick={reopenScanTips}
+                        className="w-full card-elevated rounded-2xl p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                            <Lightbulb className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-200">Log Sheet &amp; Multi-Card tips</p>
+                            <p className="text-xs text-slate-500">Framing, lighting, alignment, and multi-page capture</p>
+                        </div>
+                        <HelpCircle size={16} className="text-slate-500 shrink-0" />
+                    </button>
+                </div>
+
+                {/* Legal */}
                 <div className="space-y-3">
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">Legal & trust</p>
                     <div className="card-elevated rounded-2xl p-4 space-y-2">
@@ -837,6 +860,9 @@ const Settings = () => {
             </div>
 
             {showDeleteAccount && <DeleteAccountModal onClose={() => setShowDeleteAccount(false)} />}
+            {showScanTips && (
+                <ScanTipsOnboarding variant="both" onDismiss={dismissScanTips} />
+            )}
         </div>
     );
 };
