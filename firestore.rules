@@ -82,6 +82,8 @@ service cloud.firestore {
       //   2) claim unclaimed contact as self, or
       //   3) release own claim
       // Org admins may override/reassign/clear any claim (admin claim override).
+      // Follow-up fields (followUpStatus / followUpDueAt / followUpUpdatedAt) may
+      // change while claimedBy stays the same — covered by the "claim unchanged" arm.
       match /contacts/{contactId} {
         allow read: if isMember();
         allow create: if isMember();

@@ -78,6 +78,11 @@ export class TeamStorageService {
             claimedBy: data.claimedBy,
             claimedByName: data.claimedByName,
             claimedAt: data.claimedAt instanceof Timestamp ? data.claimedAt.toMillis() : data.claimedAt,
+            followUpStatus: data.followUpStatus,
+            followUpDueAt: data.followUpDueAt instanceof Timestamp ? data.followUpDueAt.toMillis() : data.followUpDueAt,
+            followUpUpdatedAt: data.followUpUpdatedAt instanceof Timestamp
+                ? data.followUpUpdatedAt.toMillis()
+                : data.followUpUpdatedAt,
         };
     }
 
@@ -93,11 +98,15 @@ export class TeamStorageService {
         if (data.claimedBy && data.claimedBy !== uid) {
             throw new Error(`Already claimed by ${data.claimedByName || 'another member'}`);
         }
+        const now = Date.now();
         await setDoc(ref, {
             ...data,
             claimedBy: uid,
             claimedByName: displayName,
-            claimedAt: Date.now(),
+            claimedAt: now,
+            followUpStatus: 'claimed',
+            followUpDueAt: now + 2 * 24 * 60 * 60 * 1000,
+            followUpUpdatedAt: now,
         });
     }
 
@@ -116,6 +125,9 @@ export class TeamStorageService {
         delete updated.claimedBy;
         delete updated.claimedByName;
         delete updated.claimedAt;
+        delete updated.followUpStatus;
+        delete updated.followUpDueAt;
+        delete updated.followUpUpdatedAt;
         await setDoc(ref, updated);
     }
 
@@ -123,6 +135,7 @@ export class TeamStorageService {
      * Org-admin claim override. Pass assignee to reassign (including to self);
      * pass null to force-release. Firestore rules allow this only for org admins.
      * Personal workspace has no claims — this is team-only.
+     * Reassign initializes follow-up; force-release clears it.
      */
     async adminOverrideClaim(
         contactId: string,
@@ -139,16 +152,70 @@ export class TeamStorageService {
             delete updated.claimedBy;
             delete updated.claimedByName;
             delete updated.claimedAt;
+            delete updated.followUpStatus;
+            delete updated.followUpDueAt;
+            delete updated.followUpUpdatedAt;
             await setDoc(ref, updated);
             return;
         }
 
+        const now = Date.now();
         await setDoc(ref, {
             ...data,
             claimedBy: assignee.uid,
             claimedByName: assignee.displayName,
-            claimedAt: Date.now(),
+            claimedAt: now,
+            followUpStatus: 'claimed',
+            followUpDueAt: now + 2 * 24 * 60 * 60 * 1000,
+            followUpUpdatedAt: now,
         });
+    }
+
+    /**
+     * Update follow-up pipeline status / due date for a contact you claimed.
+     * Clears due date automatically when status is `done`.
+     */
+    async updateFollowUp(
+        contactId: string,
+        patch: {
+            followUpStatus?: Contact['followUpStatus'];
+            followUpDueAt?: number | null;
+        }
+    ): Promise<void> {
+        const orgId = this.requireOrg();
+        const { uid } = this.getCurrentUserInfo();
+        const ref = doc(db, 'organizations', orgId, 'contacts', contactId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error('Contact not found');
+        const data = snap.data();
+        if (data.claimedBy !== uid) {
+            throw new Error('Only the claimer can update follow-up status');
+        }
+
+        const now = Date.now();
+        const updated: any = {
+            ...data,
+            followUpUpdatedAt: now,
+            updatedAt: now,
+        };
+
+        if (patch.followUpStatus !== undefined) {
+            updated.followUpStatus = patch.followUpStatus;
+            if (patch.followUpStatus === 'done') {
+                delete updated.followUpDueAt;
+            }
+        }
+
+        if (patch.followUpDueAt !== undefined) {
+            if (patch.followUpDueAt === null) {
+                delete updated.followUpDueAt;
+            } else {
+                updated.followUpDueAt = patch.followUpDueAt;
+            }
+        }
+
+        Object.keys(updated).forEach((k) => updated[k] === undefined && delete updated[k]);
+        await setDoc(ref, updated);
     }
 
     /** Remove base64 image fields — team workspace stores parsed data only to keep docs small and reduce legal surface */
