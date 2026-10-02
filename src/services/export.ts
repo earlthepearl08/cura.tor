@@ -1,7 +1,12 @@
 import * as XLSX from 'xlsx';
 import { Contact } from '@/types/contact';
+import { contactsToSalesforceValueMatrix } from '@/services/salesforceExport';
 
 export type BatchMap = Record<string, string>;
+
+function escapeCsvCell(cell: string | number | undefined | null): string {
+    return `"${(cell ?? '').toString().replace(/"/g, '""')}"`;
+}
 
 export const exportService = {
     toExcel(contacts: Contact[], batchMap?: BatchMap) {
@@ -43,10 +48,22 @@ export const exportService = {
 
         const csvContent = [
             headers.join(','),
-            ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+            ...rows.map(row => row.map(cell => escapeCsvCell(cell)).join(','))
         ].join('\n');
 
         this.downloadFile(csvContent, `contacts_export_${Date.now()}.csv`, 'text/csv');
+    },
+
+    /**
+     * Salesforce Import Wizard / Data Loader CSV (API field headers).
+     * See SALESFORCE_EXPORT.md. Complements HubSpot-oriented CRM CSV in PR #8.
+     */
+    toSalesforceCSV(contacts: Contact[], batchMap?: BatchMap) {
+        const matrix = contactsToSalesforceValueMatrix(contacts, batchMap);
+        const csvContent = matrix
+            .map((row) => row.map((cell) => escapeCsvCell(cell)).join(','))
+            .join('\n');
+        this.downloadFile(csvContent, `contacts_salesforce_export_${Date.now()}.csv`, 'text/csv');
     },
 
     /** Generate vCard string for a single contact */
