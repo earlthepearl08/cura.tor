@@ -19,7 +19,8 @@ test.describe('Auth gate (unauthenticated)', () => {
     test('protected /app redirects to /auth', async ({ page }) => {
         await page.goto('/app');
         await expect(page).toHaveURL(/\/auth/);
-        await expect(page.getByRole('button', { name: /Log in/i })).toBeVisible();
+        // Mode control is a tab after a11y pass; submit "Log in" appears once email form is open
+        await expect(page.getByRole('tab', { name: /Log in/i })).toBeVisible();
         await expect(page.getByAltText('Cura.tor').first()).toBeVisible();
     });
 
