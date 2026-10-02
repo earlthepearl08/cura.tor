@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Mail, Phone, MapPin, Building2, MoreVertical, Trash2, Download, Edit3, X, Save, User, Briefcase, StickyNote, Folder, FolderPlus, FileDown, CheckSquare, Square, XCircle, Lock, ChevronDown, ChevronUp, Upload, AlertCircle, Check, RotateCcw, Layers, Radio } from 'lucide-react';
 import { exportService } from '@/services/export';
 import { Contact } from '@/types/contact';
 import { Batch } from '@/types/batch';
@@ -8,6 +8,7 @@ import { checkDuplicate, DuplicateResult } from '@/services/duplicateDetection';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useTeamContacts } from '@/hooks/useTeamContacts';
 import { parseVCF, vcfToContacts, ParsedVCard } from '@/services/vcfImport';
 import { compressPhoto } from '@/utils/compressPhoto';
 import PhotoActionSheet from '@/components/PhotoActionSheet';
@@ -16,6 +17,14 @@ import OfflineStatusBanner from '@/components/OfflineStatusBanner';
 const Contacts: React.FC = () => {
     const { storage, mode: workspaceMode, organization } = useWorkspace();
     const isTeamMode = workspaceMode === 'team';
+    const {
+        contacts: liveContacts,
+        folders: liveFolders,
+        batches: liveBatches,
+        isLoading: liveLoading,
+        error: liveError,
+        isLive,
+    } = useTeamContacts();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -87,12 +96,30 @@ const Contacts: React.FC = () => {
         }
     }, [editFormData.folder]);
 
+    // Personal mode: one-shot IndexedDB load. Team mode: live listeners via useTeamContacts.
     useEffect(() => {
+        if (isTeamMode) return;
         loadContacts();
         loadFolders();
         loadDeletedContacts();
         loadBatches();
     }, [workspaceMode]);
+
+    // Mirror live team snapshots into local state (claims update without reload)
+    useEffect(() => {
+        if (!isTeamMode) return;
+        setContacts(liveContacts);
+        setPersistedFolders(liveFolders);
+        setBatches(liveBatches);
+        setIsLoading(liveLoading);
+        setDeletedContacts([]); // team workspace has no soft-delete tombstones
+        // Keep open editor in sync with live claim/presence fields
+        setEditingContact(prev => {
+            if (!prev) return prev;
+            const next = liveContacts.find(c => c.id === prev.id);
+            return next ?? prev;
+        });
+    }, [isTeamMode, liveContacts, liveFolders, liveBatches, liveLoading]);
 
     // Handle batch query parameter from URL
     useEffect(() => {
@@ -103,6 +130,7 @@ const Contacts: React.FC = () => {
     }, [searchParams]);
 
     const loadContacts = async () => {
+        if (isTeamMode) return; // live listener owns team contacts
         setIsLoading(true);
         try {
             const data = await storage.getAllContacts();
@@ -115,6 +143,7 @@ const Contacts: React.FC = () => {
     };
 
     const loadFolders = async () => {
+        if (isTeamMode) return;
         try {
             const saved = await storage.getAllFolders();
             setPersistedFolders(saved);
@@ -124,6 +153,7 @@ const Contacts: React.FC = () => {
     };
 
     const loadDeletedContacts = async () => {
+        if (isTeamMode) return;
         try {
             const deleted = await storage.getDeletedContacts();
             setDeletedContacts(deleted);
@@ -133,6 +163,7 @@ const Contacts: React.FC = () => {
     };
 
     const loadBatches = async () => {
+        if (isTeamMode) return;
         try {
             const allBatches = await storage.getAllBatches();
             setBatches(allBatches);
@@ -349,13 +380,12 @@ const Contacts: React.FC = () => {
     // Filter contacts by search, folder, and batch
     const currentUid = user?.uid;
 
-    // Claim / release — team-only, calls TeamStorageService methods
+    // Claim / release — team-only; snapshot refreshes UI (no full reload)
     const handleClaim = async (contact: Contact) => {
         if (!isTeamMode || !('claimContact' in storage)) return;
         setClaimActionId(contact.id);
         try {
             await storage.claimContact(contact.id);
-            await loadContacts();
         } catch (err: any) {
             alert(err.message || 'Failed to claim contact');
         } finally {
@@ -368,7 +398,6 @@ const Contacts: React.FC = () => {
         setClaimActionId(contact.id);
         try {
             await storage.releaseClaim(contact.id);
-            await loadContacts();
         } catch (err: any) {
             alert(err.message || 'Failed to release claim');
         } finally {
@@ -595,7 +624,18 @@ const Contacts: React.FC = () => {
                             {isTeamMode ? 'Team Contacts' : 'My Contacts'}
                         </h1>
                         {isTeamMode && organization && (
-                            <p className="text-[10px] text-sky-400/70 mt-0.5">{organization.name}</p>
+                            <p className="text-[10px] text-sky-400/70 mt-0.5 flex items-center justify-center gap-1.5">
+                                <span>{organization.name}</span>
+                                {isLive && (
+                                    <span className="inline-flex items-center gap-0.5 text-emerald-400/80" title="Live sync active">
+                                        <Radio size={10} className="animate-pulse" />
+                                        Live
+                                    </span>
+                                )}
+                            </p>
+                        )}
+                        {isTeamMode && liveError && (
+                            <p className="text-[10px] text-amber-400/90 mt-0.5">{liveError}</p>
                         )}
                     </div>
                     <div className="flex items-center gap-1">

@@ -1,4 +1,4 @@
-import { doc, getDoc, getDocs, collection, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, onSnapshot, Timestamp, Unsubscribe } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { Organization, OrgMember, OrgInvite, OrgRole } from '@/types/organization';
 import { authFetch } from '@/utils/authFetch';
@@ -10,6 +10,8 @@ function docToOrganization(data: any, id: string): Organization {
         name: data.name || '',
         ownerId: data.ownerId || '',
         seatLimit: data.seatLimit || 5,
+        // Default true when unset — matches Contacts/TeamAdmin UI (`!== false`)
+        claimsEnabled: data.claimsEnabled !== false,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : (data.createdAt || Date.now()),
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : (data.updatedAt || Date.now()),
     };
@@ -47,12 +49,52 @@ export async function getOrganization(orgId: string): Promise<Organization | nul
     return docToOrganization(snap.data(), snap.id);
 }
 
+/** Live subscription to organization metadata (e.g. claimsEnabled, seatLimit) */
+export function subscribeOrganization(
+    orgId: string,
+    onUpdate: (org: Organization | null) => void,
+    onError?: (error: Error) => void,
+): Unsubscribe {
+    return onSnapshot(
+        doc(db, 'organizations', orgId),
+        (snap) => {
+            onUpdate(snap.exists() ? docToOrganization(snap.data(), snap.id) : null);
+        },
+        (err) => {
+            console.error('Organization subscription error:', err);
+            onError?.(err);
+        },
+    );
+}
+
 /** List all members of an organization */
 export async function getMembers(orgId: string): Promise<OrgMember[]> {
     const snap = await getDocs(collection(db, 'organizations', orgId, 'members'));
     return snap.docs
         .map(d => docToMember(d.data()))
         .sort((a, b) => a.joinedAt - b.joinedAt);
+}
+
+/** Live subscription to org members */
+export function subscribeMembers(
+    orgId: string,
+    onUpdate: (members: OrgMember[]) => void,
+    onError?: (error: Error) => void,
+): Unsubscribe {
+    return onSnapshot(
+        collection(db, 'organizations', orgId, 'members'),
+        (snap) => {
+            onUpdate(
+                snap.docs
+                    .map(d => docToMember(d.data()))
+                    .sort((a, b) => a.joinedAt - b.joinedAt),
+            );
+        },
+        (err) => {
+            console.error('Org members subscription error:', err);
+            onError?.(err);
+        },
+    );
 }
 
 /** List pending invites for an organization */
@@ -62,6 +104,29 @@ export async function getInvites(orgId: string): Promise<OrgInvite[]> {
         .map(d => docToInvite(d.data(), d.id))
         .filter(i => i.status === 'pending')
         .sort((a, b) => b.invitedAt - a.invitedAt);
+}
+
+/** Live subscription to pending org invites */
+export function subscribeInvites(
+    orgId: string,
+    onUpdate: (invites: OrgInvite[]) => void,
+    onError?: (error: Error) => void,
+): Unsubscribe {
+    return onSnapshot(
+        collection(db, 'organizations', orgId, 'invites'),
+        (snap) => {
+            onUpdate(
+                snap.docs
+                    .map(d => docToInvite(d.data(), d.id))
+                    .filter(i => i.status === 'pending')
+                    .sort((a, b) => b.invitedAt - a.invitedAt),
+            );
+        },
+        (err) => {
+            console.error('Org invites subscription error:', err);
+            onError?.(err);
+        },
+    );
 }
 
 /** Generate a new invite code (admin only). Pass null/empty email for an "open" invite

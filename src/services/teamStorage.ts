@@ -5,8 +5,10 @@ import {
     getDocs,
     setDoc,
     deleteDoc,
+    onSnapshot,
     serverTimestamp,
     Timestamp,
+    Unsubscribe,
 } from 'firebase/firestore';
 import { db, auth } from '@/config/firebase';
 import { Contact } from '@/types/contact';
@@ -18,7 +20,9 @@ import { storage as personalStorage } from './storage';
  * Mirrors the StorageService API surface so pages can swap between
  * personal (IndexedDB) and team (Firestore) storage transparently.
  *
- * Note: No real-time onSnapshot in MVP — manual refresh only.
+ * Real-time: use subscribeContacts / subscribeFolders / subscribeBatches
+ * for live claim + presence updates. One-shot getters remain for import
+ * flows and personal-mode parity.
  */
 export class TeamStorageService {
     private orgId: string | null = null;
@@ -129,6 +133,67 @@ export class TeamStorageService {
         const orgId = this.requireOrg();
         const snap = await getDocs(collection(db, 'organizations', orgId, 'contacts'));
         return snap.docs.map(d => this.docToContact(d.data(), d.id));
+    }
+
+    /**
+     * Live subscription to org contacts (claims, edits, adds, deletes).
+     * Returns an unsubscribe function — call it on unmount / org switch.
+     */
+    subscribeContacts(
+        onUpdate: (contacts: Contact[]) => void,
+        onError?: (error: Error) => void,
+    ): Unsubscribe {
+        const orgId = this.requireOrg();
+        return onSnapshot(
+            collection(db, 'organizations', orgId, 'contacts'),
+            (snap) => {
+                onUpdate(snap.docs.map(d => this.docToContact(d.data(), d.id)));
+            },
+            (err) => {
+                console.error('Team contacts subscription error:', err);
+                onError?.(err);
+            },
+        );
+    }
+
+    /** Live subscription to org folder names */
+    subscribeFolders(
+        onUpdate: (folders: string[]) => void,
+        onError?: (error: Error) => void,
+    ): Unsubscribe {
+        const orgId = this.requireOrg();
+        return onSnapshot(
+            collection(db, 'organizations', orgId, 'folders'),
+            (snap) => {
+                onUpdate(snap.docs.map(d => d.id));
+            },
+            (err) => {
+                console.error('Team folders subscription error:', err);
+                onError?.(err);
+            },
+        );
+    }
+
+    /** Live subscription to org batches */
+    subscribeBatches(
+        onUpdate: (batches: Batch[]) => void,
+        onError?: (error: Error) => void,
+    ): Unsubscribe {
+        const orgId = this.requireOrg();
+        return onSnapshot(
+            collection(db, 'organizations', orgId, 'batches'),
+            (snap) => {
+                onUpdate(
+                    snap.docs
+                        .map(d => this.docToBatch(d.data(), d.id))
+                        .sort((a, b) => b.scannedAt - a.scannedAt),
+                );
+            },
+            (err) => {
+                console.error('Team batches subscription error:', err);
+                onError?.(err);
+            },
+        );
     }
 
     /** Parity with StorageService — team contacts are hard-deleted, so this is the same as getAllContacts */

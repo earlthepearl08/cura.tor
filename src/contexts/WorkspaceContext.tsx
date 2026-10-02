@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { storage, StorageService } from '@/services/storage';
 import { teamStorage, TeamStorageService } from '@/services/teamStorage';
 import { Organization } from '@/types/organization';
-import { getOrganization } from '@/services/organizationService';
+import { getOrganization, subscribeOrganization } from '@/services/organizationService';
 
 export type WorkspaceMode = 'personal' | 'team';
 
@@ -39,12 +39,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const isAdmin = user?.orgRole === 'admin';
     const canSwitchWorkspace = !!orgId;
 
-    // Load organization metadata when user changes
+    // Live organization metadata (claimsEnabled, seatLimit, name, …)
     useEffect(() => {
         if (!orgId) {
             setOrganization(null);
             teamStorage.setOrganization(null);
-            // Force back to personal if user has no org
             if (mode === 'team') {
                 setMode('personal');
                 localStorage.setItem(STORAGE_KEY, 'personal');
@@ -52,13 +51,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return;
         }
 
-        getOrganization(orgId).then(org => {
-            setOrganization(org);
-            teamStorage.setOrganization(orgId);
-        }).catch(err => {
-            console.error('Failed to load organization:', err);
-            setOrganization(null);
-        });
+        teamStorage.setOrganization(orgId);
+        const unsub = subscribeOrganization(
+            orgId,
+            (org) => setOrganization(org),
+            (err) => {
+                console.error('Failed to sync organization:', err);
+                setOrganization(null);
+            },
+        );
+        return () => unsub();
     }, [orgId]);
 
     const switchTo = useCallback((newMode: WorkspaceMode) => {
