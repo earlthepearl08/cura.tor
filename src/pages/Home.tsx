@@ -136,63 +136,6 @@ const Home = () => {
             <div className="w-full max-w-md mb-6">
                 <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Primary workflows</p>
                 <div className="space-y-3">
-                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3 px-1">Quick Actions</p>
-                {!isOnline && (
-                    <p className="text-[11px] text-amber-400/90 mb-2 px-1">
-                        Scan / upload / log sheet need a connection. Open Contacts to work with saved leads offline.
-                    </p>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                    <Link
-                        to="/scan"
-                        aria-disabled={!isOnline}
-                        title={!isOnline ? 'Scanning requires a network connection' : undefined}
-                        className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
-                    >
-                        <div className="w-12 h-12 bg-gradient-to-br from-sky-500/20 to-blue-600/20 rounded-xl flex items-center justify-center">
-                            <Camera className="w-5 h-5 text-sky-400" />
-                        </div>
-                        <span className="font-semibold text-sm text-white">Scan Card</span>
-                        <span className="text-[10px] text-slate-500">OCR Camera</span>
-                    </Link>
-
-                    <Link
-                        to="/qr-scan"
-                        aria-disabled={!isOnline}
-                        title={!isOnline ? 'Scanning requires a network connection' : undefined}
-                        className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
-                    >
-                        <div className="w-12 h-12 bg-gradient-to-br from-rose-500/20 to-pink-600/20 rounded-xl flex items-center justify-center">
-                            <QrCode className="w-5 h-5 text-rose-400" />
-                        </div>
-                        <span className="font-semibold text-sm text-white">QR Scan</span>
-                        <span className="text-[10px] text-slate-500">QR Codes</span>
-                    </Link>
-
-                    <Link
-                        to="/upload"
-                        aria-disabled={!isOnline}
-                        title={!isOnline ? 'Uploading for OCR requires a network connection' : undefined}
-                        className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
-                    >
-                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-xl flex items-center justify-center">
-                            <Upload className="w-5 h-5 text-emerald-400" />
-                        </div>
-                        <span className="font-semibold text-sm text-white">Upload</span>
-                        <span className="text-[10px] text-slate-500">Images</span>
-                    </Link>
-
-                    <Link
-                        to="/manual"
-                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                        <div className="w-12 h-12 bg-gradient-to-br from-violet-500/20 to-purple-600/20 rounded-xl flex items-center justify-center">
-                            <PenLine className="w-5 h-5 text-violet-400" />
-                        </div>
-                        <span className="font-semibold text-sm text-white">Manual</span>
-                        <span className="text-[10px] text-slate-500">Entry</span>
-                    </Link>
-
                     {isBulkLocked ? (
                         <button
                             onClick={() => setUpgradeFeature('bulk-scan')}
@@ -214,10 +157,9 @@ const Home = () => {
                     ) : (
                         <Link
                             to="/log-scan"
-                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20"
                             aria-disabled={!isOnline}
                             title={!isOnline ? 'Log sheet scan requires a network connection' : undefined}
-                            className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
+                            className={`w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-amber-500/20 ${!isOnline ? 'opacity-60' : ''}`}
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-amber-500/25 to-orange-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <FileSpreadsheet className="w-7 h-7 text-amber-400" />
@@ -251,10 +193,9 @@ const Home = () => {
                     ) : (
                         <Link
                             to="/multi-card"
-                            className="w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20"
                             aria-disabled={!isOnline}
                             title={!isOnline ? 'Multi-card scan requires a network connection' : undefined}
-                            className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
+                            className={`w-full card-elevated rounded-2xl p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-all border border-pink-500/20 ${!isOnline ? 'opacity-60' : ''}`}
                         >
                             <div className="w-14 h-14 bg-gradient-to-br from-pink-500/25 to-rose-600/25 rounded-2xl flex items-center justify-center shrink-0">
                                 <Layers className="w-7 h-7 text-pink-400" />
@@ -275,7 +216,9 @@ const Home = () => {
                 <div className="grid grid-cols-2 gap-3">
                     <Link
                         to="/scan"
-                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        aria-disabled={!isOnline}
+                        title={!isOnline ? 'Scanning requires a network connection' : undefined}
+                        className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
                     >
                         <div className="w-12 h-12 bg-gradient-to-br from-sky-500/20 to-blue-600/20 rounded-xl flex items-center justify-center">
                             <Camera className="w-5 h-5 text-sky-400" />
@@ -286,7 +229,9 @@ const Home = () => {
 
                     <Link
                         to="/upload"
-                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        aria-disabled={!isOnline}
+                        title={!isOnline ? 'Uploading for OCR requires a network connection' : undefined}
+                        className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
                     >
                         <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-xl flex items-center justify-center">
                             <Upload className="w-5 h-5 text-emerald-400" />
@@ -303,7 +248,9 @@ const Home = () => {
                 <div className="grid grid-cols-2 gap-3">
                     <Link
                         to="/qr-scan"
-                        className="card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        aria-disabled={!isOnline}
+                        title={!isOnline ? 'Scanning requires a network connection' : undefined}
+                        className={`card-elevated rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all ${!isOnline ? 'opacity-60' : ''}`}
                     >
                         <div className="w-12 h-12 bg-gradient-to-br from-rose-500/20 to-pink-600/20 rounded-xl flex items-center justify-center">
                             <QrCode className="w-5 h-5 text-rose-400" />
