@@ -2,6 +2,11 @@
 import { createWorker } from 'tesseract.js';
 import { auth } from '../config/firebase';
 import { reportGeminiHttpError, reportScanFailure } from './observability';
+import {
+    buildGeminiLanguagePromptSection,
+    getTesseractLangString,
+    getVisionLanguageHints,
+} from '../i18n';
 import { mappingToPromptHint, normalizeParseMeta } from './logSheetMapping';
 import type { LogSheetParseMeta, LogSheetParseOptions } from '../types/logSheet';
 import {
@@ -338,6 +343,7 @@ function smartCapitalize(name: string): string {
 export class OCRService {
     private worker: any = null;
     private isInitializing: boolean = false;
+    private workerLangs: string | null = null;
     private currentEngine: OCREngine = getOCREngine();
 
     // API calls are routed through backend serverless functions to keep keys secure
@@ -393,7 +399,10 @@ export class OCRService {
             const response = await fetch('/api/ocr', {
                 method: 'POST',
                 headers: await authHeaders(),
-                body: JSON.stringify({ imageData: imageSrc })
+                body: JSON.stringify({
+                    imageData: imageSrc,
+                    languageHints: getVisionLanguageHints(),
+                })
             });
 
             if (!response.ok) {
@@ -490,6 +499,8 @@ export class OCRService {
         const prompt = `You are an expert business card data extractor. You are given the raw OCR text from a business card AND the original card image. Use the image as the source of truth when the OCR text is fragmented, ambiguous, or visually stacked across multiple lines. Extract structured contact information from both signals.
 
 ${GEMINI_CORE_RULES}
+
+${buildGeminiLanguagePromptSection()}
 
 ${GEMINI_CONFIDENCE_PROMPT}
 
@@ -647,16 +658,28 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
             return this.worker;
         }
 
+        const langs = getTesseractLangString();
+
+        // Recreate worker when the user changes OCR languages
+        if (this.worker && this.workerLangs && this.workerLangs !== langs) {
+            console.log(`[OCR] Language set changed (${this.workerLangs} → ${langs}), recreating Tesseract worker`);
+            try {
+                await this.worker.terminate();
+            } catch { /* ignore */ }
+            this.worker = null;
+            this.workerLangs = null;
+        }
+
         if (!this.worker) {
             this.isInitializing = true;
             try {
-                console.log('[OCR] Initializing Tesseract worker...');
-                // Tesseract.js v5 API - createWorker returns a promise that resolves to a worker
-                this.worker = await createWorker('eng', 1, {
+                console.log(`[OCR] Initializing Tesseract worker (${langs})...`);
+                this.worker = await createWorker(langs, 1, {
                     logger: (m: any) => {
                         console.log('[Tesseract]', m.status, Math.round((m.progress || 0) * 100) + '%');
                     }
                 });
+                this.workerLangs = langs;
                 console.log('[OCR] Tesseract worker initialized successfully');
             } catch (error) {
                 console.error('[OCR] Failed to initialize Tesseract worker:', error);
@@ -1351,6 +1374,8 @@ Return ONLY the JSON object. No explanation, no markdown. Use the original card 
 ${mappingHint}${templateHint}
 ${GEMINI_CORE_RULES}
 
+${buildGeminiLanguagePromptSection()}
+
 ${GEMINI_CONFIDENCE_PROMPT}
 
 ## Output shape (single JSON object)
@@ -1506,6 +1531,8 @@ Return ONLY the JSON object. No explanation, no markdown.`;
 
 ${GEMINI_CORE_RULES}
 
+${buildGeminiLanguagePromptSection()}
+
 ${GEMINI_CONFIDENCE_PROMPT}
 
 ## Example
@@ -1625,6 +1652,7 @@ Return ONLY a JSON array of objects. No explanation, no markdown.`;
         if (this.worker) {
             this.worker.terminate();
             this.worker = null;
+            this.workerLangs = null;
         }
     }
 }

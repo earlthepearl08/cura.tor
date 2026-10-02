@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Headphones, Mail, HelpCircle, BookMarked } from 'lucide-react';
+import { ArrowLeft, Sparkles, Check, Cloud, CloudOff, RefreshCw, Link as LinkIcon, Unplug, Clock, ShieldCheck, Smartphone, Lock, Sun, Moon, LogOut, Zap, User, Users, FileText, Shield, CreditCard, ExternalLink, X, ChevronRight, ChevronDown, WifiOff, Headphones, Mail, HelpCircle, BookMarked, Languages } from 'lucide-react';
 import { getOCREngine, setOCREngine, OCREngine } from '@/services/ocr';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useTheme } from '@/hooks/useTheme';
@@ -19,6 +19,19 @@ import { SUPPORT_EMAIL, PRIORITY_SUPPORT_SLA } from '@/config/support';
 import { trackEvent } from '@/services/observability';
 import { Trash2 } from 'lucide-react';
 import { FieldCorrection } from '@/types/correction';
+import {
+    OCR_LANGUAGE_OPTIONS,
+    MAX_OCR_LANGUAGES,
+    getSelectedOcrLanguageIds,
+    setSelectedOcrLanguageIds,
+    formatOcrLanguageSummary,
+    getUiLocale,
+    setUiLocale,
+    t,
+    type OcrLanguageId,
+    type UiLocale,
+    UI_LOCALE_OPTIONS,
+} from '@/i18n';
 
 const TIER_BADGES: Record<string, { label: string; color: string; bg: string }> = {
     free: { label: 'Free', color: 'text-slate-400', bg: 'bg-slate-500/20' },
@@ -64,6 +77,9 @@ const Settings = () => {
     const [showSupport, setShowSupport] = useState(false);
     const [glossary, setGlossary] = useState<FieldCorrection[]>([]);
     const [glossaryOpen, setGlossaryOpen] = useState(false);
+    const [ocrLangs, setOcrLangs] = useState<OcrLanguageId[]>(() => getSelectedOcrLanguageIds());
+    const [uiLocale, setUiLocaleState] = useState<UiLocale>(() => getUiLocale());
+    const [langSaved, setLangSaved] = useState(false);
     const upgradeSectionRef = React.useRef<HTMLDivElement>(null);
     const isOwnerAccount = !!user?.email && OWNER_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
 
@@ -715,7 +731,97 @@ const Settings = () => {
                 </div>
 
                 {/* Advanced — OCR engine (power users) */}
+                
+                {/* OCR Languages — primary multi-language control */}
                 <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider px-1">
+                        {t('settings.ocrLanguages')}
+                    </p>
+                    <div className="card-elevated rounded-2xl p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                            <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-emerald-500/20 flex-shrink-0">
+                                <Languages className="w-5 h-5 text-emerald-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm mb-1">{t('settings.ocrLanguages')}</p>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                    {t('settings.ocrLanguagesHint', { max: MAX_OCR_LANGUAGES })}
+                                </p>
+                            </div>
+                            {langSaved && (
+                                <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">Saved</span>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                            {OCR_LANGUAGE_OPTIONS.map(opt => {
+                                const selected = ocrLangs.includes(opt.id);
+                                const atCap = !selected && ocrLangs.length >= MAX_OCR_LANGUAGES;
+                                return (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        disabled={atCap}
+                                        onClick={() => {
+                                            let next: OcrLanguageId[];
+                                            if (selected) {
+                                                next = ocrLangs.filter(id => id !== opt.id);
+                                                if (next.length === 0) next = ['en'];
+                                            } else {
+                                                next = [...ocrLangs, opt.id].slice(0, MAX_OCR_LANGUAGES);
+                                            }
+                                            setOcrLangs(next);
+                                            setSelectedOcrLanguageIds(next);
+                                            setLangSaved(true);
+                                            setTimeout(() => setLangSaved(false), 1500);
+                                        }}
+                                        className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                                            selected
+                                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                                                : atCap
+                                                ? 'bg-brand-900/40 border-brand-800 text-slate-600 opacity-50'
+                                                : 'bg-brand-900/60 border-brand-700 text-slate-400 hover:border-brand-500'
+                                        }`}
+                                    >
+                                        <span className="block">{opt.label}</span>
+                                        <span className="block text-[10px] opacity-70 font-normal">{opt.nativeLabel}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <p className="text-[11px] text-brand-400">
+                            {t('settings.ocrLanguagesActive')}: {formatOcrLanguageSummary(ocrLangs)}
+                        </p>
+
+                        <div className="pt-2 border-t border-brand-800">
+                            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">UI language (preview)</p>
+                            <div className="flex flex-wrap gap-2">
+                                {UI_LOCALE_OPTIONS.map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setUiLocale(opt.id);
+                                            setUiLocaleState(opt.id);
+                                            setLangSaved(true);
+                                            setTimeout(() => setLangSaved(false), 1500);
+                                        }}
+                                        className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                                            uiLocale === opt.id
+                                                ? 'bg-sky-500/20 border-sky-500/40 text-sky-300'
+                                                : 'bg-brand-900/60 border-brand-700 text-slate-400 hover:border-brand-500'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+<div className="space-y-3">
                     <button
                         type="button"
                         onClick={() => setShowAdvanced(v => !v)}

@@ -18,6 +18,7 @@ import {
     enrichEntriesWithGlossary,
     learnFromFieldDiffs,
 } from '@/services/correctionMemory';
+import { formatOcrLanguageSummary, t } from '@/i18n';
 
 const MultiCardScan: React.FC = () => {
     const navigate = useNavigate();
@@ -396,6 +397,14 @@ const MultiCardScan: React.FC = () => {
                             <p className="text-sm text-brand-400 max-w-xs mx-auto">
                                 Lay out multiple business cards on a flat surface, then take one photo. Each card will be parsed into a separate contact.
                             </p>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/settings')}
+                                className="px-3 py-1 rounded-full text-[11px] font-semibold bg-brand-800/80 text-brand-300 border border-brand-700 hover:border-brand-500 transition-colors"
+                            >
+                                {t('multiCard.ocrLangBadge', { langs: formatOcrLanguageSummary() })}
+                            </button>
+
                         </div>
 
                         <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelect} />

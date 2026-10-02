@@ -7,6 +7,7 @@ import ContactReview from '@/components/ContactReview';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { compressBase64ForOCR } from '@/utils/compressPhoto';
+import { formatOcrLanguageSummary, t } from '@/i18n';
 
 const Scanner: React.FC = () => {
     const webcamRef = useRef<Webcam>(null);
@@ -340,6 +341,16 @@ const Scanner: React.FC = () => {
                         "Preview confirmed. Tap the checkmark to start OCR processing."
                     )}
                 </div>
+
+                {!imgSrc && !cameraError && !isProcessing && (
+                    <button
+                        type="button"
+                        onClick={() => navigate('/settings')}
+                        className="mt-3 px-3 py-1 rounded-full text-[11px] font-semibold bg-brand-800/80 text-brand-300 border border-brand-700 hover:border-brand-500 transition-colors"
+                    >
+                        {t('scan.ocrLangBadge', { langs: formatOcrLanguageSummary() })}
+                    </button>
+                )}
 
                 {showReview && result && imgSrc && (
                     <ContactReview

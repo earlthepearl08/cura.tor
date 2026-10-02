@@ -28,6 +28,7 @@ import {
     enrichEntriesWithGlossary,
     learnFromFieldDiffs,
 } from '@/services/correctionMemory';
+import { formatOcrLanguageSummary, t } from '@/i18n';
 
 type ReviewFilter = 'needs-review' | 'all' | 'ready';
 
@@ -838,6 +839,14 @@ const LogScan: React.FC = () => {
                             >
                                 Watch log sheet tip
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/settings')}
+                                className="px-3 py-1 rounded-full text-[11px] font-semibold bg-brand-800/80 text-brand-300 border border-brand-700 hover:border-brand-500 transition-colors"
+                            >
+                                {t('logScan.ocrLangBadge', { langs: formatOcrLanguageSummary() })}
+                            </button>
+
                         </div>
 
                         <div className="w-full max-w-sm aspect-[3/4] rounded-2xl overflow-hidden relative border-2 border-brand-500/40 bg-gradient-to-b from-brand-900 to-brand-950">
