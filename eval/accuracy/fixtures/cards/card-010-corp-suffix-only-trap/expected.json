@@ -1,0 +1,22 @@
+{
+  "name": "Kevin Ong",
+  "company": "Nimbus Cloud Corporation",
+  "position": "CTO",
+  "phone": [
+    "+63 928 111 2222"
+  ],
+  "email": [
+    "kevin.ong@nimbuscloud.ph"
+  ],
+  "address": "Bonifacio Global City, Taguig",
+  "notes": "www.nimbuscloud.ph",
+  "_meta": {
+    "id": "card-010-corp-suffix-only-trap",
+    "difficulty": "hard",
+    "tags": [
+      "stacked-logo",
+      "ph"
+    ],
+    "notes": "Synthetic stacked logo: NIMBUS CLOUD over CORPORATION — expected must be full name not suffix alone."
+  }
+}

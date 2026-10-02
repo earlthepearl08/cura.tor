@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-016-warehouse-address",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "SteelForm Manufacturing",
+    "Benito Aquino",
+    "Plant Manager",
+    "046-430-8899",
+    "baquino@steelform.ph",
+    "Factory: Carmona, Cavite | Warehouse: Laguna Technopark"
+  ]
+}

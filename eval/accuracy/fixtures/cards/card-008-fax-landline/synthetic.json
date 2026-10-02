@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-008-fax-landline",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Metro Print Services",
+    "Manuel Cruz",
+    "Plant Supervisor",
+    "02-8123-9000 / 02-8123-9001 (Fax)",
+    "mcruz@metroprint.ph",
+    "Valenzuela City"
+  ]
+}

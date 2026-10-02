@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import Stripe from 'stripe';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '';
 const FIREBASE_JWKS = createRemoteJWKSet(
@@ -85,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Server configuration error', details: err.message });
   }
 
-  const uid = auth.uid;
+    const uid = auth.uid;
   const userRef = adminDb.collection('users').doc(uid);
 
   try {
@@ -93,6 +94,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // If there's no user doc we can still let the client proceed to delete
     // the Firebase Auth record — nothing to clean up on our side.
     const userData = userSnap.exists ? userSnap.data()! : null;
+
+    // --- Cancel Stripe subscription before wiping the user doc ---
+    const subscriptionId =
+      typeof userData?.stripe?.subscriptionId === 'string'
+        ? userData.stripe.subscriptionId
+        : null;
+    if (subscriptionId) {
+      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+      if (!stripeSecretKey) {
+        console.error('STRIPE_SECRET_KEY missing; cannot cancel subscription on account delete');
+        return res.status(500).json({
+          error: 'Billing is not configured. Cancel your subscription from Settings before deleting your account, or contact support.',
+          phase: 'stripe-cancel',
+        });
+      }
+      try {
+        const stripe = new Stripe(stripeSecretKey);
+        await stripe.subscriptions.cancel(subscriptionId);
+      } catch (err: any) {
+        // Already gone / already canceled — safe to continue
+        const code = err?.code || err?.raw?.code;
+        const status = err?.statusCode || err?.status;
+        if (code !== 'resource_missing' && status !== 404) {
+          console.error('Stripe subscription cancel failed:', err);
+          return res.status(500).json({
+            error: 'Failed to cancel your Stripe subscription. Please manage billing first or try again.',
+            phase: 'stripe-cancel',
+          });
+        }
+      }
+    }
 
     // --- Org cleanup ---
     if (userData?.organizationId) {
@@ -157,9 +189,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (userSnap.exists) {
       await userRef.delete();
     }
-
-    // NOTE: Stripe subscription cancellation would go here once Stripe is wired.
-    // TODO(stripe): cancel subscription for userData?.stripe?.subscriptionId
 
     return res.status(200).json({
       ok: true,

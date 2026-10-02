@@ -113,7 +113,7 @@ const AcceptInvite: React.FC = () => {
                             <h2 className="text-lg font-semibold text-white mb-2">Could not accept invite</h2>
                             <p className="text-sm text-slate-400 mb-6">{result.message}</p>
                             <button
-                                onClick={() => navigate('/')}
+                                onClick={() => navigate('/app')}
                                 className="w-full py-3 glass border border-brand-800 text-slate-300 rounded-xl text-sm font-semibold hover:border-brand-600 transition-colors"
                             >
                                 Go Home

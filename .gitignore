@@ -28,3 +28,9 @@ build/
 # Test scripts with potential secrets
 test-*.mjs
 test-*.js
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

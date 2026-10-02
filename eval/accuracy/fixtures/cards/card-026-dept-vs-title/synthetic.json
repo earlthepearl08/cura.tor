@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-026-dept-vs-title",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Northwind Retail Inc.",
+    "Patricia Uy",
+    "Marketing Manager",
+    "02-8777-5555",
+    "patricia.uy@northwind.ph",
+    "Ortigas, Pasig"
+  ]
+}

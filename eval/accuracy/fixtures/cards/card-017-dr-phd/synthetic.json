@@ -1,0 +1,13 @@
+{
+  "kind": "calling-card",
+  "id": "card-017-dr-phd",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "National Research Labs",
+    "Dr. Amelia Torres, PhD",
+    "Principal Scientist",
+    "+63 2 8123 4567",
+    "atorres@nrl.ph",
+    "UP Diliman, Quezon City"
+  ]
+}

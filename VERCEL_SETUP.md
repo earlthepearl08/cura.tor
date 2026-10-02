@@ -57,3 +57,7 @@ Free tier Gemini API provides:
 - **1 million requests per month**
 
 For a prototype/demo, this should be more than enough. If you need more, you can upgrade or implement rate limiting.
+
+## Public SEO files
+
+`public/robots.txt` and `public/sitemap.xml` are copied to the site root on build. They list Landing (`/`, `/welcome`), Accuracy (`/accuracy`), and Legal (`/legal`) using the placeholder origin `https://cura-tor.vercel.app`. See **`public/SEO.md`** to update the host for a custom domain.
