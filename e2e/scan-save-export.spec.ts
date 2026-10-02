@@ -47,11 +47,12 @@ test.describe('Happy path: auth → scan → save → export', () => {
         await expect(page.getByText('Acme Corp')).toBeVisible();
 
         await page.getByRole('button', { name: 'Export contacts' }).click();
-        await expect(page.getByRole('button', { name: /Export as CSV/i })).toBeVisible();
+        // Export options use role=menuitem after a11y pass
+        await expect(page.getByRole('menuitem', { name: /Export as CSV/i })).toBeVisible();
 
         const [download] = await Promise.all([
             page.waitForEvent('download'),
-            page.getByRole('button', { name: /Export as CSV/i }).click(),
+            page.getByRole('menuitem', { name: /Export as CSV/i }).click(),
         ]);
 
         expect(download.suggestedFilename()).toMatch(/^contacts_export_\d+\.csv$/);
