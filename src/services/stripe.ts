@@ -51,22 +51,19 @@ export const PLAN_TO_TIER: Record<StripePlan, UserTier> = {
 
 /** Create a Stripe Checkout session and return the redirect URL (Pioneer/Pro subscription). */
 export async function createCheckoutSession(params: {
-    firebaseUid: string;
-    email: string;
     priceId: string;
-    tier: UserTier;
 }): Promise<string> {
-    const res = await fetch('/api/create-checkout', {
+    const res = await authFetch('/api/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            ...params,
+            priceId: params.priceId,
             origin: window.location.origin,
         }),
     });
 
     if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({}));
         throw new Error(error.error || 'Failed to create checkout session');
     }
 
@@ -104,18 +101,17 @@ export async function createEventPackCheckoutSession(): Promise<string> {
 }
 
 /** Create a Stripe Customer Portal session and return the redirect URL */
-export async function createPortalSession(customerId: string): Promise<string> {
-    const res = await fetch('/api/create-portal', {
+export async function createPortalSession(): Promise<string> {
+    const res = await authFetch('/api/create-portal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            customerId,
             origin: window.location.origin,
         }),
     });
 
     if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({}));
         throw new Error(error.error || 'Failed to create portal session');
     }
 

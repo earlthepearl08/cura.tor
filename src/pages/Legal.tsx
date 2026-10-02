@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, FileText, Shield } from 'lucide-react';
 
 type Tab = 'tos' | 'privacy';
@@ -53,6 +53,13 @@ const Legal = () => {
                     {activeTab === 'tos' ? <TermsOfService /> : <PrivacyPolicy />}
                 </div>
             </div>
+
+            <div className="p-4 border-t border-brand-800 text-center">
+                <Link to="/accuracy#report" className="text-xs text-sky-400 hover:text-sky-300 underline-offset-2 hover:underline">
+                    Accuracy report
+                </Link>
+                <span className="text-xs text-slate-600"> · synthetic field metrics + samples</span>
+            </div>
         </div>
     );
 };
@@ -77,7 +84,7 @@ const Li: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const TermsOfService = () => (
     <div>
         <h1 className="text-xl font-bold text-white mb-1">Terms of Service</h1>
-        <p className="text-[10px] text-slate-600 mb-6">Last updated: March 16, 2026</p>
+        <p className="text-[10px] text-slate-600 mb-6">Last updated: October 1, 2026</p>
 
         <P>
             Welcome to Cura.tor ("Service"), a business card scanning and contact management application
@@ -104,9 +111,11 @@ const TermsOfService = () => (
 
         <SectionTitle>2. Account Registration</SectionTitle>
         <P>
-            To use the Service, you must create an account using Google Sign-In. By creating an account, you
-            represent that you are at least 13 years of age and that the information you provide is accurate
-            and complete. You are responsible for maintaining the security of your account credentials.
+            To use the Service, you must create an account using Google Sign-In or email and password. By
+            creating an account, you represent that you are at least 13 years of age and that the information
+            you provide is accurate and complete. You are responsible for maintaining the security of your
+            account credentials. Email/password accounts can reset their password via
+            the in-app reset flow.
         </P>
 
         <SectionTitle>3. Service Tiers</SectionTitle>
@@ -142,15 +151,15 @@ const TermsOfService = () => (
 
         <SectionTitle>6. AI and OCR Processing</SectionTitle>
         <P>
-            The Service uses third-party AI and OCR services (including Google Cloud Vision and Google Gemini)
-            to process business card images. While we strive for accuracy, we do not guarantee that the
-            extracted information will be error-free. You are responsible for verifying the accuracy of all
-            parsed contact data before relying on it.
+            The Service uses Google Gemini and Google Cloud Vision (reached through our hosted API on Vercel)
+            to extract text and structure contact fields from card, multi-card, and log-sheet images. A
+            device-side OCR fallback may also run in the browser. We do not guarantee error-free extraction;
+            you must verify parsed data before relying on it.
         </P>
         <P>
-            Images submitted for scanning are processed in real-time and are not permanently stored on our
-            servers. However, they are temporarily transmitted to third-party AI services for processing
-            as described in our Privacy Policy.
+            Scan images are sent for processing as described in our Privacy Policy. We do not operate a
+            permanent server-side image archive; optional card images you keep with a contact are stored on
+            your device (and in Google Drive App Data if you enable sync).
         </P>
 
         <SectionTitle>7. Intellectual Property</SectionTitle>
@@ -166,16 +175,17 @@ const TermsOfService = () => (
 
         <SectionTitle>8. Data and Storage</SectionTitle>
         <P>
-            Contact data is primarily stored locally on your device using browser storage (IndexedDB). The
-            Company is not responsible for data loss resulting from browser cache clearing, device changes,
-            or other local storage events. We strongly recommend enabling cloud backup for data persistence.
+            Personal contact data is primarily stored locally on your device (IndexedDB). Team / organization
+            contacts (when you use a workspace) are stored in Firebase Firestore. Account profile and usage
+            data are also in Firestore. The Company is not responsible for local data loss from clearing
+            browser storage or changing devices. Enable Google Drive backup if you need persistence across devices.
         </P>
 
         <SectionTitle>9. Third-Party Services</SectionTitle>
         <P>
-            The Service integrates with third-party services including Google Cloud Platform, Firebase, and
-            Google Drive. Your use of these services is subject to their respective terms and privacy policies.
-            We are not responsible for the availability or performance of third-party services.
+            The Service depends on subprocessors listed in the Privacy Policy (including Google Gemini and
+            Cloud Vision, Firebase/Google, Vercel, Stripe, and optional Google Drive). Their availability and
+            terms apply to those portions of the Service.
         </P>
 
         <SectionTitle>10. Disclaimer of Warranties</SectionTitle>
@@ -198,7 +208,8 @@ const TermsOfService = () => (
         <P>
             We may suspend or terminate your access to the Service at any time, with or without cause, and
             with or without notice. Upon termination, your right to use the Service ceases immediately. You
-            may export your data before termination using the available export features.
+            may export your data and, where available in Settings, delete your account as described in the
+            Privacy Policy.
         </P>
 
         <SectionTitle>13. Governing Law</SectionTitle>
@@ -221,8 +232,14 @@ const TermsOfService = () => (
         </P>
         <P>
             <strong className="text-slate-300">Kinmo PW Corporation</strong><br />
-            {/* TODO: Replace with real support email before launch */}
             Email: support@curator-app.com
+        </P>
+        <P>
+            B2B customers needing a data processing agreement can start from our{' '}
+            <a href="/dpa.md" target="_blank" rel="noopener noreferrer" className="text-brand-400 underline hover:text-brand-300">
+                DPA template stub
+            </a>{' '}
+            (not legal advice; not a signed contract until countersigned).
         </P>
     </div>
 );
@@ -231,7 +248,7 @@ const TermsOfService = () => (
 const PrivacyPolicy = () => (
     <div>
         <h1 className="text-xl font-bold text-white mb-1">Privacy Policy</h1>
-        <p className="text-[10px] text-slate-600 mb-6">Last updated: March 16, 2026</p>
+        <p className="text-[10px] text-slate-600 mb-6">Last updated: October 1, 2026</p>
 
         <P>
             Kinmo PW Corporation ("Company", "we", "us", or "our") operates the Cura.tor application
@@ -243,156 +260,204 @@ const PrivacyPolicy = () => (
 
         <SubTitle>1.1 Account Information</SubTitle>
         <P>
-            When you sign in with Google, we receive and store your name, email address, and profile photo
-            URL. This information is stored in our Firebase database to manage your account and service tier.
+            When you create an account with Google Sign-In or email/password, we store identifiers needed to
+            run the Service—typically name, email, and (for Google) profile photo URL—in Firebase Auth and
+            Firestore, along with your service tier and related account fields.
         </P>
 
         <SubTitle>1.2 Contact Data</SubTitle>
         <P>
-            When you scan business cards, upload images, or manually enter contacts, the resulting contact
-            information (names, phone numbers, email addresses, companies, job titles, addresses, notes) is
-            stored locally on your device using browser storage (IndexedDB). If you enable Google Drive
-            sync, this data is also stored in your personal Google Drive account.
+            Contacts you create (from scans, uploads, QR/vCard, or manual entry)—names, phones, emails,
+            companies, titles, addresses, notes—are stored in your browser (IndexedDB). If you join a team
+            workspace, shared contacts live in Firestore for that organization. If you enable Google Drive
+            sync, a backup of personal contacts may be stored in your Drive App Data folder.
         </P>
 
-        <SubTitle>1.3 Images</SubTitle>
+        <SubTitle>1.3 Scan and Card Images (AI processing)</SubTitle>
         <P>
-            Business card images and photos you capture or upload are processed temporarily to extract contact
-            information. Images are sent to Google Cloud Vision and Google Gemini AI for processing. Images
-            are not permanently stored on our servers after processing is complete.
+            When you scan or upload a card, multi-card sheet, or log sheet, the image is sent from your
+            browser to our Vercel-hosted API, which forwards it to Google Gemini and/or Google Cloud Vision
+            for OCR and field extraction. Those providers process the image to return text/structured
+            fields. We do not keep a permanent server-side archive of scan images after the request
+            completes; provider logs and retention follow their own terms.
+        </P>
+        <P>
+            If you save a contact with a card image (or attach person/location photos), that image data is
+            kept on your device in IndexedDB. Drive sync may omit heavy image fields from the backup file.
+            A browser-only OCR fallback may process images on-device without sending them to Gemini/Vision.
         </P>
 
-        <SubTitle>1.4 Usage Data</SubTitle>
+        <SubTitle>1.4 Usage and Billing Data</SubTitle>
         <P>
-            We track scan counts and usage metrics associated with your account to enforce service tier limits.
-            This includes the number of scans performed and your current billing period.
-        </P>
-
-        <SubTitle>1.5 Photos (Person and Location)</SubTitle>
-        <P>
-            If you attach person or location photos to contacts, these images are stored locally on your device
-            as base64-encoded data within IndexedDB, and optionally synced to Google Drive if cloud backup is
-            enabled.
+            We store scan/usage counters and tier fields in Firestore to enforce plan limits. If you start a
+            paid checkout, Stripe processes payment details; we may store Stripe customer/subscription
+            identifiers on your user profile when billing fulfillment is configured.
         </P>
 
         <SectionTitle>2. How We Use Your Information</SectionTitle>
         <P>We use the information we collect to:</P>
         <ul>
-            <Li>Provide and maintain the Service</Li>
-            <Li>Process business card images and extract contact information</Li>
-            <Li>Manage your account, service tier, and usage limits</Li>
-            <Li>Enable data export and cloud backup features</Li>
-            <Li>Improve the Service and develop new features</Li>
-            <Li>Communicate with you about service updates</Li>
+            <Li>Provide scanning, parsing, contact storage, export, and team features</Li>
+            <Li>Transmit scan images to AI/OCR subprocessors and return extracted fields to you</Li>
+            <Li>Authenticate you and enforce tiers, quotas, and (where applicable) subscriptions</Li>
+            <Li>Support optional Google Drive backup and account deletion</Li>
+            <Li>Operate, secure, and troubleshoot the Service</Li>
         </ul>
 
-        <SectionTitle>3. Third-Party Services</SectionTitle>
-        <P>The Service uses the following third-party services that may process your data:</P>
+        <SectionTitle>3. Subprocessors</SectionTitle>
+        <P>
+            We use the following subprocessors to run the Service. This is an operational list, not a claim
+            of certification or compliance attestation.
+        </P>
         <ul>
-            <Li><strong className="text-slate-300">Google Cloud Vision API:</strong> Processes business card images for text extraction. Images are transmitted to Google's servers for processing. Subject to Google Cloud's data processing terms.</Li>
-            <Li><strong className="text-slate-300">Google Gemini AI:</strong> Processes extracted text to identify and structure contact information. Subject to Google's AI terms of service.</Li>
-            <Li><strong className="text-slate-300">Firebase (Google):</strong> Handles user authentication and stores user profile data (tier, usage counts). Subject to Firebase's terms of service.</Li>
-            <Li><strong className="text-slate-300">Google Drive:</strong> Optional cloud backup for contact data, stored in your personal Google Drive application data folder. Subject to Google Drive's terms of service.</Li>
+            <Li>
+                <strong className="text-slate-300">Google Gemini</strong> — AI extraction for cards, multi-card,
+                and log sheets. Scan images (and prompts) are sent via our API for processing.
+            </Li>
+            <Li>
+                <strong className="text-slate-300">Google Cloud Vision</strong> — OCR path used by the Service
+                for text extraction from images sent via our API.
+            </Li>
+            <Li>
+                <strong className="text-slate-300">Firebase / Google</strong> — Authentication, Firestore (account
+                profile, usage, team/org data), and related Google infrastructure.
+            </Li>
+            <Li>
+                <strong className="text-slate-300">Google Drive</strong> (optional) — Personal contact backup in
+                your Drive App Data folder when you connect sync.
+            </Li>
+            <Li>
+                <strong className="text-slate-300">Vercel</strong> — Hosts the web app and serverless API routes
+                that receive scan requests and call Gemini/Vision; also serves static assets.
+            </Li>
+            <Li>
+                <strong className="text-slate-300">Stripe</strong> — Payment checkout and customer portal for paid
+                plans; card data is handled by Stripe, not stored in our app database.
+            </Li>
         </ul>
+        <P>
+            Each subprocessor processes data under its own terms and privacy policy. We share data with them
+            only as needed to provide the Service.
+        </P>
 
         <SectionTitle>4. Data Storage and Security</SectionTitle>
 
-        <SubTitle>4.1 Local Storage</SubTitle>
+        <SubTitle>4.1 On your device</SubTitle>
         <P>
-            Contact data is primarily stored in your browser's IndexedDB. This data exists only on your device
-            and can be lost if you clear your browser data, switch browsers, or change devices. We strongly
-            recommend enabling cloud backup.
+            Personal contacts (and optional attached images) live in IndexedDB. Clearing site data, switching
+            browsers, or losing the device can delete them unless you exported or enabled Drive sync.
         </P>
 
-        <SubTitle>4.2 Cloud Storage</SubTitle>
+        <SubTitle>4.2 Our / cloud systems</SubTitle>
         <P>
-            If you enable Google Drive sync, your contact data is stored as a JSON file in your Google Drive's
-            application data folder. This folder is not visible in your main Drive and can only be accessed by
-            the Cura.tor application.
+            Account and usage records, enterprise requests, and team workspace data are in Firestore.
+            Scan images transit Vercel functions to Gemini/Vision for the duration of the request. We do not
+            market a separate long-term image vault on our servers.
         </P>
 
-        <SubTitle>4.3 Server-Side</SubTitle>
+        <SubTitle>4.3 Security</SubTitle>
         <P>
-            User profile data (email, name, tier, scan usage) is stored in Google Firestore. We do not store
-            business card images or contact data on our servers. Image processing happens via direct API calls
-            to Google Cloud services.
+            We use HTTPS in transit, Firebase Auth, and scoped access where applicable. No transmission or
+            storage method is perfectly secure; we do not claim absolute security or third-party audit seals
+            beyond what those vendors publish themselves.
         </P>
 
-        <SubTitle>4.4 Security</SubTitle>
-        <P>
-            We implement reasonable technical measures to protect your data, including HTTPS encryption for all
-            data in transit, OAuth 2.0 for authentication, and scoped API access. However, no method of
-            electronic transmission or storage is 100% secure, and we cannot guarantee absolute security.
-        </P>
-
-        <SectionTitle>5. Data Retention</SectionTitle>
-        <P>
-            Your contact data is retained locally until you delete it or clear your browser storage. Cloud-synced
-            data is retained in your Google Drive until you disconnect or delete it. Your account profile data
-            is retained in Firestore for the duration of your account. Deleted contacts are marked as tombstones
-            for sync purposes and are permanently purged after 30 days.
-        </P>
+        <SectionTitle>5. Retention and Deletion</SectionTitle>
+        <ul>
+            <Li>
+                <strong className="text-slate-300">Personal contacts:</strong> Kept in IndexedDB until you delete
+                them or clear browser storage. Soft-deleted contacts are kept as sync tombstones and purged
+                after about 30 days.
+            </Li>
+            <Li>
+                <strong className="text-slate-300">Drive backup:</strong> Remains in your Google Drive App Data
+                until you remove it or disconnect sync from Settings.
+            </Li>
+            <Li>
+                <strong className="text-slate-300">Team contacts:</strong> Retained in the organization&apos;s
+                Firestore data while the workspace exists; leaving or deleting an account follows team/owner
+                rules in the app.
+            </Li>
+            <Li>
+                <strong className="text-slate-300">Account profile:</strong> Kept in Firestore for the life of the
+                account. In Settings you can delete your account: we remove your user document and related
+                cleanup (org membership / solo-org data, pending invites you sent, enterprise requests you
+                opened); the client then deletes your Firebase Auth user. Owner accounts and some team-admin
+                cases follow in-app restrictions. Stripe subscription cancellation may not complete
+                automatically until billing fulfillment is fully wired—contact us if a charge continues.
+            </Li>
+            <Li>
+                <strong className="text-slate-300">Scan images in AI pipelines:</strong> Not retained by us as a
+                permanent archive after processing; Google/Vercel may retain operational logs per their policies.
+            </Li>
+        </ul>
 
         <SectionTitle>6. Your Rights</SectionTitle>
-        <P>You have the right to:</P>
+        <P>You can:</P>
         <ul>
-            <Li><strong className="text-slate-300">Access:</strong> View all contact data stored in the app at any time.</Li>
-            <Li><strong className="text-slate-300">Export:</strong> Export your contact data via vCard, CSV, or Excel formats.</Li>
-            <Li><strong className="text-slate-300">Delete:</strong> Delete individual contacts or all data at any time.</Li>
-            <Li><strong className="text-slate-300">Disconnect:</strong> Disconnect Google Drive sync and remove cloud-stored data.</Li>
-            <Li><strong className="text-slate-300">Account Deletion:</strong> Contact us to request complete account and data deletion.</Li>
+            <Li><strong className="text-slate-300">Access / correct:</strong> View and edit contacts in the app.</Li>
+            <Li><strong className="text-slate-300">Export:</strong> Export via vCard, CSV, or Excel (tier-gated where applicable).</Li>
+            <Li><strong className="text-slate-300">Delete contacts:</strong> Delete items in-app (tombstone + ~30-day purge for personal sync).</Li>
+            <Li><strong className="text-slate-300">Disconnect Drive:</strong> Disconnect Google Drive from Settings.</Li>
+            <Li><strong className="text-slate-300">Delete account:</strong> Use account deletion in Settings when available, or contact us below.</Li>
         </ul>
 
         <SectionTitle>7. Data Sharing</SectionTitle>
         <P>
-            We do not sell, rent, or trade your personal information to third parties. We share data only with
-            the third-party services listed in Section 3, strictly for the purpose of providing the Service.
-            We may disclose information if required by law or to protect our legal rights.
+            We do not sell your personal information. We share data with the subprocessors in Section 3 to
+            operate the Service, and if required by law or to protect our rights.
         </P>
 
         <SectionTitle>8. Cookies and Local Storage</SectionTitle>
         <P>
-            The Service uses browser localStorage and sessionStorage for preferences (theme, last sync time)
-            and session management (Google Drive tokens). We do not use tracking cookies or third-party
-            analytics cookies.
+            The Service uses browser localStorage/sessionStorage for preferences and session helpers (for
+            example Drive tokens). We do not use third-party advertising analytics cookies in the app today.
         </P>
 
         <SectionTitle>9. Children's Privacy</SectionTitle>
         <P>
-            The Service is not directed at children under 13 years of age. We do not knowingly collect personal
-            information from children under 13. If we learn that we have collected information from a child
-            under 13, we will delete that information promptly.
+            The Service is not directed at children under 13. We do not knowingly collect personal information
+            from children under 13. If we learn that we have, we will delete it promptly.
         </P>
 
         <SectionTitle>10. International Data Transfers</SectionTitle>
         <P>
-            Your data may be processed by Google Cloud services located outside the Philippines. By using the
-            Service, you consent to the transfer of your data to servers in other jurisdictions for processing.
-            Google's data processing agreements govern these transfers.
+            Processing may occur on infrastructure outside the Philippines (for example Google and Vercel
+            regions). By using the Service you acknowledge that transfers may be necessary to provide AI
+            scanning, hosting, auth, and payments.
         </P>
 
         <SectionTitle>11. Changes to This Policy</SectionTitle>
         <P>
-            We may update this Privacy Policy from time to time. We will notify users of material changes by
-            updating the "Last updated" date. Your continued use of the Service after changes constitutes
-            acceptance of the updated policy.
+            We may update this Privacy Policy from time to time. Material changes are reflected by updating
+            the "Last updated" date. Continued use after changes constitutes acceptance of the updated policy.
         </P>
 
         <SectionTitle>12. Data Protection Rights (Philippines)</SectionTitle>
         <P>
             Under the Philippine Data Privacy Act of 2012 (Republic Act No. 10173), you have the right to be
-            informed, to object, to access, to rectify, to erasure or blocking, and to damages. If you wish
-            to exercise any of these rights, please contact us using the details below.
+            informed, to object, to access, to rectify, to erasure or blocking, and to damages. To exercise
+            these rights, use in-app controls where available or contact us below. This section describes
+            statutory rights; it is not a certification of NPC registration or a third-party compliance seal.
         </P>
 
         <SectionTitle>13. Contact</SectionTitle>
         <P>
-            If you have questions about this Privacy Policy or wish to exercise your data rights, contact us at:
+            Questions about this Privacy Policy or data rights:
         </P>
         <P>
             <strong className="text-slate-300">Kinmo PW Corporation</strong><br />
-            {/* TODO: Replace with real support email before launch */}
             Email: support@curator-app.com
+        </P>
+        <P>
+            Early B2B customers: see the{' '}
+            <a href="/dpa.md" target="_blank" rel="noopener noreferrer" className="text-brand-400 underline hover:text-brand-300">
+                Data Processing Agreement template stub
+            </a>{' '}
+            (<code className="text-[10px] text-slate-500">DPA.md</code> /{' '}
+            <code className="text-[10px] text-slate-500">/dpa.md</code>). Template only — not legal advice.
+            It lists subprocessors consistent with this Privacy Policy (Google Gemini, Cloud Vision,
+            Firebase/Google, optional Drive, Vercel, Stripe). Request a countersigned copy via the email above.
         </P>
     </div>
 );

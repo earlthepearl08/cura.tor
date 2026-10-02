@@ -1,0 +1,14 @@
+{
+  "kind": "calling-card",
+  "id": "card-023-llc-style",
+  "description": "Synthetic fixture — no photo required. Replace with image.jpg for live Gemini eval.",
+  "visualLines": [
+    "Harbor Tech LLC",
+    "Trevor Blake",
+    "Solutions Architect",
+    "+1 415 555 0198 / +63 917 444 0198",
+    "trevor@harbortech.io",
+    "Branch: Makati",
+    "www.harbortech.io"
+  ]
+}
