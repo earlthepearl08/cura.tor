@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
-<<<<<<< /tmp/meld/19-main-Home.tsx
-import { Link } from 'react-router-dom';
-import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers, Lock } from 'lucide-react';
-=======
-import { useNavigate, Link } from 'react-router-dom';
-import { Camera, Upload, Users, Settings, PenLine, ChevronRight, QrCode, Zap, FileSpreadsheet, Layers, Lock, CalendarDays } from 'lucide-react';
->>>>>>> /tmp/meld/19-pr-Home.tsx
+import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleDrive } from '@/hooks/useGoogleDrive';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
