@@ -84,7 +84,7 @@ export const LANDING_META = {
 } as const;
 
 export const ACCURACY_GALLERY_META = {
-    title: 'Accuracy samples — Cura.tor OCR gallery',
+    title: 'Example extractions — Cura.tor',
     description:
         'See how Cura.tor reads stacked-logo cards, multi-phone layouts, and handwritten Philippine trade-show sign-in sheets — before/after extraction samples.',
     path: '/accuracy',

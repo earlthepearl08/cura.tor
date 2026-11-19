@@ -6,7 +6,7 @@
     </linearGradient>
   </defs>
   <rect width="900" height="560" fill="url(#bg)"/>
-  <text x="40" y="40" fill="#64748b" font-family="ui-sans-serif,system-ui,sans-serif" font-size="14" font-weight="700" letter-spacing="2">PLACEHOLDER · SWAP WITH REAL PHOTO</text>
+  <text x="40" y="40" fill="#64748b" font-family="ui-sans-serif,system-ui,sans-serif" font-size="14" font-weight="700" letter-spacing="2">ILLUSTRATIVE EXAMPLE</text>
   <rect x="50" y="70" width="800" height="440" rx="8" fill="#fffbeb" stroke="#fcd34d" stroke-width="2"/>
   <text x="450" y="110" text-anchor="middle" fill="#78350f" font-family="ui-sans-serif,system-ui,sans-serif" font-size="20" font-weight="800">EVENT SIGN-IN SHEET</text>
   <text x="450" y="135" text-anchor="middle" fill="#92400e" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">Manila Trade Show · Sample</text>
