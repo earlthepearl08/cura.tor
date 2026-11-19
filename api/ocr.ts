@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyAuth, checkRateLimit, checkAndIncrementQuota, refundScan } from './_lib/scanGuards';
+import { verifyAuth, checkRateLimit, checkAndIncrementQuota, refundScan } from './_lib/scanGuards.js';
 
 // Ops (billing / 429 / cost): see GEMINI_OPS.md — no in-app health dashboard.
 // Grep Vercel logs for: "Cloud Vision API error:", "[api/ocr]", "quota-exceeded", "rate-limit-".

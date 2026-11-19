@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import grantTrial from '../_lib/admin/grant-trial';
-import enterpriseRequests from '../_lib/admin/enterprise-requests';
-import provisionEnterprise from '../_lib/admin/provision-enterprise';
+import grantTrial from '../_lib/admin/grant-trial.js';
+import enterpriseRequests from '../_lib/admin/enterprise-requests.js';
+import provisionEnterprise from '../_lib/admin/provision-enterprise.js';
 
 /**
  * Single serverless function for all owner-only admin routes.

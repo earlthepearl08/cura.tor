@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyAuth, checkRateLimit, checkAndIncrementQuota, refundScan } from './_lib/scanGuards';
-import { sanitizeGeminiRequest } from './_lib/geminiRequest';
+import { verifyAuth, checkRateLimit, checkAndIncrementQuota, refundScan } from './_lib/scanGuards.js';
+import { sanitizeGeminiRequest } from './_lib/geminiRequest.js';
 
 // Ops (billing / 429 / cost): see GEMINI_OPS.md — no in-app health dashboard.
 // Grep Vercel logs for: "Gemini API error:", "[api/gemini]", "quota-exceeded", "rate-limit-".
