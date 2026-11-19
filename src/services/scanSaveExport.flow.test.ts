@@ -93,7 +93,7 @@ describe('scan → save → export happy path', () => {
         expect(blobs[0]).toContain('Maria Santos');
         expect(blobs[0]).toContain('Kinmo PW');
         expect(blobs[0]).toContain('maria@kinmo.example');
-        expect(blobs[0]).toMatch(/^Name,Position,Company/);
+        expect(blobs[0]).toMatch(/^\uFEFF?Name,Position,Company/);
     });
 
     it('does not call fetch when OCR is mocked', async () => {

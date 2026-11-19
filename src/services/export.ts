@@ -10,6 +10,43 @@ function escapeCsvCell(cell: string | number | undefined | null): string {
     return `"${(cell ?? '').toString().replace(/"/g, '""')}"`;
 }
 
+/** UTF-8 byte-order mark so Excel opens accented / CJK names (Ñ, 陈) correctly. */
+const CSV_BOM = '\uFEFF';
+
+/** RFC 2426 text escaping for vCard values. */
+function vEscape(value: string): string {
+    return value
+        .replace(/\\/g, '\\\\')
+        .replace(/\r?\n/g, '\\n')
+        .replace(/,/g, '\\,')
+        .replace(/;/g, '\\;');
+}
+
+const NAME_PREFIXES = new Set([
+    'mr', 'mrs', 'ms', 'miss', 'dr', 'engr', 'atty', 'arch', 'prof', 'hon', 'rev', 'fr', 'gen', 'col', 'capt',
+]);
+const NAME_SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v']);
+
+/**
+ * Split a display name into vCard N parts. Handles PH card conventions:
+ * "Engr. Maria Santos, REE, PEE" -> prefix "Engr.", given "Maria",
+ * family "Santos", suffix "REE, PEE" (previously filed under last name "PEE").
+ */
+export function splitPersonName(displayName: string): { prefix: string; given: string; family: string; suffix: string } {
+    const [main, ...afterComma] = displayName.split(',');
+    const suffixParts = afterComma.map(p => p.trim()).filter(Boolean);
+    const tokens = main.trim().split(/\s+/).filter(Boolean);
+    const prefixes: string[] = [];
+    while (tokens.length > 1 && NAME_PREFIXES.has(tokens[0].replace(/\./g, '').toLowerCase())) {
+        prefixes.push(tokens.shift() as string);
+    }
+    while (tokens.length > 2 && NAME_SUFFIXES.has(tokens[tokens.length - 1].replace(/\./g, '').toLowerCase())) {
+        suffixParts.unshift(tokens.pop() as string);
+    }
+    const family = tokens.length > 1 ? (tokens.pop() as string) : '';
+    return { prefix: prefixes.join(' '), given: tokens.join(' '), family, suffix: suffixParts.join(', ') };
+}
+
 function contactExportRow(c: Contact, batchMap?: BatchMap) {
     const status = effectiveFollowUpStatus(c);
     return {
@@ -56,7 +93,7 @@ export const exportService = {
             return headers.map((h) => row[h] ?? c.customFields?.[h] ?? '');
         });
 
-        const csvContent = [
+        const csvContent = CSV_BOM + [
             headers.join(','),
             ...rows.map(row => row.map(cell => escapeCsvCell(cell)).join(','))
         ].join('\n');
@@ -70,7 +107,7 @@ export const exportService = {
      */
     toCRMCSV(contacts: Contact[], batchMap?: BatchMap) {
         const matrix = contactsToCrmValueMatrix(contacts, batchMap);
-        const csvContent = matrix
+        const csvContent = CSV_BOM + matrix
             .map((row) => row.map((cell) => escapeCsvCell(cell)).join(','))
             .join('\n');
         this.downloadFile(csvContent, `contacts_crm_export_${Date.now()}.csv`, 'text/csv');
@@ -82,7 +119,7 @@ export const exportService = {
      */
     toSalesforceCSV(contacts: Contact[], batchMap?: BatchMap) {
         const matrix = contactsToSalesforceValueMatrix(contacts, batchMap);
-        const csvContent = matrix
+        const csvContent = CSV_BOM + matrix
             .map((row) => row.map((cell) => escapeCsvCell(cell)).join(','))
             .join('\n');
         this.downloadFile(csvContent, `contacts_salesforce_export_${Date.now()}.csv`, 'text/csv');
@@ -96,32 +133,30 @@ export const exportService = {
 
     /** Generate vCard string for a single contact */
     contactToVCard(contact: Contact): string {
-        const displayName = contact.name || contact.company || 'Unknown Contact';
-        const nameParts = displayName.split(' ');
-        const lastName = nameParts.length > 1 ? nameParts.pop() : '';
-        const firstName = nameParts.join(' ');
+        const displayName = (contact.name || contact.company || 'Unknown Contact').trim();
+        const n = contact.name ? splitPersonName(displayName) : { prefix: '', given: '', family: '', suffix: '' };
 
         let vcard = 'BEGIN:VCARD\r\nVERSION:3.0\r\n';
-        vcard += `N:${lastName};${firstName};;;\r\n`;
-        vcard += `FN:${displayName}\r\n`;
+        vcard += `N:${vEscape(n.family)};${vEscape(n.given)};;${vEscape(n.prefix)};${vEscape(n.suffix)}\r\n`;
+        vcard += `FN:${vEscape(displayName)}\r\n`;
 
         if (contact.company) {
-            vcard += `ORG:${contact.company}\r\n`;
+            vcard += `ORG:${vEscape(contact.company)}\r\n`;
         }
         if (contact.position) {
-            vcard += `TITLE:${contact.position}\r\n`;
+            vcard += `TITLE:${vEscape(contact.position)}\r\n`;
         }
         for (const phone of contact.phone) {
-            vcard += `TEL;TYPE=WORK,VOICE:${phone}\r\n`;
+            vcard += `TEL;TYPE=WORK,VOICE:${vEscape(phone)}\r\n`;
         }
         for (const email of contact.email) {
-            vcard += `EMAIL;TYPE=WORK:${email}\r\n`;
+            vcard += `EMAIL;TYPE=WORK:${vEscape(email)}\r\n`;
         }
         if (contact.address) {
-            vcard += `ADR;TYPE=WORK:;;${contact.address};;;;\r\n`;
+            vcard += `ADR;TYPE=WORK:;;${vEscape(contact.address)};;;;\r\n`;
         }
         if (contact.notes) {
-            vcard += `NOTE:${contact.notes.replace(/\n/g, '\\n')}\r\n`;
+            vcard += `NOTE:${vEscape(contact.notes)}\r\n`;
         }
 
         vcard += 'END:VCARD\r\n';
