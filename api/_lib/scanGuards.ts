@@ -214,3 +214,33 @@ export async function checkAndIncrementQuota(uid: string): Promise<QuotaResult> 
     return { ok: false, reason: 'tier-unknown', tier };
   });
 }
+
+/**
+ * Give back a scan reserved by checkAndIncrementQuota when the upstream
+ * OCR/Gemini call failed. Without this, transient Google 5xx/429s (which the
+ * client retries up to 3x) silently burn the user's quota — a Free user could
+ * lose all 5 monthly scans on one unlucky card, and early_access lifetime
+ * scans are never recovered.
+ *
+ * Best-effort: never throws, never drives counters below zero.
+ */
+export async function refundScan(uid: string): Promise<void> {
+  try {
+    const db = getAdminDb();
+    const ref = db.collection('users').doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return;
+      const scanUsage = (snap.data() || {}).scanUsage || {};
+      const count: number = scanUsage.count || 0;
+      const lifetimeCount: number = scanUsage.lifetimeCount || 0;
+      tx.update(ref, {
+        'scanUsage.count': Math.max(0, count - 1),
+        'scanUsage.lifetimeCount': Math.max(0, lifetimeCount - 1),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+  } catch (err: any) {
+    console.error('[scanGuards] refundScan failed:', err?.message || err);
+  }
+}

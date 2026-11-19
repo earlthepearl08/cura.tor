@@ -114,7 +114,11 @@ async function callGeminiWithRetry(opts: {
                 const baseMsg = nestedMsg || errorData.error || `Gemini API error: ${response.status}`;
                 const parts = [baseMsg, flatDetails, errorData.reason ? `[${errorData.reason}]` : null].filter(Boolean);
                 const fullMsg = parts.join(' — ');
-                const retryable = RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg);
+                // Our own 429s (tier quota, hour/day abuse ceiling) won't clear in
+                // a few seconds — retrying just adds load and delays the upgrade prompt.
+                const reason = typeof errorData.reason === 'string' ? errorData.reason : '';
+                const nonRetryableReason = reason === 'quota-exceeded' || reason === 'rate-limit-hour' || reason === 'rate-limit-day';
+                const retryable = !nonRetryableReason && (RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg));
                 if (retryable && attempt < MAX_ATTEMPTS - 1) {
                     console.log(`[${opts.flowName}] Transient error ${response.status}, retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
                     reportGeminiHttpError({

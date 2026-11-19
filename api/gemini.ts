@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyAuth, checkRateLimit, checkAndIncrementQuota } from './_lib/scanGuards';
+import { verifyAuth, checkRateLimit, checkAndIncrementQuota, refundScan } from './_lib/scanGuards';
+import { sanitizeGeminiRequest } from './_lib/geminiRequest';
 
 // Ops (billing / 429 / cost): see GEMINI_OPS.md — no in-app health dashboard.
 // Grep Vercel logs for: "Gemini API error:", "[api/gemini]", "quota-exceeded", "rate-limit-".
@@ -102,81 +103,62 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!apiKey) {
     console.error('GEMINI_API_KEY / GOOGLE_API_KEY not found in environment variables');
+    await refundScan(auth.uid);
     return res.status(500).json({ error: 'API key not configured.' });
   }
 
+  // From here on a scan has been reserved; give it back on any failure so
+  // transient Google errors (which the client retries) don't burn quota.
   try {
-    const { contents, generationConfig, imageData, prompt } = req.body;
+    const { contents, generationConfig, imageData, prompt } = req.body || {};
 
-    // Flexible mode: accept raw Gemini request body (contents + generationConfig)
+    let upstreamBody: unknown;
+    let mode: string;
     if (contents) {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents, generationConfig }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Gemini API error:', response.status, errorText);
-        logGeminiUpstreamError(response.status, errorText, 'contents');
-        try {
-          const errorData = JSON.parse(errorText);
-          return res.status(response.status).json({ error: 'Gemini API request failed', details: errorData });
-        } catch {
-          return res.status(response.status).json({ error: 'Gemini API request failed', details: errorText });
-        }
+      const sanitized = sanitizeGeminiRequest({ contents, generationConfig });
+      if (!sanitized.ok) {
+        await refundScan(auth.uid);
+        return res.status(400).json({ error: 'Invalid request', reason: sanitized.error });
       }
-
-      const data = await response.json();
-      return res.status(200).json(data);
+      upstreamBody = sanitized.body;
+      mode = 'contents';
+    } else {
+      // Legacy mode: imageData + prompt. Routed through the same allowlist.
+      if (typeof imageData !== 'string' || typeof prompt !== 'string') {
+        await refundScan(auth.uid);
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      const sanitized = sanitizeGeminiRequest({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: 'image/jpeg', data: imageData.replace(/^data:image\/\w+;base64,/, '') } },
+          ],
+        }],
+        generationConfig: { temperature: 0.1, topK: 32, topP: 1, maxOutputTokens: 2048 },
+      });
+      if (!sanitized.ok) {
+        await refundScan(auth.uid);
+        return res.status(400).json({ error: 'Invalid request', reason: sanitized.error });
+      }
+      upstreamBody = sanitized.body;
+      mode = 'legacy';
     }
 
-    // Legacy mode: accept imageData + prompt (backward compatible)
-    if (!imageData || !prompt) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Remove data URL prefix if present
-    const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '');
-
-    // Call Gemini API
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: 'image/jpeg',
-                    data: base64Image,
-                  },
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 32,
-            topP: 1,
-            maxOutputTokens: 2048,
-          },
-        }),
+        body: JSON.stringify(upstreamBody),
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Gemini API error:', response.status, errorText);
-      logGeminiUpstreamError(response.status, errorText, 'legacy');
+      logGeminiUpstreamError(response.status, errorText, mode);
+      await refundScan(auth.uid);
       try {
         const errorData = JSON.parse(errorText);
         return res.status(response.status).json({ error: 'Gemini API request failed', details: errorData });
@@ -189,6 +171,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json(data);
   } catch (error) {
     console.error('Server error:', error);
+    await refundScan(auth.uid);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
