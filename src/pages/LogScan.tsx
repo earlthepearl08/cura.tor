@@ -249,12 +249,13 @@ const LogScan: React.FC = () => {
     };
 
     /**
-     * Outer per-sheet timeout. Must exceed the 90s fetch timeout in
-     * callGeminiWithRetry: at 60s the page gave up on dense sheets that Gemini
-     * was still answering, the server charged the scan, and the silent retry
-     * charged another.
+     * Outer per-sheet safety net. Must exceed the WHOLE inner retry chain in
+     * callGeminiWithRetry (3 attempts x 90s fetch timeout + 1s/2s backoff),
+     * because withTimeout only races — it can't cancel the inner chain. At
+     * 60s the page abandoned sheets Gemini was still answering (server charged
+     * them) and started a second chain that reserved more scans.
      */
-    const LOG_SHEET_TIMEOUT_MS = 95_000;
+    const LOG_SHEET_TIMEOUT_MS = 3 * 90_000 + 10_000;
 
     /** Wrap a promise with a hard timeout so we never get stuck */
     const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> =>

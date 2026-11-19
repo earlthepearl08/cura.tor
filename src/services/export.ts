@@ -26,13 +26,21 @@ const NAME_PREFIXES = new Set([
     'mr', 'mrs', 'ms', 'miss', 'dr', 'engr', 'atty', 'arch', 'prof', 'hon', 'rev', 'fr', 'gen', 'col', 'capt',
 ]);
 const NAME_SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v']);
-/** Post-nominals seen on PH cards: REE, PEE, CPA, RN, MBA, PhD, MD, Ph.D. ... */
-const CREDENTIAL_RE = /^(?:[A-Z]{2,6}|Ph\.?D\.?|M\.?D\.?|Esq\.?)$/;
+/**
+ * Post-nominals seen on PH cards. An explicit allowlist, not "any all-caps
+ * word": sign-in sheets write names as "LIM, JUAN", and JUAN is not a credential.
+ */
+const CREDENTIALS = new Set([
+    'ree', 'pee', 'rme', 'me', 'pme', 'ce', 'ece', 'pece', 'ee', 'rn', 'rm', 'rpm', 'rph', 'rmt', 'rnd', 'md', 'dmd',
+    'phd', 'edd', 'dba', 'mba', 'mpa', 'ms', 'msc', 'ma', 'bs', 'cpa', 'cfa', 'cma', 'cia', 'cisa', 'pmp', 'llb', 'llm',
+    'jd', 'esq', 'enp', 'uap', 'fuap', 'rla', 'rcrim', 'lpt', 'cpe', 'ceng', 'pe', 'rpt', 'ptrp', 'cssp', 'sme',
+]);
 /** Surname particles that belong to the family name (dela Cruz, de los Santos, Van Buren). */
 const SURNAME_PARTICLES = new Set(['de', 'del', 'dela', 'la', 'las', 'los', 'delos', 'di', 'da', 'san', 'sta', 'sta.', 'sto', 'sto.', 'van', 'von', 'y']);
 
 function isSuffixOrCredential(part: string): boolean {
-    return NAME_SUFFIXES.has(part.replace(/\./g, '').toLowerCase()) || CREDENTIAL_RE.test(part);
+    const key = part.replace(/\./g, '').toLowerCase();
+    return NAME_SUFFIXES.has(key) || CREDENTIALS.has(key);
 }
 
 /**

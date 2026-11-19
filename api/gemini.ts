@@ -171,9 +171,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await response.json();
-    // 200 with no text (blocked prompt, MAX_TOKENS with no candidate): the
-    // client gets nothing usable and reports a failed scan, so don't charge it.
-    if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+    // 200 with no text: refund only when Google billed no output (prompt
+    // blocked / zero output+thinking tokens). A MAX_TOKENS response that burned
+    // thinking tokens is still charged, otherwise a crafted prompt could make
+    // unlimited billed calls on the owner's key without ever using quota.
+    const usage = data?.usageMetadata || {};
+    const billedOutput = (usage.candidatesTokenCount || 0) + (usage.thoughtsTokenCount || 0);
+    const noText = !data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (noText && (data?.promptFeedback?.blockReason || billedOutput === 0)) {
       logGeminiUpstreamError(200, JSON.stringify(data?.promptFeedback || data?.candidates?.[0]?.finishReason || 'empty'), `${mode}-empty`);
       await refundScan(auth.uid, chargedPeriod);
     }

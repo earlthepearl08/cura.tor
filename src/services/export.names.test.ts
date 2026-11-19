@@ -19,6 +19,11 @@ describe('splitPersonName (PH card conventions)', () => {
     it('treats "Family, Given" as a family-first name, not a suffix', () => {
         expect(splitPersonName('Santos, Maria Cristina')).toEqual({ prefix: '', given: 'Maria Cristina', family: 'Santos', suffix: '' });
     });
+    it('reads all-caps sign-in sheet names "FAMILY, GIVEN" correctly', () => {
+        expect(splitPersonName('LIM, JUAN')).toEqual({ prefix: '', given: 'JUAN', family: 'LIM', suffix: '' });
+        expect(splitPersonName('DE LA CRUZ, JUAN')).toEqual({ prefix: '', given: 'JUAN', family: 'DE LA CRUZ', suffix: '' });
+        expect(splitPersonName('MARIA SANTOS, CPA')).toEqual({ prefix: '', given: 'MARIA', family: 'SANTOS', suffix: 'CPA' });
+    });
     it('does not strip an honorific that is the only other token', () => {
         expect(splitPersonName('Dr. Reyes')).toMatchObject({ given: 'Dr.', family: 'Reyes' });
     });
