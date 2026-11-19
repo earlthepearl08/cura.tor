@@ -351,3 +351,17 @@ describe('api/stripe-webhook handler', () => {
         expect(foundDocUpdate).not.toHaveBeenCalled();
     });
 });
+
+describe('getRawBody', () => {
+    it('reads the signed bytes from the stream without touching req.body', async () => {
+        const { Readable } = await import('node:stream');
+        const { getRawBody } = await import('../stripe-webhook');
+        const payload = '{"id":"evt_1",  "type":"checkout.session.completed"}';
+        const stream = Readable.from([Buffer.from(payload.slice(0, 10)), Buffer.from(payload.slice(10))]);
+        let bodyTouched = false;
+        Object.defineProperty(stream, 'body', { get() { bodyTouched = true; return JSON.parse(payload); } });
+        const raw = await getRawBody(stream as any);
+        expect(raw.toString()).toBe(payload); // exact bytes, incl. the double space
+        expect(bodyTouched).toBe(false);
+    });
+});

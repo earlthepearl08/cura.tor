@@ -3,7 +3,12 @@ import Stripe from 'stripe';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-/** Disable automatic body parsing — Stripe signature verification needs the raw body */
+/**
+ * NOTE: `config.api.bodyParser` is a Next.js API-route option. Plain Vercel
+ * Node functions ignore it — @vercel/node parses JSON lazily the first time
+ * `req.body` is read. getRawBody() therefore reads the request stream itself
+ * BEFORE anything touches `req.body`. Kept for clarity / Next compatibility.
+ */
 export const config = {
   api: {
     bodyParser: false,
@@ -30,20 +35,29 @@ function getAdminDb() {
   return getFirestore();
 }
 
-/** Read raw body from the request (needed for Stripe signature verification) */
-async function getRawBody(req: VercelRequest): Promise<Buffer> {
-  if (Buffer.isBuffer(req.body)) return req.body;
-  if (typeof req.body === 'string') return Buffer.from(req.body);
-  // Some runtimes parse JSON already — re-serialize only as a last resort (signature will fail).
-  if (req.body && typeof req.body === 'object') {
-    return Buffer.from(JSON.stringify(req.body));
+/**
+ * Read the exact bytes Stripe signed. Must not touch `req.body` first: on
+ * Vercel that getter JSON-parses and consumes the stream, and a re-serialized
+ * object never matches the signature (every live webhook would 400).
+ */
+export async function getRawBody(req: VercelRequest): Promise<Buffer> {
+  const stream = req as unknown as NodeJS.ReadableStream & { readableEnded?: boolean };
+  if (typeof stream.on === 'function' && !stream.readableEnded) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array));
+    }
+    if (chunks.length) return Buffer.concat(chunks as unknown as Uint8Array[]);
   }
-
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk));
+  // Stream already consumed (or a test double): fall back to whatever the runtime kept.
+  const body = (req as any).body;
+  if (Buffer.isBuffer(body)) return body;
+  if (typeof body === 'string') return Buffer.from(body);
+  if (body && typeof body === 'object') {
+    console.error('[stripe-webhook] Raw body unavailable — request was already JSON-parsed; signature check will fail.');
+    return Buffer.from(JSON.stringify(body));
   }
-  return Buffer.concat(chunks as unknown as Uint8Array[]);
+  return Buffer.alloc(0);
 }
 
 /** Determine tier from a Stripe price ID using server-side env vars */
