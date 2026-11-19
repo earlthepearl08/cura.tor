@@ -4,6 +4,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { PassThrough, Readable } from 'node:stream';
 import {
     PRICE_PIONEER,
     PRICE_PRO,
@@ -81,12 +82,14 @@ function mockRes() {
 }
 
 function mockReq(overrides: Partial<VercelRequest> = {}): VercelRequest {
-    return {
+    // Body is delivered via data/end like a real request.
+    const stream = new PassThrough();
+    stream.end(Buffer.from('{}'));
+    return Object.assign(stream, {
         method: 'POST',
         headers: { 'stripe-signature': 't=1,v1=testsig' },
-        body: Buffer.from('{}'),
         ...overrides,
-    } as VercelRequest;
+    }) as unknown as VercelRequest;
 }
 
 function foundUserDoc(tier = 'early_access', id = FIXTURE_UID) {
@@ -349,5 +352,41 @@ describe('api/stripe-webhook handler', () => {
         expect(res.payload).toEqual({ received: true });
         expect(userDocUpdate).not.toHaveBeenCalled();
         expect(foundDocUpdate).not.toHaveBeenCalled();
+    });
+});
+
+describe('getRawBody', () => {
+    /** Mirrors @vercel/node addHelpers(): drain the request, then replay via data/end only. */
+    async function vercelHelperRequest(payload: string) {
+        const req = Readable.from([Buffer.from(payload.slice(0, 10)), Buffer.from(payload.slice(10))]) as any;
+        const chunks: Buffer[] = [];
+        for await (const c of req) chunks.push(Buffer.from(c));
+        const body = Buffer.concat(chunks as unknown as Uint8Array[]);
+        const replicate = new PassThrough();
+        const on = replicate.on.bind(replicate);
+        const originalOn = req.on.bind(req);
+        req.read = replicate.read.bind(replicate);
+        req.on = req.addListener = (name: string, cb: any) =>
+            name === 'data' || name === 'end' ? on(name, cb) : originalOn(name, cb);
+        replicate.write(body);
+        replicate.end();
+        let bodyTouched = false;
+        Object.defineProperty(req, 'body', { get() { bodyTouched = true; return JSON.parse(payload); } });
+        return { req, wasBodyTouched: () => bodyTouched };
+    }
+
+    it('returns the exact signed bytes after Vercel helpers consumed the stream', async () => {
+        const { getRawBody } = await import('../stripe-webhook');
+        const payload = '{\n  "id": "evt_1",\n  "type": "checkout.session.completed"\n}';
+        const { req, wasBodyTouched } = await vercelHelperRequest(payload);
+        expect(req.readableEnded).toBe(true);
+        const raw = await getRawBody(req);
+        expect(raw.toString()).toBe(payload); // pretty-printed bytes, not re-serialized JSON
+        expect(wasBodyTouched()).toBe(false);
+    });
+
+    it('times out instead of hanging when no body is ever delivered', async () => {
+        const { getRawBody } = await import('../stripe-webhook');
+        await expect(getRawBody(new PassThrough() as any, 20)).rejects.toThrow(/Timed out/);
     });
 });

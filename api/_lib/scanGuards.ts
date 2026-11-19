@@ -120,7 +120,8 @@ export async function checkRateLimit(uid: string): Promise<RateLimitResult> {
 
 // --- Tier quota enforcement (mirrors src/services/userService.ts) ---
 export type QuotaResult =
-  | { ok: true; tier: string }
+  /** periodStartMs: the Free-tier period this scan was charged to (for refundScan). */
+  | { ok: true; tier: string; periodStartMs?: number }
   | { ok: false; reason: 'quota-exceeded' | 'user-not-found' | 'tier-unknown'; tier?: string };
 
 /** Get the next monthly reset date: same day-of-month as periodStart, one month later */
@@ -188,6 +189,7 @@ export async function checkAndIncrementQuota(uid: string): Promise<QuotaResult> 
           'scanUsage.lifetimeCount': FieldValue.increment(1),
           updatedAt: FieldValue.serverTimestamp(),
         });
+        return { ok: true, tier, periodStartMs: now };
       } else {
         tx.update(ref, {
           'scanUsage.count': FieldValue.increment(1),
@@ -195,7 +197,7 @@ export async function checkAndIncrementQuota(uid: string): Promise<QuotaResult> 
           updatedAt: FieldValue.serverTimestamp(),
         });
       }
-      return { ok: true, tier };
+      return { ok: true, tier, periodStartMs };
     }
 
     // Early access: lifetime cap, no monthly reset
@@ -213,4 +215,48 @@ export async function checkAndIncrementQuota(uid: string): Promise<QuotaResult> 
 
     return { ok: false, reason: 'tier-unknown', tier };
   });
+}
+
+/**
+ * Give back a scan reserved by checkAndIncrementQuota when the upstream
+ * OCR/Gemini call failed. Without this, transient Google 5xx/429s (which the
+ * client retries up to 3x) silently burn the user's quota — a Free user could
+ * lose all 5 monthly scans on one unlucky card, and early_access lifetime
+ * scans are never recovered.
+ *
+ * Best-effort: never throws, never drives counters below zero.
+ */
+/** Two period markers within this window are treated as the same period (server clock vs Date.now()). */
+const PERIOD_MATCH_TOLERANCE_MS = 60_000;
+
+export async function refundScan(uid: string, chargedPeriodStartMs?: number): Promise<void> {
+  try {
+    const db = getAdminDb();
+    const ref = db.collection('users').doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return;
+      const scanUsage = (snap.data() || {}).scanUsage || {};
+      const count: number = scanUsage.count || 0;
+      const lifetimeCount: number = scanUsage.lifetimeCount || 0;
+      // If the Free period rolled over between charge and refund, the scan was
+      // counted in the OLD period; decrementing the new period's count would
+      // hand out an extra scan. Only lifetimeCount is refunded then.
+      let samePeriod = true;
+      if (chargedPeriodStartMs !== undefined) {
+        const ps = scanUsage.periodStart;
+        const storedMs = typeof ps === 'number' ? ps : typeof ps?.toMillis === 'function' ? ps.toMillis() : undefined;
+        if (storedMs !== undefined && Math.abs(storedMs - chargedPeriodStartMs) > PERIOD_MATCH_TOLERANCE_MS) {
+          samePeriod = false;
+        }
+      }
+      tx.update(ref, {
+        'scanUsage.count': samePeriod ? Math.max(0, count - 1) : count,
+        'scanUsage.lifetimeCount': Math.max(0, lifetimeCount - 1),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+  } catch (err: any) {
+    console.error('[scanGuards] refundScan failed:', err?.message || err);
+  }
 }

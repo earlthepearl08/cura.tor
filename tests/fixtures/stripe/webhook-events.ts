@@ -8,7 +8,7 @@ import type {
     CheckoutSessionCompletedData,
     SubscriptionEventData,
     InvoicePaymentFailedData,
-} from '../../api/lib/stripeWebhookContract';
+} from '../../api/_lib/stripeWebhookContract';
 
 export const FIXTURE_UID = 'firebase-user-abc123';
 export const FIXTURE_CUSTOMER = 'cus_test_pioneer_001';

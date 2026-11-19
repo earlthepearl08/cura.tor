@@ -122,10 +122,10 @@ const Landing: React.FC = () => {
                     </a>
                     <nav className="flex items-center gap-2 sm:gap-3">
                         <Link
-                            to="/accuracy#report"
+                            to="/accuracy"
                             className="hidden sm:inline text-sm text-slate-400 hover:text-white transition-colors px-2"
                         >
-                            Accuracy
+                            Examples
                         </Link>
                         <a
                             href="#pricing"
@@ -354,8 +354,9 @@ const Landing: React.FC = () => {
                             </h2>
                             <p className="mt-4 text-slate-400 leading-relaxed">
                                 Scan one card at a time, or lay several on a table and capture them together.
-                                Cura.tor splits multi-card shots, parses names, phones, and emails, then keeps
-                                everything on-device until you choose to sync or export.
+                                Cura.tor splits multi-card shots and parses names, phones, and emails. Photos are
+                                read by Google Gemini to extract the text; your saved contacts stay in your browser
+                                until you choose to sync or export.
                             </p>
                             <ul className="mt-6 space-y-3">
                                 {[
@@ -534,7 +535,7 @@ const Landing: React.FC = () => {
                             to="/accuracy"
                             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-brand-950 font-bold text-sm transition-colors"
                         >
-                            Browse all sample results
+                            Browse all examples
                             <ArrowRight size={16} />
                         </Link>
                         <p className="text-xs text-slate-600">Public gallery · no account required</p>
@@ -739,8 +740,7 @@ const Landing: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-4 text-xs text-slate-500">
                         <a href="#pricing" className="hover:text-slate-300 transition-colors">Pricing</a>
-                        <Link to="/accuracy#report" className="hover:text-slate-300 transition-colors">Accuracy report</Link>
-                        <Link to="/accuracy#samples" className="hover:text-slate-300 transition-colors">Samples</Link>
+                                                <Link to="/accuracy" className="hover:text-slate-300 transition-colors">Examples</Link>
                         <Link to="/legal" className="hover:text-slate-300 transition-colors">Terms & Privacy</Link>
                         <Link to="/auth" className="hover:text-slate-300 transition-colors">
                             {isSignedIn ? 'Account' : 'Sign in'}

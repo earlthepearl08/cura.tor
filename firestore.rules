@@ -18,6 +18,9 @@ service cloud.firestore {
                     && request.resource.data.scanUsage.count == 0
                     && request.resource.data.scanUsage.lifetimeCount == 0
                     && request.resource.data.scanUsage.lifetimeLimit == null
+                    // periodStart must be serverTimestamp() — the server uses it to
+                    // decide when the Free monthly quota resets.
+                    && request.resource.data.scanUsage.periodStart == request.time
                     && request.resource.data.get('eventPackCredits', 0) == 0
                     && request.resource.data.get('eventPackPurchased', 0) == 0
                     && request.resource.data.get('organizationId', null) == null;
@@ -35,6 +38,10 @@ service cloud.firestore {
                          >= resource.data.scanUsage.lifetimeCount
                     && request.resource.data.scanUsage.count
                          >= resource.data.scanUsage.count
+                    // periodStart is server-owned: a client writing an old date
+                    // would make every scan look like a new month (unlimited Free).
+                    && request.resource.data.scanUsage.get('periodStart', null)
+                         == resource.data.scanUsage.get('periodStart', null)
                     // Billing / packs / org / trial fields immutable from client
                     && request.resource.data.get('stripe', null)
                          == resource.data.get('stripe', null)
@@ -58,9 +65,10 @@ service cloud.firestore {
 
     // --- Access Codes ---
     match /accessCodes/{codeId} {
-      // Any authenticated user can read codes (needed for redemption lookup UX;
-      // redemption writes go through Admin SDK — api/account redeem-access-code).
-      allow read: if request.auth != null;
+      // Server-only. Redemption (lookup + write) goes through Admin SDK in
+      // api/account.ts; letting clients read meant any signed-in user could
+      // enumerate unredeemed codes and claim paid tiers.
+      allow read: if false;
 
       // No client writes — redemption is server-side only.
       allow create, update, delete: if false;

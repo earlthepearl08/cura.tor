@@ -248,6 +248,15 @@ const LogScan: React.FC = () => {
         }
     };
 
+    /**
+     * Outer per-sheet safety net. Must exceed the WHOLE inner retry chain in
+     * callGeminiWithRetry (3 attempts x 90s fetch timeout + 1s/2s backoff),
+     * because withTimeout only races — it can't cancel the inner chain. At
+     * 60s the page abandoned sheets Gemini was still answering (server charged
+     * them) and started a second chain that reserved more scans.
+     */
+    const LOG_SHEET_TIMEOUT_MS = 3 * 90_000 + 10_000;
+
     /** Wrap a promise with a hard timeout so we never get stuck */
     const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
         Promise.race([
@@ -286,7 +295,7 @@ const LogScan: React.FC = () => {
                 // 60-second hard timeout per sheet so we never get stuck
                 const result = await withTimeout(
                     ocrService.parseLogSheet(data, getParseOptions()),
-                    60000,
+                    LOG_SHEET_TIMEOUT_MS,
                     `Sheet ${i + 1}`
                 );
                 if (result.entries.length > 0) {
@@ -319,7 +328,7 @@ const LogScan: React.FC = () => {
                     const data = await compressForOCR(files[idx]);
                     const result = await withTimeout(
                         ocrService.parseLogSheet(data, getParseOptions()),
-                        60000,
+                        LOG_SHEET_TIMEOUT_MS,
                         `Sheet ${idx + 1} retry ${attempt}`
                     );
                     if (result.entries.length > 0) {
@@ -397,7 +406,7 @@ const LogScan: React.FC = () => {
         const MAX_SILENT_RETRIES = 2;
         for (let attempt = 0; attempt <= MAX_SILENT_RETRIES; attempt++) {
             try {
-                return await withTimeout(ocrService.parseLogSheet(base64Image, getParseOptions()), 60000, `Sheet attempt ${attempt + 1}`);
+                return await withTimeout(ocrService.parseLogSheet(base64Image, getParseOptions()), LOG_SHEET_TIMEOUT_MS, `Sheet attempt ${attempt + 1}`);
             } catch (err) {
                 console.log(`[LogScan] Attempt ${attempt + 1} failed:`, err);
                 if (attempt < MAX_SILENT_RETRIES) {

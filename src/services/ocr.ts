@@ -114,7 +114,11 @@ async function callGeminiWithRetry(opts: {
                 const baseMsg = nestedMsg || errorData.error || `Gemini API error: ${response.status}`;
                 const parts = [baseMsg, flatDetails, errorData.reason ? `[${errorData.reason}]` : null].filter(Boolean);
                 const fullMsg = parts.join(' — ');
-                const retryable = RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg);
+                // Our own 429s (tier quota, hour/day abuse ceiling) won't clear in
+                // a few seconds — retrying just adds load and delays the upgrade prompt.
+                const reason = typeof errorData.reason === 'string' ? errorData.reason : '';
+                const nonRetryableReason = reason === 'quota-exceeded' || reason === 'rate-limit-hour' || reason === 'rate-limit-day';
+                const retryable = !nonRetryableReason && (RETRY_STATUSES.has(response.status) || RETRY_MESSAGE_RE.test(fullMsg));
                 if (retryable && attempt < MAX_ATTEMPTS - 1) {
                     console.log(`[${opts.flowName}] Transient error ${response.status}, retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
                     reportGeminiHttpError({
@@ -149,9 +153,13 @@ async function callGeminiWithRetry(opts: {
         } catch (error: any) {
             clearTimeout(timeout);
             const msg = error?.message || String(error);
-            const isNetworkError = error?.name === 'AbortError' || /failed to fetch|network|timeout/i.test(msg);
+            // Our own fetch timeout fired: the server is most likely still
+            // waiting on Gemini and will charge the scan when it answers, so a
+            // retry would reserve (and probably be charged for) a second scan.
+            const isClientTimeout = error?.name === 'AbortError';
+            const isNetworkError = /failed to fetch|network/i.test(msg);
             const isMessageRetryable = RETRY_MESSAGE_RE.test(msg);
-            if ((isNetworkError || isMessageRetryable) && attempt < MAX_ATTEMPTS - 1) {
+            if (!isClientTimeout && (isNetworkError || isMessageRetryable) && attempt < MAX_ATTEMPTS - 1) {
                 console.log(`[${opts.flowName}] Transient error "${msg}", retrying in ${BACKOFF_MS[attempt]}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
                 reportGeminiHttpError({
                     flow: opts.flowName,

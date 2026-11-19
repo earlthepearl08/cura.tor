@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyAuth, checkRateLimit, checkAndIncrementQuota } from './_lib/scanGuards';
+import { verifyAuth, checkRateLimit, checkAndIncrementQuota, refundScan } from './_lib/scanGuards.js';
 
 // Ops (billing / 429 / cost): see GEMINI_OPS.md — no in-app health dashboard.
 // Grep Vercel logs for: "Cloud Vision API error:", "[api/ocr]", "quota-exceeded", "rate-limit-".
@@ -38,8 +38,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Tier quota enforcement + atomic scan count increment
+  let quota: Awaited<ReturnType<typeof checkAndIncrementQuota>>;
   try {
-    const quota = await checkAndIncrementQuota(auth.uid);
+    quota = await checkAndIncrementQuota(auth.uid);
     if (!quota.ok) {
       if (quota.reason === 'quota-exceeded') {
         return res.status(429).json({
@@ -62,18 +63,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  const chargedPeriod = quota!.ok ? quota!.periodStartMs : undefined;
+
   // Get API key from environment variable (server-side only, no VITE_ prefix)
   const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
     console.error('GOOGLE_API_KEY / GEMINI_API_KEY not found in environment variables');
+    await refundScan(auth.uid, chargedPeriod);
     return res.status(500).json({ error: 'API key not configured.' });
   }
 
   try {
-    const { imageData, languageHints } = req.body;
+    const { imageData, languageHints } = req.body || {};
 
-    if (!imageData) {
+    if (typeof imageData !== 'string' || !imageData) {
+      await refundScan(auth.uid, chargedPeriod);
       return res.status(400).json({ error: 'Missing imageData' });
     }
 
@@ -91,7 +96,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             image: { content: base64Image },
             features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
             imageContext: {
-              languageHints: languageHints || ['en', 'tl', 'zh', 'ja', 'ko']
+              languageHints: Array.isArray(languageHints) && languageHints.length <= 8 && languageHints.every((h: unknown) => typeof h === 'string' && h.length <= 8)
+                ? languageHints
+                : ['en', 'tl', 'zh', 'ja', 'ko']
             }
           }]
         })
@@ -101,6 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Cloud Vision API error:', response.status, errorText);
+      await refundScan(auth.uid, chargedPeriod);
       try {
         const errorData = JSON.parse(errorText);
         return res.status(response.status).json({ error: 'Cloud Vision API request failed', details: errorData });
@@ -113,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json(data);
   } catch (error) {
     console.error('Server error:', error);
+    await refundScan(auth.uid, chargedPeriod);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

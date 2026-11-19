@@ -55,10 +55,10 @@ const Legal = () => {
             </div>
 
             <div className="p-4 border-t border-brand-800 text-center">
-                <Link to="/accuracy#report" className="text-xs text-sky-400 hover:text-sky-300 underline-offset-2 hover:underline">
-                    Accuracy report
+                <Link to="/accuracy" className="text-xs text-sky-400 hover:text-sky-300 underline-offset-2 hover:underline">
+                    Example extractions
                 </Link>
-                <span className="text-xs text-slate-600"> · synthetic field metrics + samples</span>
+                <span className="text-xs text-slate-600"> · illustrative before/after</span>
             </div>
         </div>
     );
@@ -99,8 +99,8 @@ const TermsOfService = () => (
             Features, limits, pricing, and availability may change. We may interrupt or discontinue beta
             features with reasonable notice when practicable. Paid plans during beta still grant the
             entitlements described at purchase for the billing period you paid for, subject to these Terms.
-            Public accuracy samples and field scores labeled &quot;synthetic&quot; are demo metrics — not a
-            guarantee of production OCR performance on your cards or sheets.
+            Public example extractions are illustrative — not a guarantee of OCR performance on your
+            cards or sheets. Always review extracted contacts before relying on them.
         </P>
 
         <SectionTitle>1. Service Description</SectionTitle>
@@ -167,10 +167,9 @@ const TermsOfService = () => (
             you must verify parsed data before relying on it for outreach, CRM import, or compliance use.
         </P>
         <P>
-            Marketing pages and the in-app Accuracy gallery may show <strong className="text-slate-300">synthetic</strong>{' '}
-            fixtures and field-level scores. Those are labeled demo materials. They are not certified
-            benchmarks against your real cards, venues, or handwriting, and they do not expand the warranty
-            disclaimer below.
+            Example extractions shown on marketing pages and the /accuracy gallery are illustrative. They are
+            not certified benchmarks against your real cards, venues, or handwriting, and they do not expand
+            the warranty disclaimer below.
         </P>
         <P>
             Scan images are sent for processing as described in our Privacy Policy. We do not operate a

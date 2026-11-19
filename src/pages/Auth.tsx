@@ -558,10 +558,10 @@ const Auth: React.FC = () => {
                     {/* Footer */}
                     <div className="p-6 text-center space-y-2">
                         <p className="text-xs text-slate-500">
-                            <Link to="/accuracy#report" className="text-sky-400/90 hover:text-sky-300 underline-offset-2 hover:underline transition-colors">
-                                See accuracy report
+                            <Link to="/accuracy" className="text-sky-400/90 hover:text-sky-300 underline-offset-2 hover:underline transition-colors">
+                                See example extractions
                             </Link>
-                            <span className="text-slate-600"> — synthetic field metrics + samples</span>
+                            <span className="text-slate-600"> — before/after cards and log sheets</span>
                         </p>
                         <p className="text-xs text-slate-500">
                             By continuing, you agree to our{' '}
