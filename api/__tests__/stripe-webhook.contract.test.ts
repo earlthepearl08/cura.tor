@@ -5,7 +5,7 @@ import {
     patchFromSubscriptionUpdated,
     patchFromSubscriptionDeleted,
     patchFromInvoicePaymentFailed,
-} from '../lib/stripeWebhookContract';
+} from '../_lib/stripeWebhookContract';
 import {
     checkoutSessionCompletedPioneer,
     checkoutSessionCompletedPro,
