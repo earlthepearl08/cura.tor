@@ -26,25 +26,52 @@ const NAME_PREFIXES = new Set([
     'mr', 'mrs', 'ms', 'miss', 'dr', 'engr', 'atty', 'arch', 'prof', 'hon', 'rev', 'fr', 'gen', 'col', 'capt',
 ]);
 const NAME_SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v']);
+/** Post-nominals seen on PH cards: REE, PEE, CPA, RN, MBA, PhD, MD, Ph.D. ... */
+const CREDENTIAL_RE = /^(?:[A-Z]{2,6}|Ph\.?D\.?|M\.?D\.?|Esq\.?)$/;
+/** Surname particles that belong to the family name (dela Cruz, de los Santos, Van Buren). */
+const SURNAME_PARTICLES = new Set(['de', 'del', 'dela', 'la', 'las', 'los', 'delos', 'di', 'da', 'san', 'sta', 'sta.', 'sto', 'sto.', 'van', 'von', 'y']);
+
+function isSuffixOrCredential(part: string): boolean {
+    return NAME_SUFFIXES.has(part.replace(/\./g, '').toLowerCase()) || CREDENTIAL_RE.test(part);
+}
 
 /**
  * Split a display name into vCard N parts. Handles PH card conventions:
  * "Engr. Maria Santos, REE, PEE" -> prefix "Engr.", given "Maria",
- * family "Santos", suffix "REE, PEE" (previously filed under last name "PEE").
+ * family "Santos", suffix "REE, PEE" (previously filed under last name "PEE");
+ * "Juan dela Cruz" -> family "dela Cruz"; "Santos, Maria" -> family "Santos".
  */
 export function splitPersonName(displayName: string): { prefix: string; given: string; family: string; suffix: string } {
-    const [main, ...afterComma] = displayName.split(',');
-    const suffixParts = afterComma.map(p => p.trim()).filter(Boolean);
+    const [main, ...afterCommaRaw] = displayName.split(',');
+    const afterComma = afterCommaRaw.map(p => p.trim()).filter(Boolean);
+    const allCredentials = afterComma.length > 0 && afterComma.every(p => p.split(/\s+/).every(isSuffixOrCredential));
+
+    // "Santos, Maria Cristina" (family-first) — comma part is not credentials.
+    if (afterComma.length > 0 && !allCredentials) {
+        const familyTokens = main.trim().split(/\s+/).filter(Boolean);
+        if (familyTokens.length <= 3) {
+            return { prefix: '', given: afterComma.join(' '), family: familyTokens.join(' '), suffix: '' };
+        }
+    }
+
+    const suffixParts = allCredentials ? [...afterComma] : [];
     const tokens = main.trim().split(/\s+/).filter(Boolean);
     const prefixes: string[] = [];
-    while (tokens.length > 1 && NAME_PREFIXES.has(tokens[0].replace(/\./g, '').toLowerCase())) {
+    // Only strip an honorific when at least two name tokens remain after it.
+    while (tokens.length > 2 && NAME_PREFIXES.has(tokens[0].replace(/\./g, '').toLowerCase())) {
         prefixes.push(tokens.shift() as string);
     }
     while (tokens.length > 2 && NAME_SUFFIXES.has(tokens[tokens.length - 1].replace(/\./g, '').toLowerCase())) {
         suffixParts.unshift(tokens.pop() as string);
     }
-    const family = tokens.length > 1 ? (tokens.pop() as string) : '';
-    return { prefix: prefixes.join(' '), given: tokens.join(' '), family, suffix: suffixParts.join(', ') };
+    if (tokens.length < 2) {
+        return { prefix: prefixes.join(' '), given: tokens.join(' '), family: '', suffix: suffixParts.join(', ') };
+    }
+    const familyParts = [tokens.pop() as string];
+    while (tokens.length > 1 && SURNAME_PARTICLES.has(tokens[tokens.length - 1].toLowerCase())) {
+        familyParts.unshift(tokens.pop() as string);
+    }
+    return { prefix: prefixes.join(' '), given: tokens.join(' '), family: familyParts.join(' '), suffix: suffixParts.join(', ') };
 }
 
 function contactExportRow(c: Contact, batchMap?: BatchMap) {

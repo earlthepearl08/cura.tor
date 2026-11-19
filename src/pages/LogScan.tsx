@@ -248,6 +248,14 @@ const LogScan: React.FC = () => {
         }
     };
 
+    /**
+     * Outer per-sheet timeout. Must exceed the 90s fetch timeout in
+     * callGeminiWithRetry: at 60s the page gave up on dense sheets that Gemini
+     * was still answering, the server charged the scan, and the silent retry
+     * charged another.
+     */
+    const LOG_SHEET_TIMEOUT_MS = 95_000;
+
     /** Wrap a promise with a hard timeout so we never get stuck */
     const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
         Promise.race([
@@ -286,7 +294,7 @@ const LogScan: React.FC = () => {
                 // 60-second hard timeout per sheet so we never get stuck
                 const result = await withTimeout(
                     ocrService.parseLogSheet(data, getParseOptions()),
-                    60000,
+                    LOG_SHEET_TIMEOUT_MS,
                     `Sheet ${i + 1}`
                 );
                 if (result.entries.length > 0) {
@@ -319,7 +327,7 @@ const LogScan: React.FC = () => {
                     const data = await compressForOCR(files[idx]);
                     const result = await withTimeout(
                         ocrService.parseLogSheet(data, getParseOptions()),
-                        60000,
+                        LOG_SHEET_TIMEOUT_MS,
                         `Sheet ${idx + 1} retry ${attempt}`
                     );
                     if (result.entries.length > 0) {
@@ -397,7 +405,7 @@ const LogScan: React.FC = () => {
         const MAX_SILENT_RETRIES = 2;
         for (let attempt = 0; attempt <= MAX_SILENT_RETRIES; attempt++) {
             try {
-                return await withTimeout(ocrService.parseLogSheet(base64Image, getParseOptions()), 60000, `Sheet attempt ${attempt + 1}`);
+                return await withTimeout(ocrService.parseLogSheet(base64Image, getParseOptions()), LOG_SHEET_TIMEOUT_MS, `Sheet attempt ${attempt + 1}`);
             } catch (err) {
                 console.log(`[LogScan] Attempt ${attempt + 1} failed:`, err);
                 if (attempt < MAX_SILENT_RETRIES) {

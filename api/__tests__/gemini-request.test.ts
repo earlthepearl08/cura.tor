@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeGeminiRequest, MAX_OUTPUT_TOKENS } from '../_lib/geminiRequest';
+import { sanitizeGeminiRequest, MAX_OUTPUT_TOKENS, TEXT_ONLY_MAX_OUTPUT_TOKENS, TEXT_ONLY_MAX_PROMPT_CHARS } from '../_lib/geminiRequest';
 
 const img = { inline_data: { mime_type: 'image/jpeg', data: 'AAAA' } };
 const ok = (extra: Record<string, unknown> = {}) => ({
@@ -30,8 +30,15 @@ describe('sanitizeGeminiRequest', () => {
     expect(r.body.generationConfig).not.toHaveProperty('candidateCount');
   });
 
-  it('rejects text-only requests (no free general-purpose LLM)', () => {
-    expect(sanitizeGeminiRequest({ contents: [{ parts: [{ text: 'write me an essay' }] }] }).ok).toBe(false);
+  it('allows text-only Reparse but caps prompt size and output tokens', () => {
+    const r = sanitizeGeminiRequest({ contents: [{ parts: [{ text: 'Parse this OCR text' }] }], generationConfig: { maxOutputTokens: 8192 } });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.body.generationConfig.maxOutputTokens).toBe(TEXT_ONLY_MAX_OUTPUT_TOKENS);
+      expect(r.body.contents).toEqual([{ role: 'user', parts: [{ text: 'Parse this OCR text' }] }]);
+    }
+    expect(sanitizeGeminiRequest({ contents: [{ parts: [{ text: 'x'.repeat(TEXT_ONLY_MAX_PROMPT_CHARS + 1) }] }] }).ok).toBe(false);
+    expect(sanitizeGeminiRequest({ contents: [{ parts: [img] }] }).ok).toBe(false);
   });
 
   it('rejects multi-turn conversations', () => {

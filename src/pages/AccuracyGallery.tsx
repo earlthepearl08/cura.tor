@@ -82,7 +82,7 @@ function SampleBlock({ sample }: { sample: GallerySample }) {
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Before · capture</p>
                         {sample.imageIsPlaceholder && (
                             <span className="text-[10px] font-semibold text-amber-400/90 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                                Placeholder image
+                                Illustrative
                             </span>
                         )}
                     </div>

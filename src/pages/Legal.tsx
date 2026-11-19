@@ -167,10 +167,9 @@ const TermsOfService = () => (
             you must verify parsed data before relying on it for outreach, CRM import, or compliance use.
         </P>
         <P>
-            Marketing pages and the in-app Accuracy gallery may show <strong className="text-slate-300">synthetic</strong>{' '}
-            fixtures and field-level scores. Those are labeled demo materials. They are not certified
-            benchmarks against your real cards, venues, or handwriting, and they do not expand the warranty
-            disclaimer below.
+            Example extractions shown on marketing pages and the /accuracy gallery are illustrative. They are
+            not certified benchmarks against your real cards, venues, or handwriting, and they do not expand
+            the warranty disclaimer below.
         </P>
         <P>
             Scan images are sent for processing as described in our Privacy Policy. We do not operate a

@@ -23,7 +23,7 @@ const ROUTES: Record<string, (req: VercelRequest, res: VercelResponse) => unknow
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const raw = req.query.action;
   const action = Array.isArray(raw) ? raw[0] : raw;
-  const route = action ? ROUTES[action] : undefined;
+  const route = action && Object.prototype.hasOwnProperty.call(ROUTES, action) ? ROUTES[action] : undefined;
   if (!route) {
     return res.status(404).json({ error: 'Not found' });
   }

@@ -65,8 +65,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Tier quota enforcement + atomic scan count increment
+  let quota: Awaited<ReturnType<typeof checkAndIncrementQuota>>;
   try {
-    const quota = await checkAndIncrementQuota(auth.uid);
+    quota = await checkAndIncrementQuota(auth.uid);
     if (!quota.ok) {
       if (quota.reason === 'quota-exceeded') {
         console.warn(JSON.stringify({
@@ -98,12 +99,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  const chargedPeriod = quota!.ok ? quota!.periodStartMs : undefined;
+
   // Get API key from environment variable (server-side only)
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
   if (!apiKey) {
     console.error('GEMINI_API_KEY / GOOGLE_API_KEY not found in environment variables');
-    await refundScan(auth.uid);
+    await refundScan(auth.uid, chargedPeriod);
     return res.status(500).json({ error: 'API key not configured.' });
   }
 
@@ -117,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (contents) {
       const sanitized = sanitizeGeminiRequest({ contents, generationConfig });
       if (!sanitized.ok) {
-        await refundScan(auth.uid);
+        await refundScan(auth.uid, chargedPeriod);
         return res.status(400).json({ error: 'Invalid request', reason: sanitized.error });
       }
       upstreamBody = sanitized.body;
@@ -125,7 +128,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       // Legacy mode: imageData + prompt. Routed through the same allowlist.
       if (typeof imageData !== 'string' || typeof prompt !== 'string') {
-        await refundScan(auth.uid);
+        await refundScan(auth.uid, chargedPeriod);
         return res.status(400).json({ error: 'Missing required fields' });
       }
       const sanitized = sanitizeGeminiRequest({
@@ -138,7 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         generationConfig: { temperature: 0.1, topK: 32, topP: 1, maxOutputTokens: 2048 },
       });
       if (!sanitized.ok) {
-        await refundScan(auth.uid);
+        await refundScan(auth.uid, chargedPeriod);
         return res.status(400).json({ error: 'Invalid request', reason: sanitized.error });
       }
       upstreamBody = sanitized.body;
@@ -158,7 +161,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const errorText = await response.text();
       console.error('Gemini API error:', response.status, errorText);
       logGeminiUpstreamError(response.status, errorText, mode);
-      await refundScan(auth.uid);
+      await refundScan(auth.uid, chargedPeriod);
       try {
         const errorData = JSON.parse(errorText);
         return res.status(response.status).json({ error: 'Gemini API request failed', details: errorData });
@@ -168,10 +171,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await response.json();
+    // 200 with no text (blocked prompt, MAX_TOKENS with no candidate): the
+    // client gets nothing usable and reports a failed scan, so don't charge it.
+    if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      logGeminiUpstreamError(200, JSON.stringify(data?.promptFeedback || data?.candidates?.[0]?.finishReason || 'empty'), `${mode}-empty`);
+      await refundScan(auth.uid, chargedPeriod);
+    }
     return res.status(200).json(data);
   } catch (error) {
     console.error('Server error:', error);
-    await refundScan(auth.uid);
+    await refundScan(auth.uid, chargedPeriod);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

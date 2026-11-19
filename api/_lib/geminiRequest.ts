@@ -9,6 +9,7 @@
  *
  * Accepted shape (exactly what the app sends today):
  *   contents: [{ parts: [{ text }, { inline_data: { mime_type, data } }] }]
+ *   or, for ContactReview "Reparse", a single bounded text part (no image)
  *   generationConfig: { temperature, maxOutputTokens, responseMimeType, responseSchema, topK, topP }
  */
 
@@ -17,6 +18,13 @@ export const MAX_PROMPT_CHARS = 40_000;
 /** base64 chars; ~3.3 MB decoded — client compresses to 2048px JPEG, well under this. */
 export const MAX_IMAGE_B64_CHARS = 4_500_000;
 export const MAX_SCHEMA_CHARS = 20_000;
+/**
+ * Text-only requests (ContactReview "Reparse" re-runs the parser on edited OCR
+ * text, no image) are allowed but tightly bounded so the endpoint can't serve
+ * as a general-purpose LLM: short prompt, small output, still charged a scan.
+ */
+export const TEXT_ONLY_MAX_PROMPT_CHARS = 16_000;
+export const TEXT_ONLY_MAX_OUTPUT_TOKENS = 1024;
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export type SanitizedGemini =
@@ -69,15 +77,18 @@ export function sanitizeGeminiRequest(input: { contents?: unknown; generationCon
     }
     return { ok: false, error: 'unsupported part type' };
   }
-  // Every Cura.tor flow sends an image; requiring one keeps this endpoint
-  // from doubling as a free text-only LLM.
-  if (text === null || image === null) {
-    return { ok: false, error: 'a prompt and an image are both required' };
+  if (text === null) {
+    return { ok: false, error: 'a prompt is required' };
+  }
+  const textOnly = image === null;
+  if (textOnly && text.length > TEXT_ONLY_MAX_PROMPT_CHARS) {
+    return { ok: false, error: 'prompt too long for a text-only request' };
   }
 
   const gc = (generationConfig && typeof generationConfig === 'object' ? generationConfig : {}) as any;
   const out: Record<string, unknown> = {
-    maxOutputTokens: clampNumber(gc.maxOutputTokens, 1, MAX_OUTPUT_TOKENS) ?? 2048,
+    maxOutputTokens: clampNumber(gc.maxOutputTokens, 1, textOnly ? TEXT_ONLY_MAX_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS)
+      ?? (textOnly ? TEXT_ONLY_MAX_OUTPUT_TOKENS : 2048),
   };
   const temperature = clampNumber(gc.temperature, 0, 1);
   if (temperature !== undefined) out.temperature = temperature;
@@ -104,7 +115,7 @@ export function sanitizeGeminiRequest(input: { contents?: unknown; generationCon
   return {
     ok: true,
     body: {
-      contents: [{ role: 'user', parts: [{ text }, { inline_data: image }] }],
+      contents: [{ role: 'user', parts: image ? [{ text }, { inline_data: image }] : [{ text }] }],
       generationConfig: out,
     },
   };

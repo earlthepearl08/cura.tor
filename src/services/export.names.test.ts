@@ -9,8 +9,18 @@ describe('splitPersonName (PH card conventions)', () => {
         });
     });
     it('handles Jr./III and multi-word given names', () => {
-        expect(splitPersonName('Juan Miguel dela Cruz Jr.')).toMatchObject({ given: 'Juan Miguel dela', family: 'Cruz', suffix: 'Jr.' });
+        expect(splitPersonName('Juan Miguel dela Cruz Jr.')).toMatchObject({ given: 'Juan Miguel', family: 'dela Cruz', suffix: 'Jr.' });
         expect(splitPersonName('Atty. Jose Rizal III')).toMatchObject({ prefix: 'Atty.', given: 'Jose', family: 'Rizal', suffix: 'III' });
+    });
+    it('keeps surname particles with the family name', () => {
+        expect(splitPersonName('Ma. Cristina de los Santos')).toMatchObject({ given: 'Ma. Cristina', family: 'de los Santos' });
+        expect(splitPersonName('Engr. Jose P. Rizal Jr., PEE')).toEqual({ prefix: 'Engr.', given: 'Jose P.', family: 'Rizal', suffix: 'Jr., PEE' });
+    });
+    it('treats "Family, Given" as a family-first name, not a suffix', () => {
+        expect(splitPersonName('Santos, Maria Cristina')).toEqual({ prefix: '', given: 'Maria Cristina', family: 'Santos', suffix: '' });
+    });
+    it('does not strip an honorific that is the only other token', () => {
+        expect(splitPersonName('Dr. Reyes')).toMatchObject({ given: 'Dr.', family: 'Reyes' });
     });
     it('single-token names stay as given name', () => {
         expect(splitPersonName('Madonna')).toEqual({ prefix: '', given: 'Madonna', family: '', suffix: '' });

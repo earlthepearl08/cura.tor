@@ -6,7 +6,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 /**
  * NOTE: `config.api.bodyParser` is a Next.js API-route option. Plain Vercel
  * Node functions ignore it — @vercel/node parses JSON lazily the first time
- * `req.body` is read. getRawBody() therefore reads the request stream itself
+ * `req.body` is read. getRawBody() therefore reads via data/end events
  * BEFORE anything touches `req.body`. Kept for clarity / Next compatibility.
  */
 export const config = {
@@ -36,28 +36,27 @@ function getAdminDb() {
 }
 
 /**
- * Read the exact bytes Stripe signed. Must not touch `req.body` first: on
- * Vercel that getter JSON-parses and consumes the stream, and a re-serialized
- * object never matches the signature (every live webhook would 400).
+ * Read the exact bytes Stripe signed.
+ *
+ * @vercel/node's helpers drain the IncomingMessage BEFORE the handler runs
+ * (readBody) and replay the original bytes only through `req.on('data'|'end')`
+ * (restoreBody -> PassThrough). `for await`, `readableEnded` and the lazy
+ * `req.body` getter all miss that replay; `req.body` for application/json is
+ * a parsed object whose re-serialization never matches the signature.
+ * So: listen for data/end (works with and without helpers), with a timeout.
  */
-export async function getRawBody(req: VercelRequest): Promise<Buffer> {
-  const stream = req as unknown as NodeJS.ReadableStream & { readableEnded?: boolean };
-  if (typeof stream.on === 'function' && !stream.readableEnded) {
+export function getRawBody(req: VercelRequest, timeoutMs = 10_000): Promise<Buffer> {
+  return new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
+    let settled = false;
+    const done = (fn: () => void) => { if (!settled) { settled = true; clearTimeout(timer); fn(); } };
+    const timer = setTimeout(() => done(() => reject(new Error('Timed out reading webhook body'))), timeoutMs);
+    req.on('data', (chunk: Buffer | string) => {
       chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array));
-    }
-    if (chunks.length) return Buffer.concat(chunks as unknown as Uint8Array[]);
-  }
-  // Stream already consumed (or a test double): fall back to whatever the runtime kept.
-  const body = (req as any).body;
-  if (Buffer.isBuffer(body)) return body;
-  if (typeof body === 'string') return Buffer.from(body);
-  if (body && typeof body === 'object') {
-    console.error('[stripe-webhook] Raw body unavailable — request was already JSON-parsed; signature check will fail.');
-    return Buffer.from(JSON.stringify(body));
-  }
-  return Buffer.alloc(0);
+    });
+    req.on('end', () => done(() => resolve(Buffer.concat(chunks as unknown as Uint8Array[]))));
+    req.on('error', (err: Error) => done(() => reject(err)));
+  });
 }
 
 /** Determine tier from a Stripe price ID using server-side env vars */
